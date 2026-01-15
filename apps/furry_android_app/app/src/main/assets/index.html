@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Furry Player</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #121218;
+        --card: #1e1e26;
+        --muted: #9a9aa2;
+        --text: #f0f0f0;
+        --accent: #ff6432;
+        --accent2: #32c8b4;
+        --border: #3c3c46;
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC",
+          "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      header {
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(30, 30, 38, 0.8);
+        position: sticky;
+        top: 0;
+        backdrop-filter: blur(10px);
+      }
+      h1 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 650;
+      }
+      main {
+        padding: 16px;
+        display: grid;
+        gap: 12px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      button {
+        appearance: none;
+        border: 1px solid var(--border);
+        background: #282833;
+        color: var(--text);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 14px;
+      }
+      button.primary {
+        border-color: transparent;
+        background: var(--accent);
+        color: #120f12;
+        font-weight: 650;
+      }
+      button.secondary {
+        border-color: transparent;
+        background: var(--accent2);
+        color: #081715;
+        font-weight: 650;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 12px;
+      }
+	      pre {
+	        white-space: pre-wrap;
+	        word-break: break-word;
+	        margin: 8px 0 0;
+	        max-height: 240px;
+	        overflow: auto;
+	        font-size: 12px;
+	        color: var(--muted);
+	      }
+    </style>
+  </head>
+  <body>
+    <header><h1>Furry Player（Android WebView）</h1></header>
+    <main>
+	      <div class="card">
+	        <div class="row">
+	          <button onclick="refreshOutputs()">刷新输出列表</button>
+	          <button onclick="stopPlayback()">停止播放</button>
+	        </div>
+	        <div class="muted">WebView 前端 + Rust JNI 后端（当前为最小可用的打包/播放/导出 .furry）。</div>
+	        <pre id="log"></pre>
+      </div>
+
+      <div class="card">
+        <h2 style="margin: 0 0 10px; font-size: 14px">打包（音频 → .furry）</h2>
+        <div class="row">
+          <button class="secondary" onclick="pickPackInput()">选择音频文件</button>
+          <button class="primary" onclick="startPack()">开始打包</button>
+        </div>
+        <div class="row" style="margin-top: 8px">
+          <label class="muted" for="padding">Padding(KB)</label>
+          <input
+            id="padding"
+            type="number"
+            min="0"
+            step="1"
+            value="0"
+            style="
+              width: 120px;
+              background: #101015;
+              border: 1px solid var(--border);
+              border-radius: 10px;
+              padding: 10px 12px;
+              color: var(--text);
+            "
+          />
+          <span class="muted" id="packInputInfo">未选择输入文件</span>
+        </div>
+      </div>
+
+	      <div class="card">
+	        <h2 style="margin: 0 0 10px; font-size: 14px">输出文件（仅 .furry）</h2>
+	        <div id="outputs" class="muted">（暂无）</div>
+	      </div>
+
+	      <div class="card">
+	        <h2 style="margin: 0 0 10px; font-size: 14px">播放器</h2>
+	        <div class="row">
+	          <button class="secondary" onclick="pickPlayAudio()">选择音频/.furry 播放</button>
+	          <span class="muted" id="playInputInfo">未选择播放文件</span>
+	        </div>
+	        <div class="row" style="margin-top: 10px">
+	          <button class="primary" onclick="pausePlayback()">暂停</button>
+	          <button class="secondary" onclick="resumePlayback()">继续</button>
+	          <button onclick="stopPlayback()">停止</button>
+	        </div>
+	        <div class="row" style="margin-top: 10px">
+          <input
+            id="seek"
+            type="range"
+            min="0"
+            max="0"
+            value="0"
+            style="flex: 1 1 auto"
+          />
+          <span class="muted" id="time">00:00 / 00:00</span>
+        </div>
+        <div class="muted" id="nowPlaying">状态：stopped</div>
+      </div>
+    </main>
+
+	    <script>
+	      const logEl = document.getElementById("log");
+	      const logLines = [];
+
+	      function formatBytes(bytes) {
+	        const n = Number(bytes);
+	        if (!isFinite(n)) return String(bytes);
+	        const abs = Math.abs(n);
+	        if (abs < 1024) return `${n} B`;
+	        if (abs < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+	        if (abs < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+	        return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
+	      }
+
+	      function playbackStateText(state) {
+	        switch (String(state || "").toLowerCase()) {
+	          case "preparing":
+	            return "准备中";
+	          case "playing":
+	            return "播放中";
+	          case "paused":
+	            return "已暂停";
+	          case "stopped":
+	            return "已停止";
+	          default:
+	            return state || "未知";
+	        }
+	      }
+
+	      function log(msg) {
+	        const ts = new Date().toLocaleTimeString();
+	        logLines.push(`[${ts}] ${msg}`);
+	        if (logLines.length > 200) logLines.shift();
+	        logEl.textContent = logLines.join("\n");
+	        logEl.scrollTop = logEl.scrollHeight;
+	      }
+
+		      const packInfoEl = document.getElementById("packInputInfo");
+		      const playInfoEl = document.getElementById("playInputInfo");
+		      const outputsEl = document.getElementById("outputs");
+	      const nowPlayingEl = document.getElementById("nowPlaying");
+	      const seekEl = document.getElementById("seek");
+	      const timeEl = document.getElementById("time");
+
+      let seekDragging = false;
+      seekEl.addEventListener("pointerdown", () => (seekDragging = true));
+      seekEl.addEventListener("pointerup", () => (seekDragging = false));
+      seekEl.addEventListener("change", () => {
+        try {
+          const ms = Number(seekEl.value || "0");
+          window.FurryBridge?.seekPlayback?.(String(isFinite(ms) ? ms : 0));
+        } catch (e) {
+          log(`seek error: ${String(e)}`);
+        }
+      });
+
+	      // Native -> Web 事件入口
+	      window.__nativeEmit = function (event, payload) {
+	        payload = payload ?? {};
+	        const logEvent = (() => {
+	          if (event === "outputsChanged") return null;
+	          if (event === "activityResultCanceled") return null;
+
+	          if (event === "packInputSelected") {
+	            if (payload.ok === false) {
+	              return payload.canceled
+	                ? "已取消选择待打包音频"
+	                : `选择待打包音频失败：${payload.error ?? "unknown"}`;
+	            }
+	            return `已选择待打包音频：${payload.name}（${formatBytes(payload.size)}）`;
+	          }
+
+		          if (event === "playInputSelected") {
+		            if (payload.ok === false) {
+		              return payload.canceled
+	                ? "已取消选择播放文件"
+	                : `选择播放文件失败：${payload.error ?? "unknown"}`;
+	            }
+		            const isFurry = payload.isFurry === true;
+		            return isFurry
+		              ? `已选择 .furry：${payload.name}（${formatBytes(payload.size)}），将解密后在内存播放（不生成文件）`
+		              : `已选择播放文件：${payload.name}（${formatBytes(payload.size)}）`;
+		          }
+
+	          if (event === "packStarted") {
+	            return `开始打包：${payload.input ?? ""}`.trim();
+	          }
+	          if (event === "packFinished") {
+	            if (payload.ok === true) {
+	              return `打包完成：${payload.outputName ?? ""}（${formatBytes(payload.outputSize)}）`.trim();
+	            }
+	            if (payload.canceled) return "打包已取消";
+	            if (payload.error) return `打包失败：${payload.error}`;
+	            if (payload.code != null) return `打包失败：code=${payload.code}`;
+	            return "打包失败";
+	          }
+
+	          if (event === "unpackStarted") {
+	            return `开始解包：${payload.input ?? ""}`.trim();
+	          }
+	          if (event === "unpackFinished") {
+	            if (payload.ok === true) {
+	              return `解包完成：${payload.outputName ?? ""}（${formatBytes(payload.outputSize)}）`.trim();
+	            }
+	            if (payload.canceled) return "解包已取消";
+	            if (payload.error) return `解包失败：${payload.error}`;
+	            if (payload.code != null) return `解包失败：code=${payload.code}`;
+	            return "解包失败";
+	          }
+
+	          if (event === "exportFinished") {
+	            if (payload.ok === true) return `导出完成：${payload.name ?? ""}`.trim();
+	            if (payload.canceled) return "已取消导出";
+	            if (payload.error) return `导出失败：${payload.error}`;
+	            return "导出失败";
+	          }
+
+	          if (event === "playbackPreparing") {
+	            return `准备播放：${payload.name ?? ""}`.trim();
+	          }
+	          if (event === "playbackPreparedFile") {
+	            return `已生成播放文件：${payload.name ?? ""}（${formatBytes(payload.size)}）`.trim();
+	          }
+	          if (event === "playbackStateChanged") {
+	            const st = playbackStateText(payload.state);
+	            const name = payload.name ? ` | ${payload.name}` : "";
+	            return `播放器：${st}${name}`;
+	          }
+	          if (event === "playbackEnded") {
+	            return `播放结束：${payload.name ?? ""}`.trim();
+	          }
+	          if (event === "playbackStopped") {
+	            return "已停止播放";
+	          }
+	          if (event === "playbackError") {
+	            const parts = [];
+	            if (payload.name) parts.push(payload.name);
+	            if (payload.error) parts.push(payload.error);
+	            if (payload.code != null) parts.push(`code=${payload.code}`);
+	            if (payload.what != null) parts.push(`what=${payload.what}`);
+	            if (payload.extra != null) parts.push(`extra=${payload.extra}`);
+	            return `播放失败：${parts.join(" | ") || "unknown"}`;
+	          }
+	          if (event === "activityResultError") {
+	            return `系统返回错误：${payload.error ?? "unknown"}`;
+	          }
+
+	          // fallback：避免刷屏，但保留可见性
+	          return `事件：${event}`;
+	        })();
+	        if (logEvent) log(logEvent);
+
+	        if (event === "packInputSelected") {
+	          if (payload.ok === false) {
+	            packInfoEl.textContent = payload.canceled
+	              ? "已取消选择输入文件"
+              : `选择失败：${payload.error ?? "unknown"}`;
+	          } else {
+	            packInfoEl.textContent = `输入：${payload.name}（${formatBytes(payload.size)}）`;
+	          }
+	        }
+			        if (event === "playInputSelected") {
+			          if (payload.ok === false) {
+			            playInfoEl.textContent = payload.canceled
+		              ? "已取消选择播放文件"
+		              : `选择失败：${payload.error ?? "unknown"}`;
+			          } else {
+			            const isFurry = payload.isFurry === true;
+			            playInfoEl.textContent = isFurry
+			              ? `.furry：${payload.name}（${formatBytes(payload.size)}，内存播放不生成文件）`
+			              : `播放文件：${payload.name}（${formatBytes(payload.size)}）`;
+			          }
+			        }
+		        if (event === "outputsChanged") {
+		          refreshOutputs();
+	        }
+	        if (event === "packFinished" || event === "unpackFinished") {
+          refreshOutputs();
+        }
+      };
+
+	      function pickPackInput() {
+	        try {
+	          window.FurryBridge?.pickPackInput?.();
+	        } catch (e) {
+	          log(`pickPackInput error: ${String(e)}`);
+        }
+      }
+
+	      function pickPlayAudio() {
+	        try {
+	          window.FurryBridge?.pickPlayAudio?.();
+	        } catch (e) {
+	          log(`pickPlayAudio error: ${String(e)}`);
+	        }
+	      }
+
+	      function startPack() {
+	        try {
+	          const kb = Number(document.getElementById("padding").value || "0");
+	          window.FurryBridge?.startPack?.(String(isFinite(kb) ? kb : 0));
+	        } catch (e) {
+          log(`startPack error: ${String(e)}`);
+        }
+      }
+
+      function stopPlayback() {
+        try {
+          window.FurryBridge?.stopPlayback?.();
+        } catch (e) {
+          log(`stopPlayback error: ${String(e)}`);
+        }
+      }
+
+      function pausePlayback() {
+        try {
+          window.FurryBridge?.pausePlayback?.();
+        } catch (e) {
+          log(`pausePlayback error: ${String(e)}`);
+        }
+      }
+
+      function resumePlayback() {
+        try {
+          window.FurryBridge?.resumePlayback?.();
+        } catch (e) {
+          log(`resumePlayback error: ${String(e)}`);
+        }
+      }
+
+      function refreshOutputs() {
+        try {
+          const raw = window.FurryBridge?.listOutputs?.() ?? "[]";
+          const list = JSON.parse(raw);
+          renderOutputs(list);
+        } catch (e) {
+          outputsEl.textContent = `读取输出列表失败：${String(e)}`;
+        }
+      }
+
+	      function renderOutputs(list) {
+	        if (!Array.isArray(list) || list.length === 0) {
+	          outputsEl.textContent = "（暂无）";
+	          return;
+	        }
+	        outputsEl.innerHTML = "";
+	        for (const item of list) {
+          const row = document.createElement("div");
+          row.style.cssText =
+            "display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--border)";
+
+	          const name = document.createElement("div");
+	          name.style.cssText = "flex: 1 1 auto; min-width: 120px; color: var(--text)";
+	          name.textContent = `${item.name} (${formatBytes(item.size)})`;
+
+          const btnPlay = document.createElement("button");
+          btnPlay.textContent = "播放";
+          btnPlay.onclick = () => window.FurryBridge?.playOutput?.(item.name);
+
+          const btnExport = document.createElement("button");
+          btnExport.textContent = "导出";
+          btnExport.onclick = () => window.FurryBridge?.exportOutput?.(item.name);
+
+          const btnDelete = document.createElement("button");
+          btnDelete.textContent = "删除";
+          btnDelete.onclick = () => window.FurryBridge?.deleteOutput?.(item.name);
+
+	          const ext = String(item.name || "").split(".").pop().toLowerCase();
+	          row.appendChild(name);
+	          row.appendChild(btnPlay);
+	          row.appendChild(btnExport);
+	          row.appendChild(btnDelete);
+	          outputsEl.appendChild(row);
+	        }
+	      }
+
+      // 初次加载
+      refreshOutputs();
+
+      function formatTime(ms) {
+        const s = Math.max(0, Math.floor(ms / 1000));
+        const m = Math.floor(s / 60);
+        const ss = String(s % 60).padStart(2, "0");
+        return `${String(m).padStart(2, "0")}:${ss}`;
+      }
+
+	      function updatePlaybackState() {
+	        try {
+	          const raw = window.FurryBridge?.getPlaybackState?.();
+	          if (!raw) return;
+	          const st = JSON.parse(raw);
+	          const state = st.state || "stopped";
+	          const name = st.name || "";
+          const pos = Number(st.positionMs || 0);
+          const dur = Number(st.durationMs || 0);
+
+	          const stText = playbackStateText(state);
+	          nowPlayingEl.textContent = name ? `状态：${stText} | ${name}` : `状态：${stText}`;
+	          timeEl.textContent = `${formatTime(pos)} / ${formatTime(dur)}`;
+
+          if (!seekDragging) {
+            seekEl.max = String(Math.max(dur, 0));
+            seekEl.value = String(Math.min(Math.max(pos, 0), Math.max(dur, 0)));
+          }
+        } catch (e) {
+          // 失败时不刷屏
+        }
+      }
+
+      setInterval(updatePlaybackState, 500);
+    </script>
+  </body>
+</html>

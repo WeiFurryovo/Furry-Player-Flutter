@@ -1,0 +1,14 @@
+[package]
+name = "furry_gui"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+eframe.workspace = true
+egui.workspace = true
+furry_crypto = { path = "../../crates/furry_crypto" }
+furry_converter = { path = "../../crates/furry_converter" }
+furry_player = { path = "../../crates/furry_player" }
+crossbeam-channel.workspace = true
+rfd = "0.14"

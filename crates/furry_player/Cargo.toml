@@ -1,0 +1,13 @@
+[package]
+name = "furry_player"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+cpal.workspace = true
+crossbeam-channel.workspace = true
+furry_crypto = { path = "../furry_crypto" }
+furry_format = { path = "../furry_format" }
+symphonia.workspace = true
+thiserror.workspace = true

@@ -1,0 +1,11 @@
+[package]
+name = "furry_converter"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+furry_crypto = { path = "../furry_crypto" }
+furry_format = { path = "../furry_format" }
+thiserror.workspace = true
+getrandom.workspace = true

@@ -1,0 +1,41 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/furry_crypto",
+    "crates/furry_format",
+    "crates/furry_player",
+    "crates/furry_converter",
+    "apps/furry_gui",
+    "apps/furry_cli",
+    "apps/furry_android",
+]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+# 加密
+aes-gcm = "0.10"
+hkdf = "0.12"
+sha2 = "0.10"
+blake3 = "1.5"
+zeroize = "1.7"
+getrandom = "0.2"
+
+# 格式
+byteorder = "1.5"
+crc32fast = "1.4"
+
+# 音频
+symphonia = { version = "0.5", features = ["mp3", "ogg", "flac", "wav"] }
+cpal = "0.15"
+
+# GUI
+eframe = "0.29"
+egui = "0.29"
+
+# 工具
+thiserror = "2.0"
+crossbeam-channel = "0.5"

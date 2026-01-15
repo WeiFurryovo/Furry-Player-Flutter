@@ -1,0 +1,11 @@
+[package]
+name = "furry_format"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+byteorder.workspace = true
+crc32fast.workspace = true
+furry_crypto = { path = "../furry_crypto" }
+thiserror.workspace = true
