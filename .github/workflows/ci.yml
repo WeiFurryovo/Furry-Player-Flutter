@@ -27,21 +27,24 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Flutter doctor
+        run: flutter doctor -v || true
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1
-        id: setup-ndk
-        with:
-          ndk-version: "26.1.10909125"
+      - name: Install Android NDK (sdkmanager)
+        run: |
+          set -euxo pipefail
+          sdkmanager --install "ndk;26.1.10909125"
+          yes | sdkmanager --licenses >/dev/null
 
       - name: Build debug APK (no signing secrets needed)
         env:
-          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
         run: |
           set -euxo pipefail
           ./apps/furry_flutter/create_flutter_app.sh --no-ffi
@@ -77,13 +80,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             clang cmake ninja-build pkg-config \
-            libgtk-3-dev libblkid-dev liblzma-dev
+            libgtk-3-dev libblkid-dev liblzma-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
+
+      - name: Flutter doctor
+        run: flutter doctor -v || true
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -126,6 +133,11 @@ jobs:
         with:
           channel: stable
           cache: true
+
+      - name: Flutter doctor
+        shell: pwsh
+        run: |
+          flutter doctor -v
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -180,4 +192,3 @@ jobs:
           path: |
             dist/desktop/flutter/windows/furry_flutter_windows.zip
             dist/desktop/flutter/windows/SHA256SUMS.txt
-
