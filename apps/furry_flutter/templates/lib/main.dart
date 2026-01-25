@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'furry_api.dart';
 import 'furry_api_selector.dart';
+import 'in_memory_audio_source.dart';
 import 'system_media_bridge.dart';
 
 Future<void> main() async {
@@ -363,11 +364,18 @@ class _AppController {
         );
         appendLog('Unpacking .furry → $outExt…');
         final rc = await api.unpackToFile(inputPath: file.path, outputPath: outPath);
-        if (rc != 0) {
-          appendLog('Unpack failed: rc=$rc');
-          return;
+        File? unpacked;
+        if (rc == 0) {
+          final f = File(outPath);
+          if (await f.exists()) {
+            unpacked = f;
+          } else {
+            appendLog('Unpack ok but output missing: $outPath');
+          }
+        } else {
+          appendLog('Unpack-to-file failed: rc=$rc (fallback to bytes)');
         }
-        final unpacked = File(outPath);
+
         final meta = await getMetaPreviewForFurry(file);
         final artUri = await _writeCoverToTempUri(meta);
         final mediaItem = MediaItem(
@@ -376,7 +384,18 @@ class _AppController {
           artist: meta.subtitle,
           artUri: artUri,
         );
-        await player.setAudioSource(AudioSource.uri(unpacked.uri, tag: mediaItem));
+        if (unpacked != null) {
+          await player.setAudioSource(AudioSource.uri(unpacked.uri, tag: mediaItem));
+        } else {
+          final bytes = await api.unpackFromFurryToBytes(inputPath: file.path);
+          if (bytes == null) {
+            appendLog('Unpack-to-bytes failed: null');
+            return;
+          }
+          await player.setAudioSource(
+            InMemoryAudioSource(bytes: bytes),
+          );
+        }
         await player.play();
         nowPlaying.value = _NowPlaying(
           title: meta.title.isEmpty ? name : meta.title,
@@ -392,7 +411,11 @@ class _AppController {
             duration: player.duration,
           ),
         );
-        appendLog('Playing (.furry → $originalExt): ${p.basename(unpacked.path)}');
+        if (unpacked != null) {
+          appendLog('Playing (.furry → $originalExt): ${p.basename(unpacked.path)}');
+        } else {
+          appendLog('Playing (.furry → $originalExt): in-memory');
+        }
       } else {
         final mediaItem = MediaItem(
           id: file.path,
@@ -414,8 +437,8 @@ class _AppController {
         );
         appendLog('Playing (raw): $name');
       }
-    } catch (e) {
-      appendLog('Play failed: $e');
+    } catch (e, st) {
+      appendLog('Play failed: $e\n$st');
     }
   }
 
