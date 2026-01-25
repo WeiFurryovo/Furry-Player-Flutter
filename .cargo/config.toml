@@ -1,0 +1,21 @@
+# Cargo 交叉编译配置
+
+# Windows x86_64 (GNU)
+[target.x86_64-pc-windows-gnu]
+linker = "x86_64-w64-mingw32-gcc"
+
+# Windows x86_64 (MSVC) - 需要 Wine + MSVC
+[target.x86_64-pc-windows-msvc]
+# 使用 xwin 或 cargo-xwin
+
+# Android ARM64
+[target.aarch64-linux-android]
+linker = "aarch64-linux-android21-clang"
+
+# Android ARMv7
+[target.armv7-linux-androideabi]
+linker = "armv7a-linux-androideabi21-clang"
+
+# Android x86_64 (模拟器)
+[target.x86_64-linux-android]
+linker = "x86_64-linux-android21-clang"

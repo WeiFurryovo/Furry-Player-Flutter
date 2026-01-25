@@ -1,0 +1,22 @@
+.ace-tool/
+.git/
+.gitdir/
+
+# Rust
+/target/
+**/*.rs.bk
+
+# Build outputs
+/dist/
+**/build/
+
+# Android / Gradle
+**/.gradle/
+**/local.properties
+**/*.iml
+.idea/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
