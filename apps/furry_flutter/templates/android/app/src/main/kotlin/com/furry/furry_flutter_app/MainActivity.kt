@@ -10,6 +10,17 @@ class MainActivity : FlutterActivity() {
   private val channelName = "furry/native"
   private var inited = false
 
+  private fun <T> runAsync(result: MethodChannel.Result, block: () -> T) {
+    Thread {
+      try {
+        val v = block()
+        runOnUiThread { result.success(v) }
+      } catch (t: Throwable) {
+        runOnUiThread { result.error("native_error", t.toString(), null) }
+      }
+    }.start()
+  }
+
   override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
     super.configureFlutterEngine(flutterEngine)
     MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
@@ -40,7 +51,7 @@ class MainActivity : FlutterActivity() {
         val inputPath = call.argument<String>("inputPath") ?: ""
         val outputPath = call.argument<String>("outputPath") ?: ""
         val paddingKb = call.argument<Number>("paddingKb")?.toLong() ?: 0L
-        result.success(NativeLib.packToFurry(inputPath, outputPath, paddingKb))
+        runAsync(result) { NativeLib.packToFurry(inputPath, outputPath, paddingKb) }
       }
 
       "isValidFurryFile" -> {
@@ -58,7 +69,14 @@ class MainActivity : FlutterActivity() {
       "unpackFromFurryToBytes" -> {
         ensureInit()
         val inputPath = call.argument<String>("inputPath") ?: ""
-        result.success(NativeLib.unpackFromFurryToBytes(inputPath))
+        runAsync(result) { NativeLib.unpackFromFurryToBytes(inputPath) }
+      }
+
+      "unpackToFile" -> {
+        ensureInit()
+        val inputPath = call.argument<String>("inputPath") ?: ""
+        val outputPath = call.argument<String>("outputPath") ?: ""
+        runAsync(result) { NativeLib.unpackToFile(inputPath, outputPath) }
       }
 
       "getTagsJson" -> {

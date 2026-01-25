@@ -10,7 +10,6 @@ import 'package:path_provider/path_provider.dart';
 
 import 'furry_api.dart';
 import 'furry_api_selector.dart';
-import 'in_memory_audio_source.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -119,11 +118,49 @@ class _AppController {
   Future<void> init() async {
     try {
       await api.init();
+      await cleanupTempArtifacts();
       await refreshOutputs();
       appendLog('Native init ok');
     } catch (e) {
       appendLog('Native init failed: $e');
     }
+  }
+
+  Future<void> cleanupTempArtifacts() async {
+    try {
+      final tmp = await getTemporaryDirectory();
+
+      // Cleanup unpacked audio files from `.furry` (keep recent ones).
+      final unpackDir = Directory(p.join(tmp.path, 'furry_unpacked'));
+      if (await unpackDir.exists()) {
+        final files = unpackDir.listSync().whereType<File>().toList()
+          ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+        const keep = 12;
+        final cutoff = DateTime.now().subtract(const Duration(days: 2));
+        for (var i = 0; i < files.length; i++) {
+          final f = files[i];
+          final m = f.lastModifiedSync();
+          if (i >= keep || m.isBefore(cutoff)) {
+            try {
+              await f.delete();
+            } catch (_) {}
+          }
+        }
+      }
+
+      // Cleanup imported temp files created from picker streams/bytes.
+      final rootFiles = tmp.listSync().whereType<File>().toList();
+      final importCutoff = DateTime.now().subtract(const Duration(days: 2));
+      for (final f in rootFiles) {
+        final base = p.basename(f.path);
+        if (!base.startsWith('import_')) continue;
+        if (f.lastModifiedSync().isBefore(importCutoff)) {
+          try {
+            await f.delete();
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
   }
 
   void dispose() {
@@ -155,21 +192,48 @@ class _AppController {
     return out;
   }
 
+  Future<File> writePickedStreamToTemp({
+    required String filenameHint,
+    required Stream<List<int>> stream,
+  }) async {
+    final tmp = await getTemporaryDirectory();
+    final safeName = filenameHint.isEmpty ? 'input.bin' : filenameHint;
+    final out = File(p.join(tmp.path, 'import_${DateTime.now().millisecondsSinceEpoch}_$safeName'));
+    final sink = out.openWrite();
+    await sink.addStream(stream);
+    await sink.flush();
+    await sink.close();
+    return out;
+  }
+
+  Future<File?> materializePickedFile(PlatformFile file) async {
+    final path = file.path;
+    if (path != null && path.isNotEmpty) return File(path);
+    if (file.readStream != null) {
+      return writePickedStreamToTemp(filenameHint: file.name, stream: file.readStream!);
+    }
+    if (file.bytes != null) {
+      return writePickedBytesToTemp(filenameHint: file.name, bytes: file.bytes!);
+    }
+    return null;
+  }
+
   Future<void> pickForPack() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.audio,
-      withData: true,
+      withData: false,
+      withReadStream: true,
     );
     final file = result?.files.single;
     if (file == null) return;
-    if (file.bytes == null) {
-      appendLog('Pick failed: bytes is null (try a different picker / storage)');
+    final realFile = await materializePickedFile(file);
+    if (realFile == null) {
+      appendLog('Pick failed: file path/stream unavailable (try a different picker / storage)');
       return;
     }
-    final tmp = await writePickedBytesToTemp(filenameHint: file.name, bytes: file.bytes!);
-    pickedForPack = tmp;
-    pickedForPackName = file.name;
-    appendLog('Picked for pack: ${file.name} (${file.size} bytes)');
+    pickedForPack = realFile;
+    pickedForPackName = file.name.isEmpty ? p.basename(realFile.path) : file.name;
+    appendLog('Picked for pack: ${pickedForPackName!}');
   }
 
   Future<void> startPack() async {
@@ -212,32 +276,18 @@ class _AppController {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['mp3', 'wav', 'ogg', 'flac', 'furry'],
-      withData: true,
+      withData: false,
+      withReadStream: true,
     );
     final file = result?.files.single;
     if (file == null) return null;
-    if (file.bytes == null) {
-      appendLog('Pick failed: bytes is null (try a different picker / storage)');
+    final realFile = await materializePickedFile(file);
+    if (realFile == null) {
+      appendLog('Pick failed: file path/stream unavailable (try a different picker / storage)');
       return null;
     }
-    final tmp = await writePickedBytesToTemp(filenameHint: file.name, bytes: file.bytes!);
-    appendLog('Picked for play: ${file.name} (${file.size} bytes)');
-    return tmp;
-  }
-
-  String? _mimeFromExt(String ext) {
-    switch (ext.toLowerCase()) {
-      case 'mp3':
-        return 'audio/mpeg';
-      case 'wav':
-        return 'audio/wav';
-      case 'ogg':
-        return 'audio/ogg';
-      case 'flac':
-        return 'audio/flac';
-      default:
-        return null;
-    }
+    appendLog('Picked for play: ${file.name.isEmpty ? p.basename(realFile.path) : file.name}');
+    return realFile;
   }
 
   Future<void> playFile({
@@ -250,16 +300,24 @@ class _AppController {
       final isFurry = ext == '.furry' || await api.isValidFurryFile(filePath: file.path);
 
       if (isFurry) {
-        appendLog('Unpacking .furry to bytes…');
+        await cleanupTempArtifacts();
         final originalExt = await api.getOriginalFormat(filePath: file.path);
-        final bytes = await api.unpackFromFurryToBytes(inputPath: file.path);
-        if (bytes == null) {
-          appendLog('Unpack failed: null');
+        final tmp = await getTemporaryDirectory();
+        final outDir = Directory(p.join(tmp.path, 'furry_unpacked'));
+        if (!await outDir.exists()) await outDir.create(recursive: true);
+        final outExt = originalExt.trim().isEmpty ? 'bin' : originalExt.trim();
+        final outPath = p.join(
+          outDir.path,
+          'unpacked_${file.path.hashCode}_${DateTime.now().millisecondsSinceEpoch}.$outExt',
+        );
+        appendLog('Unpacking .furry → $outExt…');
+        final rc = await api.unpackToFile(inputPath: file.path, outputPath: outPath);
+        if (rc != 0) {
+          appendLog('Unpack failed: rc=$rc');
           return;
         }
-        await player.setAudioSource(
-          InMemoryAudioSource(bytes: bytes, contentType: _mimeFromExt(originalExt)),
-        );
+        final unpacked = File(outPath);
+        await player.setAudioSource(AudioSource.uri(unpacked.uri));
         await player.play();
         final meta = await getMetaPreviewForFurry(file);
         nowPlaying.value = _NowPlaying(
@@ -267,7 +325,7 @@ class _AppController {
           subtitle: meta.subtitle.isEmpty ? '.furry → $originalExt' : meta.subtitle,
           sourcePath: file.path,
         );
-        appendLog('Playing (.furry → $originalExt), ${bytes.length} bytes');
+        appendLog('Playing (.furry → $originalExt): ${p.basename(unpacked.path)}');
       } else {
         await player.setAudioSource(AudioSource.uri(file.uri));
         await player.play();

@@ -181,6 +181,48 @@ pub unsafe extern "C" fn furry_unpack_from_furry_to_bytes(
     0
 }
 
+/// Decrypts `.furry` and writes decrypted bytes into `output_path`.
+/// Returns 0 on success.
+///
+/// # Safety
+/// - `input_path` and `output_path` must be valid NUL-terminated C string pointers (or NULL).
+#[no_mangle]
+pub unsafe extern "C" fn furry_unpack_from_furry_to_file(
+    input_path: *const c_char,
+    output_path: *const c_char,
+) -> c_int {
+    let input_path = match cstr_to_path(input_path) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
+    let output_path = match cstr_to_path(output_path) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
+
+    let mut input = match File::open(&input_path) {
+        Ok(f) => f,
+        Err(_) => return -23,
+    };
+
+    if let Some(parent) = output_path.parent() {
+        if std::fs::create_dir_all(parent).is_err() {
+            return -24;
+        }
+    }
+
+    let mut output = match File::create(&output_path) {
+        Ok(f) => f,
+        Err(_) => return -25,
+    };
+
+    let master_key = MasterKey::default_key();
+    match unpack_from_furry(&mut input, &mut output, &master_key) {
+        Ok(_) => 0,
+        Err(_) => -26,
+    }
+}
+
 /// Returns embedded tags JSON (UTF-8) from `.furry` META chunk.
 /// On success returns 0 and sets `*out_ptr`/`*out_len`. Caller must call `furry_free_bytes`.
 ///

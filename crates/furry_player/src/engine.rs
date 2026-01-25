@@ -66,14 +66,13 @@ struct EngineState {
     playback_state: PlaybackState,
     current_track: Option<LoadedTrack>,
     volume: f32,
+    position_base: Duration,
     last_position_update: std::time::Instant,
 }
 
 struct LoadedTrack {
-    path: PathBuf,
     decoder: AudioDecoder,
     output: AudioOutput,
-    duration: Duration,
 }
 
 impl EngineState {
@@ -84,6 +83,7 @@ impl EngineState {
             playback_state: PlaybackState::Idle,
             current_track: None,
             volume: 1.0,
+            position_base: Duration::ZERO,
             last_position_update: std::time::Instant::now(),
         }
     }
@@ -117,6 +117,7 @@ impl EngineState {
 
     fn load_track(&mut self, path: PathBuf) {
         self.set_state(PlaybackState::Loading);
+        self.position_base = Duration::ZERO;
 
         // 停止当前播放
         if let Some(track) = self.current_track.take() {
@@ -189,12 +190,7 @@ impl EngineState {
         let _ = self.evt_tx.send(PlayerEvent::TrackInfo(track_info));
         let _ = self.evt_tx.send(PlayerEvent::Duration(duration));
 
-        self.current_track = Some(LoadedTrack {
-            path,
-            decoder,
-            output,
-            duration,
-        });
+        self.current_track = Some(LoadedTrack { decoder, output });
 
         self.set_state(PlaybackState::Paused);
     }
@@ -221,6 +217,7 @@ impl EngineState {
         if let Some(track) = self.current_track.take() {
             track.output.set_playing(false);
         }
+        self.position_base = Duration::ZERO;
         self.set_state(PlaybackState::Stopped);
     }
 
@@ -232,6 +229,7 @@ impl EngineState {
                     .send(PlayerEvent::Error(format!("Seek error: {}", e)));
             } else {
                 track.output.reset_position();
+                self.position_base = pos;
                 let _ = self.evt_tx.send(PlayerEvent::Position(pos));
             }
         }
@@ -270,9 +268,8 @@ impl EngineState {
         if self.last_position_update.elapsed() >= Duration::from_millis(100) {
             if let Some(track) = &self.current_track {
                 let pos = track.output.position();
-                let _ = self
-                    .evt_tx
-                    .send(PlayerEvent::Position(Duration::from_secs_f64(pos)));
+                let pos = self.position_base + Duration::from_secs_f64(pos);
+                let _ = self.evt_tx.send(PlayerEvent::Position(pos));
             }
             self.last_position_update = std::time::Instant::now();
         }

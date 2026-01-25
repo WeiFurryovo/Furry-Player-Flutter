@@ -39,8 +39,6 @@ pub struct VirtualAudioStream {
 }
 
 struct ChunkCache {
-    /// chunk 索引
-    index: usize,
     /// 解密后的数据
     data: Vec<u8>,
     /// 该 chunk 的虚拟起始偏移
@@ -119,7 +117,6 @@ impl VirtualAudioStream {
             let data = self.reader.read_chunk(entry)?;
 
             self.current_chunk = Some(ChunkCache {
-                index: chunk_idx,
                 data,
                 virtual_start: entry.virtual_offset,
             });

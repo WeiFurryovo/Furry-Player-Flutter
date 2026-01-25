@@ -145,6 +145,72 @@ pub extern "system" fn Java_com_furry_furry_1flutter_1app_NativeLib_unpackFromFu
     unpack_from_furry_to_bytes_impl(&mut env, input_path)
 }
 
+/// JNI: 解密 `.furry` 到文件
+///
+/// @param inputPath 输入 .furry 文件路径
+/// @param outputPath 输出原始音频文件路径
+/// @return 0 成功，负数失败
+#[no_mangle]
+pub extern "system" fn Java_com_furry_player_NativeLib_unpackToFile<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    input_path: JString<'local>,
+    output_path: JString<'local>,
+) -> jint {
+    unpack_to_file_impl(&mut env, input_path, output_path)
+}
+
+/// JNI: 解密 `.furry` 到文件（Flutter 模板包名：com.furry.furry_flutter_app.NativeLib）
+#[no_mangle]
+pub extern "system" fn Java_com_furry_furry_1flutter_1app_NativeLib_unpackToFile<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    input_path: JString<'local>,
+    output_path: JString<'local>,
+) -> jint {
+    unpack_to_file_impl(&mut env, input_path, output_path)
+}
+
+fn unpack_to_file_impl(
+    env: &mut JNIEnv<'_>,
+    input_path: JString<'_>,
+    output_path: JString<'_>,
+) -> jint {
+    let input_str: String = match env.get_string(&input_path) {
+        Ok(s) => s.into(),
+        Err(_) => return -60,
+    };
+    let output_str: String = match env.get_string(&output_path) {
+        Ok(s) => s.into(),
+        Err(_) => return -61,
+    };
+
+    let input_path = PathBuf::from(input_str);
+    let output_path = PathBuf::from(output_str);
+
+    let mut input = match File::open(&input_path) {
+        Ok(f) => f,
+        Err(_) => return -62,
+    };
+
+    if let Some(parent) = output_path.parent() {
+        if std::fs::create_dir_all(parent).is_err() {
+            return -63;
+        }
+    }
+
+    let mut output = match File::create(&output_path) {
+        Ok(f) => f,
+        Err(_) => return -64,
+    };
+
+    let master_key = MasterKey::default_key();
+    match unpack_from_furry(&mut input, &mut output, &master_key) {
+        Ok(_) => 0,
+        Err(_) => -65,
+    }
+}
+
 fn unpack_from_furry_to_bytes_impl(env: &mut JNIEnv<'_>, input_path: JString<'_>) -> jbyteArray {
     let input_str: String = match env.get_string(&input_path) {
         Ok(s) => s.into(),

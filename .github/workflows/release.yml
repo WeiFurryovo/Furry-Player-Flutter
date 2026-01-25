@@ -79,6 +79,7 @@ jobs:
           storeFile=upload-keystore.jks
           EOF
 
+          flutter analyze
           flutter build apk --release --verbose
           flutter build appbundle --release --verbose
 
@@ -137,8 +138,10 @@ jobs:
           cargo build --release -p furry_ffi -v
           cd apps/furry_flutter/furry_flutter_app
           flutter config --enable-linux-desktop
+          flutter analyze
           flutter build linux --release --verbose
-          cp -f ../../../target/release/libfurry_ffi.so build/linux/x64/release/bundle/ || true
+          cp -f ../../../target/release/libfurry_ffi.so build/linux/x64/release/bundle/
+          test -f build/linux/x64/release/bundle/libfurry_ffi.so
 
           mkdir -p ../../../dist/desktop/flutter/linux
           tar -C build/linux/x64/release -czf ../../../dist/desktop/flutter/linux/furry_flutter_linux.tar.gz bundle
@@ -207,16 +210,22 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $env:RUST_BACKTRACE = "1"
+          $root = (Get-Location).Path
           cargo --version
           rustc --version
           cargo build --release -p furry_ffi -v
           cd apps/furry_flutter/furry_flutter_app
           flutter config --enable-windows-desktop
+          flutter analyze
           flutter build windows --release --verbose
 
           New-Item -ItemType Directory -Force -Path ..\..\..\dist\desktop\flutter\windows | Out-Null
-          Copy-Item -Force ..\..\..\target\release\furry_ffi.dll build\windows\x64\runner\Release\ -ErrorAction SilentlyContinue
+          $dllSrc = Join-Path $root "target\\release\\furry_ffi.dll"
+          if (!(Test-Path $dllSrc)) { throw "Missing furry_ffi.dll at: $dllSrc" }
+          Copy-Item -Force $dllSrc build\windows\x64\runner\Release\
+          if (!(Test-Path "build\\windows\\x64\\runner\\Release\\furry_ffi.dll")) { throw "Failed to copy furry_ffi.dll into Release folder" }
           Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath ..\..\..\dist\desktop\flutter\windows\furry_flutter_windows.zip -Force
+          if (!(Test-Path "..\\..\\..\\dist\\desktop\\flutter\\windows\\furry_flutter_windows.zip")) { throw "Failed to create zip bundle" }
 
       - name: Checksums
         shell: pwsh

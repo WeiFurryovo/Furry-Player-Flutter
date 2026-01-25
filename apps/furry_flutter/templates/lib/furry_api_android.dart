@@ -32,6 +32,15 @@ class FurryApiAndroid implements FurryApi {
   }
 
   @override
+  Future<int> unpackToFile({required String inputPath, required String outputPath}) async {
+    final rc = await _channel.invokeMethod<int>('unpackToFile', {
+      'inputPath': inputPath,
+      'outputPath': outputPath,
+    });
+    return rc ?? -999;
+  }
+
+  @override
   Future<bool> isValidFurryFile({required String filePath}) async {
     final ok = await _channel.invokeMethod<bool>('isValidFurryFile', {
       'filePath': filePath,

@@ -11,6 +11,9 @@ abstract class FurryApi {
 
   Future<Uint8List?> unpackFromFurryToBytes({required String inputPath});
 
+  /// Decrypts `.furry` to a file, returns 0 on success.
+  Future<int> unpackToFile({required String inputPath, required String outputPath});
+
   Future<bool> isValidFurryFile({required String filePath});
 
   Future<String> getOriginalFormat({required String filePath});

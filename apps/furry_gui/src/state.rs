@@ -54,16 +54,11 @@ pub struct AppState {
     converter_evt_rx: Receiver<ConverterEvent>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum ConverterTab {
+    #[default]
     Pack,
     Unpack,
-}
-
-impl Default for ConverterTab {
-    fn default() -> Self {
-        Self::Pack
-    }
 }
 
 #[derive(Debug, Clone)]
