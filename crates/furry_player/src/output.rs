@@ -2,12 +2,13 @@
 //!
 //! 使用 cpal 进行音频播放
 
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, SampleFormat, Stream, StreamConfig};
-use crossbeam_channel::{Receiver, Sender, bounded};
+use crossbeam_channel::{Sender, bounded};
 
 /// 音频输出错误
 #[derive(thiserror::Error, Debug)]
@@ -167,34 +168,49 @@ impl AudioOutput {
 
 /// 简单的环形缓冲区
 struct RingBuffer {
-    buffer: std::sync::Mutex<Vec<f32>>,
+    buffer: std::sync::Mutex<VecDeque<f32>>,
     capacity: usize,
 }
 
 impl RingBuffer {
     fn new(capacity: usize) -> Self {
         Self {
-            buffer: std::sync::Mutex::new(Vec::with_capacity(capacity)),
+            buffer: std::sync::Mutex::new(VecDeque::with_capacity(capacity)),
             capacity,
         }
     }
 
     fn write(&self, data: &[f32]) {
         let mut buf = self.buffer.lock().unwrap();
-        // 如果缓冲区满了，丢弃旧数据
-        if buf.len() + data.len() > self.capacity {
-            let overflow = buf.len() + data.len() - self.capacity;
-            let drain_count = overflow.min(buf.len());
-            buf.drain(0..drain_count);
+        if data.len() >= self.capacity {
+            buf.clear();
+            buf.extend(data[data.len() - self.capacity..].iter().copied());
+            return;
         }
-        buf.extend_from_slice(data);
+
+        // 如果缓冲区满了，丢弃旧数据
+        let needed = buf.len() + data.len();
+        if needed > self.capacity {
+            let drain_count = needed - self.capacity;
+            buf.drain(..drain_count);
+        }
+
+        buf.extend(data.iter().copied());
     }
 
     fn read(&self, output: &mut [f32]) -> usize {
         let mut buf = self.buffer.lock().unwrap();
         let to_read = output.len().min(buf.len());
-        output[..to_read].copy_from_slice(&buf[..to_read]);
-        buf.drain(0..to_read);
+
+        let (a, b) = buf.as_slices();
+        let a_len = a.len().min(to_read);
+        output[..a_len].copy_from_slice(&a[..a_len]);
+        let b_len = to_read - a_len;
+        if b_len > 0 {
+            output[a_len..to_read].copy_from_slice(&b[..b_len]);
+        }
+
+        buf.drain(..to_read);
         to_read
     }
 }

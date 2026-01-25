@@ -65,9 +65,7 @@ jobs:
             cd apps/furry_flutter/furry_flutter_app
             flutter build apk --debug --verbose
           ) 2>&1 | tee dist/android/flutter/android_debug_build.log
-
-          mkdir -p ../../../../dist/android/flutter
-          cp -f build/app/outputs/flutter-apk/app-debug.apk ../../../../dist/android/flutter/
+          cp -f apps/furry_flutter/furry_flutter_app/build/app/outputs/flutter-apk/app-debug.apk dist/android/flutter/
 
       - name: Checksums
         if: success()

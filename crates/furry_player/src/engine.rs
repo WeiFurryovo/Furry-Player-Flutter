@@ -1,8 +1,6 @@
 //! 播放引擎
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -37,9 +35,11 @@ fn run_engine(
     evt_tx: Sender<PlayerEvent>,
     master_key: MasterKey,
 ) {
-    let mut state = EngineState::new(master_key, evt_tx.clone());
+    let mut state = EngineState::new(master_key, evt_tx);
 
-    let _ = evt_tx.send(PlayerEvent::StateChanged(PlaybackState::Idle));
+    let _ = state
+        .evt_tx
+        .send(PlayerEvent::StateChanged(PlaybackState::Idle));
 
     loop {
         // 非阻塞检查命令
@@ -70,7 +70,6 @@ struct EngineState {
     playback_state: PlaybackState,
     current_track: Option<LoadedTrack>,
     volume: f32,
-    is_playing: Arc<AtomicBool>,
     last_position_update: std::time::Instant,
 }
 
@@ -89,7 +88,6 @@ impl EngineState {
             playback_state: PlaybackState::Idle,
             current_track: None,
             volume: 1.0,
-            is_playing: Arc::new(AtomicBool::new(false)),
             last_position_update: std::time::Instant::now(),
         }
     }
@@ -203,7 +201,6 @@ impl EngineState {
         if let Some(track) = &self.current_track {
             if self.playback_state != PlaybackState::Playing {
                 track.output.set_playing(true);
-                self.is_playing.store(true, Ordering::SeqCst);
                 self.set_state(PlaybackState::Playing);
             }
         }
@@ -213,7 +210,6 @@ impl EngineState {
         if let Some(track) = &self.current_track {
             if self.playback_state == PlaybackState::Playing {
                 track.output.set_playing(false);
-                self.is_playing.store(false, Ordering::SeqCst);
                 self.set_state(PlaybackState::Paused);
             }
         }
@@ -223,7 +219,6 @@ impl EngineState {
         if let Some(track) = self.current_track.take() {
             track.output.set_playing(false);
         }
-        self.is_playing.store(false, Ordering::SeqCst);
         self.set_state(PlaybackState::Stopped);
     }
 
@@ -244,17 +239,16 @@ impl EngineState {
             match track.decoder.decode_next() {
                 Ok(Some(samples)) => {
                     // 应用音量
-                    let samples: Vec<f32> = samples
-                        .into_iter()
-                        .map(|s| s * self.volume)
-                        .collect();
+                    let mut samples = samples;
+                    for sample in &mut samples {
+                        *sample *= self.volume;
+                    }
 
                     track.output.write(samples);
                 }
                 Ok(None) => {
                     // 播放结束
                     track.output.set_playing(false);
-                    self.is_playing.store(false, Ordering::SeqCst);
                     self.set_state(PlaybackState::Stopped);
                     let _ = self.evt_tx.send(PlayerEvent::TrackEnded);
                 }

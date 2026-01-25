@@ -77,7 +77,7 @@ fn main() {
         }
         "info" => {
             let input_path = PathBuf::from(&args[2]);
-            let file = match File::open(&input_path) {
+            let mut file = match File::open(&input_path) {
                 Ok(f) => f,
                 Err(_) => {
                     println!(r#"{{"valid":false,"error":"open_failed"}}"#);
@@ -86,21 +86,11 @@ fn main() {
             };
 
             // quick magic check first
-            let mut reader = std::io::BufReader::new(file);
             let mut magic = [0u8; 8];
-            if reader.read_exact(&mut magic).is_err() || &magic != b"FURRYFMT" {
+            if file.read_exact(&mut magic).is_err() || &magic != b"FURRYFMT" {
                 println!(r#"{{"valid":false,"error":"bad_magic"}}"#);
                 std::process::exit(3);
             }
-
-            // reopen for full parse (FurryReader expects start from 0)
-            let file = match File::open(&input_path) {
-                Ok(f) => f,
-                Err(_) => {
-                    println!(r#"{{"valid":false,"error":"open_failed"}}"#);
-                    std::process::exit(2);
-                }
-            };
 
             let reader = match FurryReader::open(file, &master_key) {
                 Ok(r) => r,

@@ -5,7 +5,7 @@
 use std::io::{Read, Seek};
 use std::time::Duration;
 
-use symphonia::core::audio::{AudioBufferRef, SampleBuffer, SignalSpec};
+use symphonia::core::audio::{SampleBuffer, SignalSpec};
 use symphonia::core::codecs::{Decoder, DecoderOptions, CODEC_TYPE_NULL};
 use symphonia::core::errors::Error as SymphoniaError;
 use symphonia::core::formats::{FormatOptions, FormatReader, SeekMode, SeekTo};
@@ -186,23 +186,5 @@ impl AudioDecoder {
         self.decoder.reset();
 
         Ok(())
-    }
-
-    /// 将音频缓冲区转换为 f32 向量
-    fn audio_buf_to_f32(&mut self, buf: AudioBufferRef) -> Vec<f32> {
-        let spec = *buf.spec();
-        let duration = buf.capacity() as u64;
-
-        // 确保采样缓冲区足够大
-        if self.sample_buf.is_none()
-            || self.sample_buf.as_ref().unwrap().capacity() < duration as usize
-        {
-            self.sample_buf = Some(SampleBuffer::new(duration, spec));
-        }
-
-        let sample_buf = self.sample_buf.as_mut().unwrap();
-        sample_buf.copy_interleaved_ref(buf);
-
-        sample_buf.samples().to_vec()
     }
 }

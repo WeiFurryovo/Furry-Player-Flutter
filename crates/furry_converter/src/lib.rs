@@ -2,7 +2,7 @@
 //!
 //! 提供音频文件与 .furry 格式之间的转换功能。
 
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{Read, Seek, Write};
 use std::path::Path;
 
 use furry_crypto::MasterKey;
@@ -64,10 +64,6 @@ where
     R: Read + Seek,
     W: Write + Seek,
 {
-    // 获取输入文件大小
-    let input_size = input.seek(SeekFrom::End(0))?;
-    input.seek(SeekFrom::Start(0))?;
-
     // 创建 writer
     let mut writer = FurryWriter::create(output, master_key, original_format)?;
 
@@ -116,9 +112,7 @@ where
     let original_format = reader.index.header.original_format;
 
     // 按 virtual_offset 顺序读取所有 AUDIO chunks
-    let audio_entries: Vec<_> = reader.index.audio_entries().into_iter().cloned().collect();
-
-    for entry in &audio_entries {
+    for entry in reader.index.audio_entries() {
         let data = reader.read_chunk(entry)?;
         output.write_all(&data)?;
     }
