@@ -32,6 +32,12 @@ pub extern "system" fn Java_com_furry_player_NativeLib_init(_env: JNIEnv, _class
     init_logging();
 }
 
+/// JNI: 初始化库（Flutter 模板包名：com.furry.furry_flutter_app.NativeLib）
+#[no_mangle]
+pub extern "system" fn Java_com_furry_furry_1flutter_1app_NativeLib_init(_env: JNIEnv, _class: JClass) {
+    init_logging();
+}
+
 /// JNI: 打包音频文件到 .furry 格式
 ///
 /// @param inputPath 输入文件路径
@@ -44,6 +50,27 @@ pub extern "system" fn Java_com_furry_player_NativeLib_packToFurry<'local>(
     _class: JClass<'local>,
     input_path: JString<'local>,
     output_path: JString<'local>,
+    padding_kb: jlong,
+) -> jint {
+    pack_to_furry_impl(&mut env, input_path, output_path, padding_kb)
+}
+
+/// JNI: 打包（Flutter 模板包名：com.furry.furry_flutter_app.NativeLib）
+#[no_mangle]
+pub extern "system" fn Java_com_furry_furry_1flutter_1app_NativeLib_packToFurry<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    input_path: JString<'local>,
+    output_path: JString<'local>,
+    padding_kb: jlong,
+) -> jint {
+    pack_to_furry_impl(&mut env, input_path, output_path, padding_kb)
+}
+
+fn pack_to_furry_impl(
+    env: &mut JNIEnv<'_>,
+    input_path: JString<'_>,
+    output_path: JString<'_>,
     padding_kb: jlong,
 ) -> jint {
     let input_str: String = match env.get_string(&input_path) {
@@ -93,6 +120,20 @@ pub extern "system" fn Java_com_furry_player_NativeLib_unpackFromFurryToBytes<'l
     _class: JClass<'local>,
     input_path: JString<'local>,
 ) -> jbyteArray {
+    unpack_from_furry_to_bytes_impl(&mut env, input_path)
+}
+
+/// JNI: 解密 .furry 到内存（Flutter 模板包名：com.furry.furry_flutter_app.NativeLib）
+#[no_mangle]
+pub extern "system" fn Java_com_furry_furry_1flutter_1app_NativeLib_unpackFromFurryToBytes<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    input_path: JString<'local>,
+) -> jbyteArray {
+    unpack_from_furry_to_bytes_impl(&mut env, input_path)
+}
+
+fn unpack_from_furry_to_bytes_impl(env: &mut JNIEnv<'_>, input_path: JString<'_>) -> jbyteArray {
     let input_str: String = match env.get_string(&input_path) {
         Ok(s) => s.into(),
         Err(_) => return std::ptr::null_mut(),
@@ -138,6 +179,20 @@ pub extern "system" fn Java_com_furry_player_NativeLib_isValidFurryFile<'local>(
     _class: JClass<'local>,
     file_path: JString<'local>,
 ) -> jboolean {
+    is_valid_furry_file_impl(&mut env, file_path)
+}
+
+/// JNI: 检查文件是否为有效的 .furry（Flutter 模板包名：com.furry.furry_flutter_app.NativeLib）
+#[no_mangle]
+pub extern "system" fn Java_com_furry_furry_1flutter_1app_NativeLib_isValidFurryFile<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    file_path: JString<'local>,
+) -> jboolean {
+    is_valid_furry_file_impl(&mut env, file_path)
+}
+
+fn is_valid_furry_file_impl(env: &mut JNIEnv<'_>, file_path: JString<'_>) -> jboolean {
     let path_str: String = match env.get_string(&file_path) {
         Ok(s) => s.into(),
         Err(_) => return JNI_FALSE,
@@ -172,6 +227,20 @@ pub extern "system" fn Java_com_furry_player_NativeLib_getOriginalFormat<'local>
     _class: JClass<'local>,
     file_path: JString<'local>,
 ) -> jstring {
+    get_original_format_impl(&mut env, file_path)
+}
+
+/// JNI: 获取原始格式（Flutter 模板包名：com.furry.furry_flutter_app.NativeLib）
+#[no_mangle]
+pub extern "system" fn Java_com_furry_furry_1flutter_1app_NativeLib_getOriginalFormat<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    file_path: JString<'local>,
+) -> jstring {
+    get_original_format_impl(&mut env, file_path)
+}
+
+fn get_original_format_impl(env: &mut JNIEnv<'_>, file_path: JString<'_>) -> jstring {
     fn to_jstring(env: &mut JNIEnv<'_>, s: &str) -> jstring {
         match env.new_string(s) {
             Ok(v) => v.into_raw(),
@@ -204,5 +273,5 @@ pub extern "system" fn Java_com_furry_player_NativeLib_getOriginalFormat<'local>
         furry_format::OriginalFormat::Unknown => "",
     };
 
-    to_jstring(&mut env, ext)
+    to_jstring(env, ext)
 }

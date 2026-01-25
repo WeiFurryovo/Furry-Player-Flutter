@@ -16,8 +16,8 @@ class MainActivity : FlutterActivity() {
       .setMethodCallHandler { call, result ->
         try {
           handleCall(call, result)
-        } catch (e: Exception) {
-          result.error("native_error", e.toString(), null)
+        } catch (t: Throwable) {
+          result.error("native_error", t.toString(), null)
         }
       }
   }
@@ -65,4 +65,3 @@ class MainActivity : FlutterActivity() {
     }
   }
 }
-
