@@ -60,12 +60,22 @@ impl<W: Write + Seek> FurryWriter<W> {
         self.write_chunk_internal(ChunkType::Padding, &padding, 0, 0, 0)
     }
 
+    /// 写入 META chunk
+    pub fn write_meta_chunk(
+        &mut self,
+        kind: crate::MetaKind,
+        data: &[u8],
+        chunk_flags: u8,
+    ) -> Result<(), FormatError> {
+        self.write_chunk_internal(ChunkType::Meta, data, 0, kind as u16, chunk_flags)
+    }
+
     fn write_chunk_internal(
         &mut self,
         chunk_type: ChunkType,
         data: &[u8],
         virtual_offset: u64,
-        _meta_kind: u16,
+        meta_kind: u16,
         chunk_flags: u8,
     ) -> Result<(), FormatError> {
         let chunk_seq = self.chunk_seq;
@@ -112,6 +122,17 @@ impl<W: Write + Seek> FurryWriter<W> {
             ChunkType::Audio => {
                 self.index.header.audio_stream_len += data.len() as u64;
                 IndexEntryV1::new_audio(chunk_seq, file_offset, record_len, data.len() as u32, virtual_offset)
+            }
+            ChunkType::Meta => {
+                let kind = crate::MetaKind::from_u16(meta_kind);
+                IndexEntryV1::new_meta(
+                    chunk_seq,
+                    file_offset,
+                    record_len,
+                    data.len() as u32,
+                    kind,
+                    chunk_flags,
+                )
             }
             ChunkType::Padding => {
                 IndexEntryV1::new_padding(chunk_seq, file_offset, record_len, data.len() as u32)

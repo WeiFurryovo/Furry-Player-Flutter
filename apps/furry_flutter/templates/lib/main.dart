@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -107,6 +108,8 @@ class _AppController {
   final ValueNotifier<_NowPlaying?> nowPlaying = ValueNotifier<_NowPlaying?>(null);
   final ValueNotifier<List<File>> furryOutputs = ValueNotifier<List<File>>(<File>[]);
   final ValueNotifier<String> log = ValueNotifier<String>('');
+
+  final Map<String, Future<_MetaPreview>> _metaPreviewCache = <String, Future<_MetaPreview>>{};
 
   int paddingKb = 0;
 
@@ -258,7 +261,12 @@ class _AppController {
           InMemoryAudioSource(bytes: bytes, contentType: _mimeFromExt(originalExt)),
         );
         await player.play();
-        nowPlaying.value = _NowPlaying(title: name, subtitle: '.furry → $originalExt', sourcePath: file.path);
+        final meta = await getMetaPreviewForFurry(file);
+        nowPlaying.value = _NowPlaying(
+          title: meta.title.isEmpty ? name : meta.title,
+          subtitle: meta.subtitle.isEmpty ? '.furry → $originalExt' : meta.subtitle,
+          sourcePath: file.path,
+        );
         appendLog('Playing (.furry → $originalExt), ${bytes.length} bytes');
       } else {
         await player.setAudioSource(AudioSource.uri(file.uri));
@@ -282,6 +290,53 @@ class _AppController {
     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$m:$s';
   }
+
+  Future<_MetaPreview> getMetaPreviewForFurry(File furryFile) {
+    return _metaPreviewCache.putIfAbsent(furryFile.path, () async {
+      final fallbackTitle = p.basename(furryFile.path);
+
+      String title = '';
+      String artist = '';
+      String album = '';
+
+      try {
+        final jsonStr = await api.getTagsJson(filePath: furryFile.path);
+        if (jsonStr.trim().isNotEmpty) {
+          final m = jsonDecode(jsonStr);
+          if (m is Map<String, dynamic>) {
+            title = (m['title'] as String?)?.trim() ?? '';
+            artist = (m['artist'] as String?)?.trim() ?? '';
+            album = (m['album'] as String?)?.trim() ?? '';
+          }
+        }
+      } catch (_) {}
+
+      Uint8List? coverBytes;
+      String? coverMime;
+      try {
+        final payload = await api.getCoverArt(filePath: furryFile.path);
+        if (payload != null && payload.isNotEmpty) {
+          final sep = payload.indexOf(0);
+          if (sep > 0 && sep < payload.length - 1) {
+            coverMime = String.fromCharCodes(payload.sublist(0, sep));
+            coverBytes = payload.sublist(sep + 1);
+          }
+        }
+      } catch (_) {}
+
+      final subtitleParts = <String>[
+        if (artist.isNotEmpty) artist,
+        if (album.isNotEmpty) album,
+      ];
+
+      return _MetaPreview(
+        title: title.isNotEmpty ? title : fallbackTitle,
+        subtitle: subtitleParts.join(' · '),
+        coverBytes: coverBytes,
+        coverMime: coverMime,
+      );
+    });
+  }
 }
 
 class _NowPlaying {
@@ -293,6 +348,20 @@ class _NowPlaying {
     required this.title,
     required this.subtitle,
     required this.sourcePath,
+  });
+}
+
+class _MetaPreview {
+  final String title;
+  final String subtitle;
+  final Uint8List? coverBytes;
+  final String? coverMime;
+
+  _MetaPreview({
+    required this.title,
+    required this.subtitle,
+    required this.coverBytes,
+    required this.coverMime,
   });
 }
 
@@ -356,12 +425,24 @@ class _LibraryPageState extends State<LibraryPage> {
               return Column(
                 children: [
                   for (final f in filtered)
-                    ListTile(
-                      leading: const Icon(Icons.library_music),
-                      title: Text(p.basename(f.path)),
-                      subtitle: Text('${_fmtBytes(f.lengthSync())} · ${f.lastModifiedSync().toLocal()}'),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => controller.playFile(file: f, displayName: p.basename(f.path)),
+                    FutureBuilder<_MetaPreview>(
+                      future: controller.getMetaPreviewForFurry(f),
+                      builder: (context, snap) {
+                        final meta = snap.data;
+                        return ListTile(
+                          leading: _CoverThumb(bytes: meta?.coverBytes),
+                          title: Text(meta?.title ?? p.basename(f.path), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          subtitle: Text(
+                            meta == null || meta.subtitle.isEmpty
+                                ? '${_fmtBytes(f.lengthSync())} · ${f.lastModifiedSync().toLocal()}'
+                                : meta.subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => controller.playFile(file: f, displayName: p.basename(f.path)),
+                        );
+                      },
                     ),
                 ],
               );
@@ -378,6 +459,28 @@ class _LibraryPageState extends State<LibraryPage> {
     if (bytes >= mb) return '${(bytes / mb).toStringAsFixed(1)} MB';
     if (bytes >= kb) return '${(bytes / kb).toStringAsFixed(1)} KB';
     return '$bytes B';
+  }
+}
+
+class _CoverThumb extends StatelessWidget {
+  final Uint8List? bytes;
+  const _CoverThumb({required this.bytes});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final b = bytes;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 44,
+        height: 44,
+        color: cs.surfaceContainerHighest,
+        child: b == null || b.isEmpty
+            ? Icon(Icons.music_note, color: cs.primary)
+            : Image.memory(b, fit: BoxFit.cover),
+      ),
+    );
   }
 }
 

@@ -46,7 +46,7 @@ fn main() {
                 ..Default::default()
             };
 
-            pack_to_furry(&mut input, &mut output, format, &master_key, &options)
+            pack_to_furry(&mut input, &mut output, Some(&input_path), format, &master_key, &options)
                 .expect("Failed to pack");
 
             let input_size = std::fs::metadata(&input_path).unwrap().len();

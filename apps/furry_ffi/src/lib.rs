@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use furry_converter::{detect_format, pack_to_furry, unpack_from_furry, PackOptions};
 use furry_crypto::MasterKey;
-use furry_format::FurryReader;
+use furry_format::{FurryReader, MetaKind};
 
 fn cstr_to_path(ptr: *const c_char) -> Result<PathBuf, c_int> {
     if ptr.is_null() {
@@ -52,7 +52,7 @@ pub extern "C" fn furry_pack_to_furry(
         ..Default::default()
     };
 
-    match pack_to_furry(&mut input, &mut output, format, &master_key, &options) {
+    match pack_to_furry(&mut input, &mut output, Some(&input_path), format, &master_key, &options) {
         Ok(_) => 0,
         Err(_) => -5,
     }
@@ -166,6 +166,99 @@ pub extern "C" fn furry_unpack_from_furry_to_bytes(
     0
 }
 
+/// Returns embedded tags JSON (UTF-8) from `.furry` META chunk.
+/// On success returns 0 and sets `*out_ptr`/`*out_len`. Caller must call `furry_free_bytes`.
+#[no_mangle]
+pub extern "C" fn furry_get_tags_json_to_bytes(
+    input_path: *const c_char,
+    out_ptr: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if out_ptr.is_null() || out_len.is_null() {
+        return -30;
+    }
+
+    let input_path = match cstr_to_path(input_path) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
+
+    let file = match File::open(&input_path) {
+        Ok(f) => f,
+        Err(_) => return -31,
+    };
+
+    let master_key = MasterKey::default_key();
+    let mut reader = match FurryReader::open(file, &master_key) {
+        Ok(r) => r,
+        Err(_) => return -32,
+    };
+
+    let bytes = match reader.read_latest_meta(MetaKind::Tags) {
+        Ok(Some(b)) => b,
+        Ok(None) => Vec::new(),
+        Err(_) => return -33,
+    };
+
+    let len = bytes.len();
+    let mut bytes = bytes;
+    let ptr = bytes.as_mut_ptr();
+    std::mem::forget(bytes);
+
+    unsafe {
+        *out_ptr = ptr;
+        *out_len = len;
+    }
+    0
+}
+
+/// Returns embedded cover art payload bytes from `.furry` META chunk.
+/// Payload format: `mime\\0<image-bytes>`.
+/// On success returns 0 and sets `*out_ptr`/`*out_len`. Caller must call `furry_free_bytes`.
+#[no_mangle]
+pub extern "C" fn furry_get_cover_art_to_bytes(
+    input_path: *const c_char,
+    out_ptr: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if out_ptr.is_null() || out_len.is_null() {
+        return -40;
+    }
+
+    let input_path = match cstr_to_path(input_path) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
+
+    let file = match File::open(&input_path) {
+        Ok(f) => f,
+        Err(_) => return -41,
+    };
+
+    let master_key = MasterKey::default_key();
+    let mut reader = match FurryReader::open(file, &master_key) {
+        Ok(r) => r,
+        Err(_) => return -42,
+    };
+
+    let bytes = match reader.read_latest_meta(MetaKind::CoverArt) {
+        Ok(Some(b)) => b,
+        Ok(None) => Vec::new(),
+        Err(_) => return -43,
+    };
+
+    let len = bytes.len();
+    let mut bytes = bytes;
+    let ptr = bytes.as_mut_ptr();
+    std::mem::forget(bytes);
+
+    unsafe {
+        *out_ptr = ptr;
+        *out_len = len;
+    }
+    0
+}
+
 /// Frees bytes allocated by `furry_unpack_from_furry_to_bytes`.
 #[no_mangle]
 pub extern "C" fn furry_free_bytes(ptr: *mut c_uchar, len: usize) {
@@ -176,4 +269,3 @@ pub extern "C" fn furry_free_bytes(ptr: *mut c_uchar, len: usize) {
         drop(Vec::from_raw_parts(ptr, len, len));
     }
 }
-

@@ -87,6 +87,19 @@ impl<R: Read + Seek> FurryReader<R> {
         Ok(ciphertext)
     }
 
+    /// 读取指定 kind 的最新 META chunk（按 chunk_seq 最大）
+    pub fn read_latest_meta(&mut self, kind: crate::MetaKind) -> Result<Option<Vec<u8>>, FormatError> {
+        let entry = self
+            .index
+            .meta_entries_by_kind(kind)
+            .last()
+            .map(|e| (*e).clone());
+        let Some(entry) = entry else {
+            return Ok(None);
+        };
+        Ok(Some(self.read_chunk(&entry)?))
+    }
+
     /// 获取内部 reader
     pub fn into_inner(self) -> R {
         self.inner

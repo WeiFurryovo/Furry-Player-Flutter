@@ -11,7 +11,7 @@ use jni::JNIEnv;
 
 use furry_converter::{detect_format, pack_to_furry, unpack_from_furry, PackOptions};
 use furry_crypto::MasterKey;
-use furry_format::FurryReader;
+use furry_format::{FurryReader, MetaKind};
 
 /// 初始化日志（Android）
 #[cfg(target_os = "android")]
@@ -104,7 +104,7 @@ fn pack_to_furry_impl(
         ..Default::default()
     };
 
-    match pack_to_furry(&mut input, &mut output, format, &master_key, &options) {
+    match pack_to_furry(&mut input, &mut output, Some(&input_path), format, &master_key, &options) {
         Ok(_) => 0,
         Err(_) => -5,
     }
@@ -274,4 +274,123 @@ fn get_original_format_impl(env: &mut JNIEnv<'_>, file_path: JString<'_>) -> jst
     };
 
     to_jstring(env, ext)
+}
+
+/// JNI: 获取 tags JSON（com.furry_player.NativeLib）
+#[no_mangle]
+pub extern "system" fn Java_com_furry_player_NativeLib_getTagsJson<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    file_path: JString<'local>,
+) -> jstring {
+    get_tags_json_impl(&mut env, file_path)
+}
+
+/// JNI: 获取 tags JSON（com.furry.furry_flutter_app.NativeLib）
+#[no_mangle]
+pub extern "system" fn Java_com_furry_furry_1flutter_1app_NativeLib_getTagsJson<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    file_path: JString<'local>,
+) -> jstring {
+    get_tags_json_impl(&mut env, file_path)
+}
+
+fn get_tags_json_impl(env: &mut JNIEnv<'_>, file_path: JString<'_>) -> jstring {
+    fn to_jstring(env: &mut JNIEnv<'_>, s: &str) -> jstring {
+        match env.new_string(s) {
+            Ok(v) => v.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        }
+    }
+
+    let path_str: String = match env.get_string(&file_path) {
+        Ok(s) => s.into(),
+        Err(_) => return to_jstring(env, ""),
+    };
+    let path = PathBuf::from(path_str);
+
+    let file = match File::open(&path) {
+        Ok(f) => f,
+        Err(_) => return to_jstring(env, ""),
+    };
+
+    let master_key = MasterKey::default_key();
+    let mut reader = match FurryReader::open(file, &master_key) {
+        Ok(r) => r,
+        Err(_) => return to_jstring(env, ""),
+    };
+
+    let bytes = match reader.read_latest_meta(MetaKind::Tags) {
+        Ok(Some(b)) => b,
+        _ => Vec::new(),
+    };
+
+    let s = match String::from_utf8(bytes) {
+        Ok(v) => v,
+        Err(_) => String::new(),
+    };
+
+    to_jstring(env, &s)
+}
+
+/// JNI: 获取封面字节（payload: mime\\0<bytes>）(com.furry_player.NativeLib)
+#[no_mangle]
+pub extern "system" fn Java_com_furry_player_NativeLib_getCoverArt<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    file_path: JString<'local>,
+) -> jbyteArray {
+    get_cover_art_impl(&mut env, file_path)
+}
+
+/// JNI: 获取封面字节（payload: mime\\0<bytes>）(com.furry.furry_flutter_app.NativeLib)
+#[no_mangle]
+pub extern "system" fn Java_com_furry_furry_1flutter_1app_NativeLib_getCoverArt<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    file_path: JString<'local>,
+) -> jbyteArray {
+    get_cover_art_impl(&mut env, file_path)
+}
+
+fn get_cover_art_impl(env: &mut JNIEnv<'_>, file_path: JString<'_>) -> jbyteArray {
+    let path_str: String = match env.get_string(&file_path) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let path = PathBuf::from(path_str);
+
+    let file = match File::open(&path) {
+        Ok(f) => f,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let master_key = MasterKey::default_key();
+    let mut reader = match FurryReader::open(file, &master_key) {
+        Ok(r) => r,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let bytes = match reader.read_latest_meta(MetaKind::CoverArt) {
+        Ok(Some(b)) => b,
+        _ => Vec::new(),
+    };
+    if bytes.is_empty() {
+        return std::ptr::null_mut();
+    }
+
+    let len_i32 = match i32::try_from(bytes.len()) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let arr = match env.new_byte_array(len_i32) {
+        Ok(a) => a,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let bytes_i8: &[i8] = unsafe { std::slice::from_raw_parts(bytes.as_ptr() as *const i8, bytes.len()) };
+    if env.set_byte_array_region(&arr, 0, bytes_i8).is_err() {
+        return std::ptr::null_mut();
+    }
+    arr.into_raw()
 }

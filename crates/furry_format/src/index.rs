@@ -321,4 +321,15 @@ impl FurryIndexV1 {
             .filter(|e| e.chunk_type == ChunkType::Meta)
             .collect()
     }
+
+    /// 获取指定 META kind 的条目（按 chunk_seq 升序）
+    pub fn meta_entries_by_kind(&self, kind: MetaKind) -> Vec<&IndexEntryV1> {
+        let mut entries: Vec<_> = self
+            .entries
+            .iter()
+            .filter(|e| e.chunk_type == ChunkType::Meta && MetaKind::from_u16(e.meta_kind) == kind)
+            .collect();
+        entries.sort_by_key(|e| e.chunk_seq);
+        entries
+    }
 }

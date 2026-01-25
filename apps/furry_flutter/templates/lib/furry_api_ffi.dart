@@ -16,6 +16,10 @@ class FurryApiFfi implements FurryApi {
     );
     _unpackToBytes =
         _lib.lookupFunction<_UnpackToBytesC, _UnpackToBytesDart>('furry_unpack_from_furry_to_bytes');
+    _getTagsJsonToBytes =
+        _lib.lookupFunction<_GetTagsJsonToBytesC, _GetTagsJsonToBytesDart>('furry_get_tags_json_to_bytes');
+    _getCoverArtToBytes =
+        _lib.lookupFunction<_GetCoverArtToBytesC, _GetCoverArtToBytesDart>('furry_get_cover_art_to_bytes');
     _freeBytes = _lib.lookupFunction<_FreeBytesC, _FreeBytesDart>('furry_free_bytes');
   }
 
@@ -25,6 +29,8 @@ class FurryApiFfi implements FurryApi {
   late final _IsValidDart _isValid;
   late final _GetOriginalFormatDart _getOriginalFormat;
   late final _UnpackToBytesDart _unpackToBytes;
+  late final _GetTagsJsonToBytesDart _getTagsJsonToBytes;
+  late final _GetCoverArtToBytesDart _getCoverArtToBytes;
   late final _FreeBytesDart _freeBytes;
 
   static ffi.DynamicLibrary _openLib() {
@@ -98,6 +104,50 @@ class FurryApiFfi implements FurryApi {
       calloc.free(outLen);
     }
   }
+
+  @override
+  Future<String> getTagsJson({required String filePath}) async {
+    final p = filePath.toNativeUtf8();
+    final outPtr = calloc<ffi.Pointer<ffi.Uint8>>();
+    final outLen = calloc<ffi.Size>();
+    try {
+      final rc = _getTagsJsonToBytes(p.cast(), outPtr, outLen);
+      if (rc != 0) return '';
+      final ptr = outPtr.value;
+      final len = outLen.value;
+      if (ptr.address == 0 || len == 0) return '';
+      final bytes = ptr.asTypedList(len);
+      final copy = Uint8List.fromList(bytes);
+      _freeBytes(ptr, len);
+      return String.fromCharCodes(copy);
+    } finally {
+      malloc.free(p);
+      calloc.free(outPtr);
+      calloc.free(outLen);
+    }
+  }
+
+  @override
+  Future<Uint8List?> getCoverArt({required String filePath}) async {
+    final p = filePath.toNativeUtf8();
+    final outPtr = calloc<ffi.Pointer<ffi.Uint8>>();
+    final outLen = calloc<ffi.Size>();
+    try {
+      final rc = _getCoverArtToBytes(p.cast(), outPtr, outLen);
+      if (rc != 0) return null;
+      final ptr = outPtr.value;
+      final len = outLen.value;
+      if (ptr.address == 0 || len == 0) return null;
+      final bytes = ptr.asTypedList(len);
+      final copy = Uint8List.fromList(bytes);
+      _freeBytes(ptr, len);
+      return copy;
+    } finally {
+      malloc.free(p);
+      calloc.free(outPtr);
+      calloc.free(outLen);
+    }
+  }
 }
 
 typedef _PackToFurryC = ffi.Int32 Function(
@@ -131,6 +181,28 @@ typedef _UnpackToBytesC = ffi.Int32 Function(
   ffi.Pointer<ffi.Size>,
 );
 typedef _UnpackToBytesDart = int Function(
+  ffi.Pointer<ffi.Char>,
+  ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+  ffi.Pointer<ffi.Size>,
+);
+
+typedef _GetTagsJsonToBytesC = ffi.Int32 Function(
+  ffi.Pointer<ffi.Char>,
+  ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+  ffi.Pointer<ffi.Size>,
+);
+typedef _GetTagsJsonToBytesDart = int Function(
+  ffi.Pointer<ffi.Char>,
+  ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+  ffi.Pointer<ffi.Size>,
+);
+
+typedef _GetCoverArtToBytesC = ffi.Int32 Function(
+  ffi.Pointer<ffi.Char>,
+  ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+  ffi.Pointer<ffi.Size>,
+);
+typedef _GetCoverArtToBytesDart = int Function(
   ffi.Pointer<ffi.Char>,
   ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
   ffi.Pointer<ffi.Size>,

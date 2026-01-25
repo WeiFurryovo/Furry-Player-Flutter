@@ -16,5 +16,6 @@ object NativeLib {
   external fun isValidFurryFile(filePath: String): Boolean
   external fun getOriginalFormat(filePath: String): String
   external fun unpackFromFurryToBytes(inputPath: String): ByteArray?
+  external fun getTagsJson(filePath: String): String
+  external fun getCoverArt(filePath: String): ByteArray?
 }
-

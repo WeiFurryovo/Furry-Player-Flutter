@@ -9,3 +9,6 @@ furry_crypto = { path = "../furry_crypto" }
 furry_format = { path = "../furry_format" }
 thiserror.workspace = true
 getrandom.workspace = true
+symphonia.workspace = true
+serde.workspace = true
+serde_json.workspace = true

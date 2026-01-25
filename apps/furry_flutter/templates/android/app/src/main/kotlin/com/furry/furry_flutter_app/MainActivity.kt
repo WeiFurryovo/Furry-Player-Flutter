@@ -61,6 +61,18 @@ class MainActivity : FlutterActivity() {
         result.success(NativeLib.unpackFromFurryToBytes(inputPath))
       }
 
+      "getTagsJson" -> {
+        ensureInit()
+        val filePath = call.argument<String>("filePath") ?: ""
+        result.success(NativeLib.getTagsJson(filePath))
+      }
+
+      "getCoverArt" -> {
+        ensureInit()
+        val filePath = call.argument<String>("filePath") ?: ""
+        result.success(NativeLib.getCoverArt(filePath))
+      }
+
       else -> result.notImplemented()
     }
   }

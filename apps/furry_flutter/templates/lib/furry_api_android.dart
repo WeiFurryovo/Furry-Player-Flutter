@@ -46,5 +46,19 @@ class FurryApiAndroid implements FurryApi {
     });
     return ext ?? '';
   }
-}
 
+  @override
+  Future<String> getTagsJson({required String filePath}) async {
+    final json = await _channel.invokeMethod<String>('getTagsJson', {
+      'filePath': filePath,
+    });
+    return json ?? '';
+  }
+
+  @override
+  Future<Uint8List?> getCoverArt({required String filePath}) {
+    return _channel.invokeMethod<Uint8List>('getCoverArt', {
+      'filePath': filePath,
+    });
+  }
+}
