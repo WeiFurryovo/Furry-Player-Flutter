@@ -21,72 +21,127 @@ class FurryApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const seed = Color(0xFF8E7CFF);
     return MaterialApp(
       title: 'Furry Player (Flutter)',
-      theme: ThemeData.dark(useMaterial3: true),
-      home: const HomePage(),
+      debugShowCheckedModeBanner: false,
+      themeMode: ThemeMode.system,
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light),
+      ),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark),
+      ),
+      home: const AppShell(),
     );
   }
 }
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+class AppShell extends StatefulWidget {
+  const AppShell({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  State<AppShell> createState() => _AppShellState();
 }
 
-class _HomePageState extends State<HomePage> {
-  final AudioPlayer _player = AudioPlayer();
-  late final FurryApi _api = createFurryApi();
-
-  String _log = '';
-  int _paddingKb = 0;
-
-  File? _pickedForPack;
-  String? _pickedForPackName;
-
-  File? _pickedForPlay;
-  String? _pickedForPlayName;
-
-  List<FileSystemEntity> _outputs = const [];
+class _AppShellState extends State<AppShell> {
+  late final _controller = _AppController();
+  int _tabIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _bootstrap();
-  }
-
-  Future<void> _bootstrap() async {
-    try {
-      await _api.init();
-      await _refreshOutputs();
-      _appendLog('Native init ok');
-    } catch (e) {
-      _appendLog('Native init failed: $e');
-    }
+    _controller.init();
   }
 
   @override
   void dispose() {
-    _player.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
-  void _appendLog(String msg) {
-    setState(() {
-      _log = '${DateTime.now().toIso8601String()}  $msg\n$_log';
-    });
+  @override
+  Widget build(BuildContext context) {
+    final destinations = <NavigationDestination>[
+      const NavigationDestination(icon: Icon(Icons.library_music_outlined), selectedIcon: Icon(Icons.library_music), label: '本地'),
+      const NavigationDestination(icon: Icon(Icons.swap_horiz_outlined), selectedIcon: Icon(Icons.swap_horiz), label: '转换'),
+      const NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: '设置'),
+    ];
+
+    return Scaffold(
+      body: SafeArea(
+        top: false,
+        child: IndexedStack(
+          index: _tabIndex,
+          children: [
+            LibraryPage(controller: _controller),
+            ConverterPage(controller: _controller),
+            SettingsPage(controller: _controller),
+          ],
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            MiniPlayerBar(controller: _controller),
+            NavigationBar(
+              selectedIndex: _tabIndex,
+              destinations: destinations,
+              onDestinationSelected: (i) => setState(() => _tabIndex = i),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AppController {
+  final AudioPlayer player = AudioPlayer();
+  final FurryApi api = createFurryApi();
+
+  final ValueNotifier<_NowPlaying?> nowPlaying = ValueNotifier<_NowPlaying?>(null);
+  final ValueNotifier<List<File>> furryOutputs = ValueNotifier<List<File>>(<File>[]);
+  final ValueNotifier<String> log = ValueNotifier<String>('');
+
+  int paddingKb = 0;
+
+  File? pickedForPack;
+  String? pickedForPackName;
+
+  Future<void> init() async {
+    try {
+      await api.init();
+      await refreshOutputs();
+      appendLog('Native init ok');
+    } catch (e) {
+      appendLog('Native init failed: $e');
+    }
   }
 
-  Future<Directory> _outputsDir() async {
+  void dispose() {
+    player.dispose();
+    nowPlaying.dispose();
+    furryOutputs.dispose();
+    log.dispose();
+  }
+
+  void appendLog(String msg) {
+    log.value = '${DateTime.now().toIso8601String()}  $msg\n${log.value}';
+  }
+
+  Future<Directory> outputsDir() async {
     final doc = await getApplicationDocumentsDirectory();
     final dir = Directory(p.join(doc.path, 'outputs'));
     if (!await dir.exists()) await dir.create(recursive: true);
     return dir;
   }
 
-  Future<File> _writePickedBytesToTemp({
+  Future<File> writePickedBytesToTemp({
     required String filenameHint,
     required Uint8List bytes,
   }) async {
@@ -97,7 +152,7 @@ class _HomePageState extends State<HomePage> {
     return out;
   }
 
-  Future<void> _pickForPack() async {
+  Future<void> pickForPack() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.audio,
       withData: true,
@@ -105,71 +160,66 @@ class _HomePageState extends State<HomePage> {
     final file = result?.files.single;
     if (file == null) return;
     if (file.bytes == null) {
-      _appendLog('Pick failed: bytes is null (try a different picker / storage)');
+      appendLog('Pick failed: bytes is null (try a different picker / storage)');
       return;
     }
-    final tmp = await _writePickedBytesToTemp(filenameHint: file.name, bytes: file.bytes!);
-    setState(() {
-      _pickedForPack = tmp;
-      _pickedForPackName = file.name;
-    });
-    _appendLog('Picked for pack: ${file.name} (${file.size} bytes)');
+    final tmp = await writePickedBytesToTemp(filenameHint: file.name, bytes: file.bytes!);
+    pickedForPack = tmp;
+    pickedForPackName = file.name;
+    appendLog('Picked for pack: ${file.name} (${file.size} bytes)');
   }
 
-  Future<void> _startPack() async {
-    final input = _pickedForPack;
+  Future<void> startPack() async {
+    final input = pickedForPack;
     if (input == null) {
-      _appendLog('No pack input selected');
+      appendLog('No pack input selected');
       return;
     }
 
-    final outDir = await _outputsDir();
-    final base = p.basenameWithoutExtension(_pickedForPackName ?? input.path);
+    final outDir = await outputsDir();
+    final base = p.basenameWithoutExtension(pickedForPackName ?? input.path);
     final outPath = p.join(outDir.path, '$base.furry');
 
-    _appendLog('Packing…');
-    final rc = await _api.packToFurry(
+    appendLog('Packing…');
+    final rc = await api.packToFurry(
       inputPath: input.path,
       outputPath: outPath,
-      paddingKb: _paddingKb,
+      paddingKb: paddingKb,
     );
     if (rc == 0) {
-      _appendLog('Pack ok: ${p.basename(outPath)}');
-      await _refreshOutputs();
+      appendLog('Pack ok: ${p.basename(outPath)}');
+      await refreshOutputs();
     } else {
-      _appendLog('Pack failed: rc=$rc');
+      appendLog('Pack failed: rc=$rc');
     }
   }
 
-  Future<void> _refreshOutputs() async {
-    final outDir = await _outputsDir();
+  Future<void> refreshOutputs() async {
+    final outDir = await outputsDir();
     final files = outDir
         .listSync()
         .whereType<File>()
         .where((f) => p.extension(f.path).toLowerCase() == '.furry')
         .toList()
       ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
-    setState(() => _outputs = files);
+    furryOutputs.value = files;
   }
 
-  Future<void> _pickForPlay() async {
+  Future<File?> pickForPlay() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['mp3', 'wav', 'ogg', 'flac', 'furry'],
       withData: true,
     );
     final file = result?.files.single;
-    if (file == null) return;
+    if (file == null) return null;
     if (file.bytes == null) {
-      _appendLog('Pick failed: bytes is null (try a different picker / storage)');
-      return;
+      appendLog('Pick failed: bytes is null (try a different picker / storage)');
+      return null;
     }
-    final tmp = await _writePickedBytesToTemp(filenameHint: file.name, bytes: file.bytes!);
-    setState(() {
-      _pickedForPlay = tmp;
-      _pickedForPlayName = file.name;
-    });
-    _appendLog('Picked for play: ${file.name} (${file.size} bytes)');
+    final tmp = await writePickedBytesToTemp(filenameHint: file.name, bytes: file.bytes!);
+    appendLog('Picked for play: ${file.name} (${file.size} bytes)');
+    return tmp;
   }
 
   String? _mimeFromExt(String ext) {
@@ -187,42 +237,43 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _startPlaySelected() async {
-    final input = _pickedForPlay;
-    if (input == null) {
-      _appendLog('No play input selected');
-      return;
-    }
+  Future<void> playFile({
+    required File file,
+    String? displayName,
+  }) async {
+    final name = displayName ?? p.basename(file.path);
+    try {
+      final ext = p.extension(name).toLowerCase();
+      final isFurry = ext == '.furry' || await api.isValidFurryFile(filePath: file.path);
 
-    final isFurry = p.extension(_pickedForPlayName ?? input.path).toLowerCase() == '.furry' ||
-        await _api.isValidFurryFile(filePath: input.path);
-
-    if (isFurry) {
-      _appendLog('Unpacking .furry to bytes…');
-      final ext = await _api.getOriginalFormat(filePath: input.path);
-      final bytes = await _api.unpackFromFurryToBytes(inputPath: input.path);
-      if (bytes == null) {
-        _appendLog('Unpack failed: null');
-        return;
+      if (isFurry) {
+        appendLog('Unpacking .furry to bytes…');
+        final originalExt = await api.getOriginalFormat(filePath: file.path);
+        final bytes = await api.unpackFromFurryToBytes(inputPath: file.path);
+        if (bytes == null) {
+          appendLog('Unpack failed: null');
+          return;
+        }
+        await player.setAudioSource(
+          InMemoryAudioSource(bytes: bytes, contentType: _mimeFromExt(originalExt)),
+        );
+        await player.play();
+        nowPlaying.value = _NowPlaying(title: name, subtitle: '.furry → $originalExt', sourcePath: file.path);
+        appendLog('Playing (.furry → $originalExt), ${bytes.length} bytes');
+      } else {
+        await player.setAudioSource(AudioSource.uri(file.uri));
+        await player.play();
+        nowPlaying.value = _NowPlaying(title: name, subtitle: '本地文件', sourcePath: file.path);
+        appendLog('Playing (raw): $name');
       }
-      await _player.setAudioSource(
-        InMemoryAudioSource(
-          bytes: bytes,
-          contentType: _mimeFromExt(ext),
-        ),
-      );
-      await _player.play();
-      _appendLog('Playing (.furry → $ext), ${bytes.length} bytes');
-    } else {
-      await _player.setAudioSource(AudioSource.uri(input.uri));
-      await _player.play();
-      _appendLog('Playing (raw): ${_pickedForPlayName ?? p.basename(input.path)}');
+    } catch (e) {
+      appendLog('Play failed: $e');
     }
   }
 
-  Future<void> _stop() async {
-    await _player.stop();
-    _appendLog('Stopped');
+  Future<void> stop() async {
+    await player.stop();
+    appendLog('Stopped');
   }
 
   String _fmt(Duration? d) {
@@ -231,11 +282,121 @@ class _HomePageState extends State<HomePage> {
     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$m:$s';
   }
+}
+
+class _NowPlaying {
+  final String title;
+  final String subtitle;
+  final String sourcePath;
+
+  _NowPlaying({
+    required this.title,
+    required this.subtitle,
+    required this.sourcePath,
+  });
+}
+
+class LibraryPage extends StatefulWidget {
+  final _AppController controller;
+  const LibraryPage({super.key, required this.controller});
+
+  @override
+  State<LibraryPage> createState() => _LibraryPageState();
+}
+
+class _LibraryPageState extends State<LibraryPage> {
+  String _query = '';
 
   @override
   Widget build(BuildContext context) {
+    final controller = widget.controller;
     return Scaffold(
-      appBar: AppBar(title: const Text('Furry Player (Flutter/Android)')),
+      appBar: AppBar(
+        title: const Text('本地音乐'),
+        actions: [
+          IconButton(
+            tooltip: '选择文件播放',
+            onPressed: () async {
+              final f = await controller.pickForPlay();
+              if (f == null) return;
+              await controller.playFile(file: f);
+            },
+            icon: const Icon(Icons.playlist_add),
+          ),
+          IconButton(
+            tooltip: '刷新',
+            onPressed: controller.refreshOutputs,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [
+          SearchBar(
+            hintText: '搜索（输出的 .furry）',
+            leading: const Icon(Icons.search),
+            onChanged: (v) => setState(() => _query = v.trim()),
+          ),
+          const SizedBox(height: 12),
+          Text('最近输出', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          ValueListenableBuilder<List<File>>(
+            valueListenable: controller.furryOutputs,
+            builder: (context, files, _) {
+              final filtered = files.where((f) {
+                if (_query.isEmpty) return true;
+                return p.basename(f.path).toLowerCase().contains(_query.toLowerCase());
+              }).toList();
+
+              if (filtered.isEmpty) {
+                return const Text('暂无 .furry 输出文件（去“转换”页打包试试）');
+              }
+
+              return Column(
+                children: [
+                  for (final f in filtered)
+                    ListTile(
+                      leading: const Icon(Icons.library_music),
+                      title: Text(p.basename(f.path)),
+                      subtitle: Text('${_fmtBytes(f.lengthSync())} · ${f.lastModifiedSync().toLocal()}'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => controller.playFile(file: f, displayName: p.basename(f.path)),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _fmtBytes(int bytes) {
+    const kb = 1024;
+    const mb = 1024 * 1024;
+    if (bytes >= mb) return '${(bytes / mb).toStringAsFixed(1)} MB';
+    if (bytes >= kb) return '${(bytes / kb).toStringAsFixed(1)} KB';
+    return '$bytes B';
+  }
+}
+
+class ConverterPage extends StatefulWidget {
+  final _AppController controller;
+  const ConverterPage({super.key, required this.controller});
+
+  @override
+  State<ConverterPage> createState() => _ConverterPageState();
+}
+
+class _ConverterPageState extends State<ConverterPage> {
+  @override
+  Widget build(BuildContext context) {
+    final controller = widget.controller;
+    final cs = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('转换 / 打包')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -245,39 +406,58 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('打包（音频 → .furry）', style: TextStyle(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.lock, color: cs.primary),
+                      const SizedBox(width: 8),
+                      const Text('打包（音频 → .furry）', style: TextStyle(fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      ElevatedButton(onPressed: _pickForPack, child: const Text('选择音频')),
-                      FilledButton(onPressed: _startPack, child: const Text('开始打包')),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          await controller.pickForPack();
+                          setState(() {});
+                        },
+                        icon: const Icon(Icons.audio_file),
+                        label: const Text('选择音频'),
+                      ),
+                      FilledButton.icon(
+                        onPressed: controller.startPack,
+                        icon: const Icon(Icons.auto_fix_high),
+                        label: const Text('开始打包'),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Text(_pickedForPackName == null ? '未选择输入文件' : '输入：$_pickedForPackName'),
-                  const SizedBox(height: 8),
+                  Text(controller.pickedForPackName == null ? '未选择输入文件' : '输入：${controller.pickedForPackName}'),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Text('Padding(KB)'),
+                      const Text('Padding (KB)'),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Slider(
-                          value: _paddingKb.toDouble(),
+                          value: controller.paddingKb.toDouble().clamp(0, 1024),
                           min: 0,
-                          max: 256,
-                          divisions: 256,
-                          label: '$_paddingKb',
-                          onChanged: (v) => setState(() => _paddingKb = v.round()),
+                          max: 1024,
+                          divisions: 64,
+                          label: '${controller.paddingKb} KB',
+                          onChanged: (v) => setState(() => controller.paddingKb = v.round()),
                         ),
                       ),
                     ],
                   ),
+                  Text('当前 padding: ${controller.paddingKb} KB', style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),
             ),
           ),
+          const SizedBox(height: 12),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -286,83 +466,67 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   Row(
                     children: [
-                      const Expanded(
-                        child: Text('输出文件（.furry）', style: TextStyle(fontWeight: FontWeight.w700)),
-                      ),
-                      TextButton(onPressed: _refreshOutputs, child: const Text('刷新')),
+                      Icon(Icons.play_circle, color: cs.primary),
+                      const SizedBox(width: 8),
+                      const Text('播放（文件或 .furry）', style: TextStyle(fontWeight: FontWeight.w700)),
                     ],
                   ),
-                  if (_outputs.isEmpty) const Text('（暂无）'),
-                  for (final f in _outputs.whereType<File>())
-                    ListTile(
-                      dense: true,
-                      title: Text(p.basename(f.path)),
-                      subtitle: Text('${f.lengthSync()} bytes'),
-                      onTap: () async {
-                        setState(() {
-                          _pickedForPlay = f;
-                          _pickedForPlayName = p.basename(f.path);
-                        });
-                        _appendLog('Selected output for play: ${p.basename(f.path)}');
-                      },
-                    ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final f = await controller.pickForPlay();
+                          if (f == null) return;
+                          await controller.playFile(file: f);
+                        },
+                        icon: const Icon(Icons.folder_open),
+                        label: const Text('选择并播放'),
+                      ),
+                      FilledTonalButton.icon(
+                        onPressed: controller.stop,
+                        icon: const Icon(Icons.stop),
+                        label: const Text('停止'),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class SettingsPage extends StatelessWidget {
+  final _AppController controller;
+  const SettingsPage({super.key, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('设置')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
           Card(
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('播放器', style: TextStyle(fontWeight: FontWeight.w700)),
+                  const Text('诊断日志', style: TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      ElevatedButton(onPressed: _pickForPlay, child: const Text('选择音频/.furry')),
-                      FilledButton(onPressed: _startPlaySelected, child: const Text('播放')),
-                      OutlinedButton(
-                        onPressed: () => _player.pause(),
-                        child: const Text('暂停'),
-                      ),
-                      OutlinedButton(
-                        onPressed: () => _player.play(),
-                        child: const Text('继续'),
-                      ),
-                      TextButton(onPressed: _stop, child: const Text('停止')),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(_pickedForPlayName == null ? '未选择播放文件' : '播放：$_pickedForPlayName'),
-                  const SizedBox(height: 8),
-                  StreamBuilder<Duration>(
-                    stream: _player.positionStream,
-                    builder: (context, snapPos) {
-                      return StreamBuilder<Duration?>(
-                        stream: _player.durationStream,
-                        builder: (context, snapDur) {
-                          final pos = snapPos.data ?? Duration.zero;
-                          final dur = snapDur.data ?? Duration.zero;
-                          final max =
-                              (dur.inMilliseconds.toDouble()).clamp(0.0, double.infinity) as double;
-                          final value = (pos.inMilliseconds.toDouble()).clamp(0.0, max) as double;
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Slider(
-                                value: value.isNaN ? 0.0 : value,
-                                max: max == 0 ? 1 : max,
-                                onChanged: (v) async {
-                                  await _player.seek(Duration(milliseconds: v.round()));
-                                },
-                              ),
-                              Text('${_fmt(pos)} / ${_fmt(dur)}'),
-                            ],
-                          );
-                        },
+                  ValueListenableBuilder<String>(
+                    valueListenable: controller.log,
+                    builder: (context, log, _) {
+                      return SelectableText(
+                        log.isEmpty ? '(empty)' : log,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
                       );
                     },
                   ),
@@ -370,21 +534,227 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-          Card(
+        ],
+      ),
+    );
+  }
+}
+
+class MiniPlayerBar extends StatelessWidget {
+  final _AppController controller;
+  const MiniPlayerBar({super.key, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return ValueListenableBuilder<_NowPlaying?>(
+      valueListenable: controller.nowPlaying,
+      builder: (context, np, _) {
+        if (np == null) return const SizedBox.shrink();
+
+        return Material(
+          color: cs.surfaceContainerHighest,
+          child: InkWell(
+            onTap: () => _showNowPlaying(context, controller, np),
             child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
                 children: [
-                  const Text('日志', style: TextStyle(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  SelectableText(_log.isEmpty ? '（空）' : _log),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.music_note, color: cs.onPrimaryContainer),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(np.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text(np.subtitle, style: Theme.of(context).textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
+                  ),
+                  StreamBuilder<PlayerState>(
+                    stream: controller.player.playerStateStream,
+                    builder: (context, snap) {
+                      final playing = snap.data?.playing ?? false;
+                      final processing = snap.data?.processingState ?? ProcessingState.idle;
+                      final busy = processing == ProcessingState.loading || processing == ProcessingState.buffering;
+                      return IconButton.filledTonal(
+                        onPressed: busy
+                            ? null
+                            : () async {
+                                if (playing) {
+                                  await controller.player.pause();
+                                } else {
+                                  await controller.player.play();
+                                }
+                              },
+                        icon: busy
+                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            : Icon(playing ? Icons.pause : Icons.play_arrow),
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
           ),
-        ],
-      ),
+        );
+      },
+    );
+  }
+
+  void _showNowPlaying(BuildContext context, _AppController controller, _NowPlaying np) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => NowPlayingSheet(controller: controller, np: np),
+    );
+  }
+}
+
+class NowPlayingSheet extends StatelessWidget {
+  final _AppController controller;
+  final _NowPlaying np;
+  const NowPlayingSheet({super.key, required this.controller, required this.np});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return DraggableScrollableSheet(
+      initialChildSize: 0.70,
+      minChildSize: 0.45,
+      maxChildSize: 0.98,
+      expand: false,
+      builder: (context, scrollController) {
+        return Material(
+          color: cs.surface,
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            children: [
+              Center(
+                child: Container(
+                  width: 48,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: cs.outlineVariant,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              AspectRatio(
+                aspectRatio: 1,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Icon(Icons.album, size: 96, color: cs.primary),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(np.title, style: Theme.of(context).textTheme.titleLarge, maxLines: 2, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 4),
+              Text(np.subtitle, style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: 16),
+              StreamBuilder<Duration?>(
+                stream: controller.player.durationStream,
+                builder: (context, durSnap) {
+                  final duration = durSnap.data ?? Duration.zero;
+                  return StreamBuilder<Duration>(
+                    stream: controller.player.positionStream,
+                    builder: (context, posSnap) {
+                      final position = posSnap.data ?? Duration.zero;
+                      final max = duration.inMilliseconds > 0 ? duration.inMilliseconds.toDouble() : 1.0;
+                      final value = position.inMilliseconds.clamp(0, max.toInt()).toDouble();
+                      return Column(
+                        children: [
+                          Slider(
+                            value: value,
+                            max: max,
+                            onChanged: (v) => controller.player.seek(Duration(milliseconds: v.round())),
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(controller._fmt(position), style: Theme.of(context).textTheme.bodySmall),
+                              Text(controller._fmt(duration), style: Theme.of(context).textTheme.bodySmall),
+                            ],
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    tooltip: '停止',
+                    onPressed: controller.stop,
+                    icon: const Icon(Icons.stop),
+                  ),
+                  const SizedBox(width: 12),
+                  StreamBuilder<PlayerState>(
+                    stream: controller.player.playerStateStream,
+                    builder: (context, snap) {
+                      final playing = snap.data?.playing ?? false;
+                      final processing = snap.data?.processingState ?? ProcessingState.idle;
+                      final busy = processing == ProcessingState.loading || processing == ProcessingState.buffering;
+                      return FilledButton.tonalIcon(
+                        onPressed: busy
+                            ? null
+                            : () async {
+                                if (playing) {
+                                  await controller.player.pause();
+                                } else {
+                                  await controller.player.play();
+                                }
+                              },
+                        icon: busy
+                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            : Icon(playing ? Icons.pause : Icons.play_arrow),
+                        label: Text(playing ? '暂停' : '播放'),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          np.sourcePath,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
