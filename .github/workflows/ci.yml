@@ -59,25 +59,31 @@ jobs:
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
         run: |
           set -euxo pipefail
-          ./apps/furry_flutter/create_flutter_app.sh --no-ffi
-          cd apps/furry_flutter/furry_flutter_app
-          flutter build apk --debug --verbose
+          mkdir -p dist/android/flutter
+          (
+            ./apps/furry_flutter/create_flutter_app.sh --no-ffi
+            cd apps/furry_flutter/furry_flutter_app
+            flutter build apk --debug --verbose
+          ) 2>&1 | tee dist/android/flutter/android_debug_build.log
 
           mkdir -p ../../../../dist/android/flutter
           cp -f build/app/outputs/flutter-apk/app-debug.apk ../../../../dist/android/flutter/
 
       - name: Checksums
+        if: success()
         run: |
           set -euxo pipefail
           cd dist/android/flutter
           sha256sum app-debug.apk > SHA256SUMS.txt
 
       - name: Upload artifact (android-debug)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: android-debug
           path: |
             dist/android/flutter/app-debug.apk
+            dist/android/flutter/android_debug_build.log
             dist/android/flutter/SHA256SUMS.txt
 
   linux-desktop:
@@ -110,30 +116,34 @@ jobs:
       - name: Build Linux desktop bundle
         run: |
           set -euxo pipefail
-          ./apps/furry_flutter/create_flutter_app.sh --no-android
-          cargo --version
-          rustc --version
-          cargo build --release -p furry_ffi -v
-          cd apps/furry_flutter/furry_flutter_app
-          flutter config --enable-linux-desktop
-          flutter build linux --release --verbose
-          cp -f ../../../../target/release/libfurry_ffi.so build/linux/x64/release/bundle/ || true
-
-          mkdir -p ../../../../dist/desktop/flutter/linux
-          tar -C build/linux/x64/release -czf ../../../../dist/desktop/flutter/linux/furry_flutter_linux.tar.gz bundle
+          mkdir -p dist/desktop/flutter/linux
+          (
+            ./apps/furry_flutter/create_flutter_app.sh --no-android
+            cargo --version
+            rustc --version
+            cargo build --release -p furry_ffi -v
+            cd apps/furry_flutter/furry_flutter_app
+            flutter config --enable-linux-desktop
+            flutter build linux --release --verbose
+            cp -f ../../../../target/release/libfurry_ffi.so build/linux/x64/release/bundle/ || true
+            tar -C build/linux/x64/release -czf ../../../../dist/desktop/flutter/linux/furry_flutter_linux.tar.gz bundle
+          ) 2>&1 | tee dist/desktop/flutter/linux/linux_desktop_build.log
 
       - name: Checksums
+        if: success()
         run: |
           set -euxo pipefail
           cd dist/desktop/flutter/linux
           sha256sum furry_flutter_linux.tar.gz > SHA256SUMS.txt
 
       - name: Upload artifact (linux-desktop)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: linux-desktop
           path: |
             dist/desktop/flutter/linux/furry_flutter_linux.tar.gz
+            dist/desktop/flutter/linux/linux_desktop_build.log
             dist/desktop/flutter/linux/SHA256SUMS.txt
 
   windows-desktop:
@@ -186,18 +196,26 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $env:RUST_BACKTRACE = "1"
-          cargo --version
-          rustc --version
-          cargo build --release -p furry_ffi -v
-          cd apps/furry_flutter/furry_flutter_app
-          flutter config --enable-windows-desktop
-          flutter build windows --release --verbose
+          New-Item -ItemType Directory -Force -Path dist\desktop\flutter\windows | Out-Null
+          $log = "dist\\desktop\\flutter\\windows\\windows_desktop_build.log"
 
-          New-Item -ItemType Directory -Force -Path ..\..\..\..\dist\desktop\flutter\windows | Out-Null
-          Copy-Item -Force ..\..\..\..\target\release\furry_ffi.dll build\windows\x64\runner\Release\ -ErrorAction SilentlyContinue
-          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath ..\..\..\..\dist\desktop\flutter\windows\furry_flutter_windows.zip -Force
+          & {
+            cargo --version
+            rustc --version
+            cargo build --release -p furry_ffi -v
+            cd apps/furry_flutter/furry_flutter_app
+            flutter config --enable-windows-desktop
+            flutter build windows --release --verbose
+
+            New-Item -ItemType Directory -Force -Path ..\..\..\..\dist\desktop\flutter\windows | Out-Null
+            Copy-Item -Force ..\..\..\..\target\release\furry_ffi.dll build\windows\x64\runner\Release\ -ErrorAction SilentlyContinue
+            Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath ..\..\..\..\dist\desktop\flutter\windows\furry_flutter_windows.zip -Force
+          } 2>&1 | Tee-Object -FilePath $log
+
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Checksums
+        if: success()
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -206,9 +224,11 @@ jobs:
           "$hash  furry_flutter_windows.zip" | Out-File -Encoding ascii SHA256SUMS.txt
 
       - name: Upload artifact (windows-desktop)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: windows-desktop
           path: |
             dist/desktop/flutter/windows/furry_flutter_windows.zip
+            dist/desktop/flutter/windows/windows_desktop_build.log
             dist/desktop/flutter/windows/SHA256SUMS.txt
