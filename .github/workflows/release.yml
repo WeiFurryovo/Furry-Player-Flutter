@@ -199,7 +199,7 @@ jobs:
           }
 
           Push-Location $outDir
-          flutter pub add file_picker path_provider just_audio path ffi just_audio_background audio_service smtc_windows dbus
+          flutter pub add file_picker path_provider just_audio just_audio_platform_interface path ffi just_audio_background audio_service smtc_windows dbus
           Pop-Location
 
           Copy-Item -Recurse -Force (Join-Path $templates "lib\*") (Join-Path $outDir "lib")

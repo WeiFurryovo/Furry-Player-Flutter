@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -17,6 +18,7 @@ import 'system_media_bridge.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (!kIsWeb && Platform.isAndroid) {
+    final prevPlatform = JustAudioPlatform.instance;
     try {
       await JustAudioBackground.init(
         androidNotificationChannelId: 'com.furry.furry_flutter_app.channel.audio',
@@ -24,6 +26,9 @@ Future<void> main() async {
         androidNotificationOngoing: true,
       );
     } catch (e) {
+      // If AudioService init fails, just_audio_background may have already replaced the platform.
+      // Restore the previous platform so playback still works (without system controls).
+      JustAudioPlatform.instance = prevPlatform;
       debugPrint('JustAudioBackground init failed: $e');
     }
   }
