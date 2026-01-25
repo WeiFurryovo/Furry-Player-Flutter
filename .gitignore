@@ -10,6 +10,9 @@
 /dist/
 **/build/
 
+# Generated Flutter app (created from templates)
+apps/furry_flutter/furry_flutter_app/
+
 # Android / Gradle
 **/.gradle/
 **/local.properties

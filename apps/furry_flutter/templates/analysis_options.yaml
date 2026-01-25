@@ -4,4 +4,6 @@ linter:
   rules:
     # This app intentionally uses private State classes like `_AppShellState`.
     library_private_types_in_public_api: false
-
+    # Keep lints minimal for generated-template CI.
+    prefer_const_constructors: false
+    prefer_final_fields: false

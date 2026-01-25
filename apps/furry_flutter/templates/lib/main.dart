@@ -1,18 +1,27 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'furry_api.dart';
 import 'furry_api_selector.dart';
+import 'system_media_bridge.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (!kIsWeb && Platform.isAndroid) {
+    await JustAudioBackground.init(
+      androidNotificationChannelId: 'com.furry.furry_flutter_app.channel.audio',
+      androidNotificationChannelName: 'Furry Player',
+      androidNotificationOngoing: true,
+    );
+  }
   runApp(const FurryApp());
 }
 
@@ -103,6 +112,7 @@ class _AppShellState extends State<AppShell> {
 class _AppController {
   final AudioPlayer player = AudioPlayer();
   final FurryApi api = createFurryApi();
+  late final SystemMediaBridge systemMedia = SystemMediaBridge(player);
 
   final ValueNotifier<_NowPlaying?> nowPlaying = ValueNotifier<_NowPlaying?>(null);
   final ValueNotifier<List<File>> furryOutputs = ValueNotifier<List<File>>(<File>[]);
@@ -118,6 +128,7 @@ class _AppController {
   Future<void> init() async {
     try {
       await api.init();
+      await systemMedia.init();
       await cleanupTempArtifacts();
       await refreshOutputs();
       appendLog('Native init ok');
@@ -160,14 +171,50 @@ class _AppController {
           } catch (_) {}
         }
       }
+
+      // Cleanup cover art temp files.
+      final artDir = Directory(p.join(tmp.path, 'furry_media_art'));
+      if (await artDir.exists()) {
+        final cutoff = DateTime.now().subtract(const Duration(days: 7));
+        for (final f in artDir.listSync().whereType<File>()) {
+          if (f.lastModifiedSync().isBefore(cutoff)) {
+            try {
+              await f.delete();
+            } catch (_) {}
+          }
+        }
+      }
     } catch (_) {}
   }
 
   void dispose() {
     player.dispose();
+    systemMedia.dispose();
     nowPlaying.dispose();
     furryOutputs.dispose();
     log.dispose();
+  }
+
+  Future<Uri?> _writeCoverToTempUri(_MetaPreview meta) async {
+    final bytes = meta.coverBytes;
+    if (bytes == null || bytes.isEmpty) return null;
+
+    final tmp = await getTemporaryDirectory();
+    final artDir = Directory(p.join(tmp.path, 'furry_media_art'));
+    if (!await artDir.exists()) await artDir.create(recursive: true);
+
+    final mime = (meta.coverMime ?? '').toLowerCase();
+    final ext = mime.contains('png')
+        ? 'png'
+        : mime.contains('webp')
+            ? 'webp'
+            : 'jpg';
+
+    final out = File(p.join(artDir.path, 'cover_${bytes.length}_${bytes.hashCode}.$ext'));
+    if (!await out.exists()) {
+      await out.writeAsBytes(bytes, flush: true);
+    }
+    return out.uri;
   }
 
   void appendLog(String msg) {
@@ -317,19 +364,50 @@ class _AppController {
           return;
         }
         final unpacked = File(outPath);
-        await player.setAudioSource(AudioSource.uri(unpacked.uri));
-        await player.play();
         final meta = await getMetaPreviewForFurry(file);
+        final artUri = await _writeCoverToTempUri(meta);
+        final mediaItem = MediaItem(
+          id: file.path,
+          title: meta.title.isEmpty ? name : meta.title,
+          artist: meta.subtitle,
+          artUri: artUri,
+        );
+        await player.setAudioSource(AudioSource.uri(unpacked.uri, tag: mediaItem));
+        await player.play();
         nowPlaying.value = _NowPlaying(
           title: meta.title.isEmpty ? name : meta.title,
           subtitle: meta.subtitle.isEmpty ? '.furry → $originalExt' : meta.subtitle,
           sourcePath: file.path,
         );
+        await systemMedia.setMetadata(
+          SystemMediaMetadata(
+            title: nowPlaying.value!.title,
+            artist: meta.subtitle,
+            album: '',
+            artUri: artUri,
+            duration: player.duration,
+          ),
+        );
         appendLog('Playing (.furry → $originalExt): ${p.basename(unpacked.path)}');
       } else {
-        await player.setAudioSource(AudioSource.uri(file.uri));
+        final mediaItem = MediaItem(
+          id: file.path,
+          title: name,
+          artist: '',
+          artUri: null,
+        );
+        await player.setAudioSource(AudioSource.uri(file.uri, tag: mediaItem));
         await player.play();
         nowPlaying.value = _NowPlaying(title: name, subtitle: '本地文件', sourcePath: file.path);
+        await systemMedia.setMetadata(
+          SystemMediaMetadata(
+            title: name,
+            artist: '',
+            album: '',
+            artUri: null,
+            duration: player.duration,
+          ),
+        );
         appendLog('Playing (raw): $name');
       }
     } catch (e) {

@@ -41,7 +41,7 @@ else
 fi
 
 echo "[INFO] 添加依赖（pub add）"
-(cd "$OUT_DIR" && flutter pub add file_picker path_provider just_audio path ffi)
+(cd "$OUT_DIR" && flutter pub add file_picker path_provider just_audio path ffi just_audio_background audio_service smtc_windows dbus)
 
 echo "[INFO] 覆盖模板代码"
 cp -a "$TEMPLATES_DIR/lib/." "$OUT_DIR/lib/"
