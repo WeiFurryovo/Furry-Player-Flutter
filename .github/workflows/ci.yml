@@ -123,8 +123,8 @@ jobs:
             cd apps/furry_flutter/furry_flutter_app
             flutter config --enable-linux-desktop
             flutter build linux --release --verbose
-            cp -f ../../../../target/release/libfurry_ffi.so build/linux/x64/release/bundle/ || true
-            tar -C build/linux/x64/release -czf ../../../../dist/desktop/flutter/linux/furry_flutter_linux.tar.gz bundle
+            cp -f ../../../target/release/libfurry_ffi.so build/linux/x64/release/bundle/ || true
+            tar -C build/linux/x64/release -czf ../../../dist/desktop/flutter/linux/furry_flutter_linux.tar.gz bundle
           ) 2>&1 | tee dist/desktop/flutter/linux/linux_desktop_build.log
 
       - name: Checksums

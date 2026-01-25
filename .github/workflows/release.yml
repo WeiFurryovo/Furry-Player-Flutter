@@ -82,9 +82,9 @@ jobs:
           flutter build apk --release --verbose
           flutter build appbundle --release --verbose
 
-          mkdir -p ../../../../dist/android/flutter
-          cp -f build/app/outputs/flutter-apk/app-release.apk ../../../../dist/android/flutter/
-          cp -f build/app/outputs/bundle/release/app-release.aab ../../../../dist/android/flutter/
+          mkdir -p ../../../dist/android/flutter
+          cp -f build/app/outputs/flutter-apk/app-release.apk ../../../dist/android/flutter/
+          cp -f build/app/outputs/bundle/release/app-release.aab ../../../dist/android/flutter/
 
       - name: Checksums
         run: |
@@ -138,10 +138,10 @@ jobs:
           cd apps/furry_flutter/furry_flutter_app
           flutter config --enable-linux-desktop
           flutter build linux --release --verbose
-          cp -f ../../../../target/release/libfurry_ffi.so build/linux/x64/release/bundle/ || true
+          cp -f ../../../target/release/libfurry_ffi.so build/linux/x64/release/bundle/ || true
 
-          mkdir -p ../../../../dist/desktop/flutter/linux
-          tar -C build/linux/x64/release -czf ../../../../dist/desktop/flutter/linux/furry_flutter_linux.tar.gz bundle
+          mkdir -p ../../../dist/desktop/flutter/linux
+          tar -C build/linux/x64/release -czf ../../../dist/desktop/flutter/linux/furry_flutter_linux.tar.gz bundle
 
       - name: Checksums
         run: |
@@ -214,9 +214,9 @@ jobs:
           flutter config --enable-windows-desktop
           flutter build windows --release --verbose
 
-          New-Item -ItemType Directory -Force -Path ..\..\..\..\dist\desktop\flutter\windows | Out-Null
-          Copy-Item -Force ..\..\..\..\target\release\furry_ffi.dll build\windows\x64\runner\Release\ -ErrorAction SilentlyContinue
-          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath ..\..\..\..\dist\desktop\flutter\windows\furry_flutter_windows.zip -Force
+          New-Item -ItemType Directory -Force -Path ..\..\..\dist\desktop\flutter\windows | Out-Null
+          Copy-Item -Force ..\..\..\target\release\furry_ffi.dll build\windows\x64\runner\Release\ -ErrorAction SilentlyContinue
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath ..\..\..\dist\desktop\flutter\windows\furry_flutter_windows.zip -Force
 
       - name: Checksums
         shell: pwsh
