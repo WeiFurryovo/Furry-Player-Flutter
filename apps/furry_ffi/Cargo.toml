@@ -1,0 +1,15 @@
+[package]
+name = "furry_ffi"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+furry_crypto = { path = "../../crates/furry_crypto" }
+furry_converter = { path = "../../crates/furry_converter" }
+furry_format = { path = "../../crates/furry_format" }
+thiserror.workspace = true
+

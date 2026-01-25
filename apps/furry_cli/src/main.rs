@@ -3,10 +3,12 @@
 //! 用于转换音频文件为 .furry 格式
 
 use std::fs::File;
+use std::io::Read;
 use std::path::PathBuf;
 
 use furry_converter::{pack_to_furry, unpack_from_furry, PackOptions, detect_format};
 use furry_crypto::MasterKey;
+use furry_format::FurryReader;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -15,6 +17,7 @@ fn main() {
         eprintln!("Usage:");
         eprintln!("  {} pack <input.mp3> <output.furry> [padding_kb]", args[0]);
         eprintln!("  {} unpack <input.furry> <output.mp3>", args[0]);
+        eprintln!("  {} info <input.furry>   # prints JSON (valid/original_format)", args[0]);
         std::process::exit(1);
     }
 
@@ -71,6 +74,51 @@ fn main() {
 
             println!("Unpacked successfully!");
             println!("  Original format: {:?}", format);
+        }
+        "info" => {
+            let input_path = PathBuf::from(&args[2]);
+            let file = match File::open(&input_path) {
+                Ok(f) => f,
+                Err(_) => {
+                    println!(r#"{{"valid":false,"error":"open_failed"}}"#);
+                    std::process::exit(2);
+                }
+            };
+
+            // quick magic check first
+            let mut reader = std::io::BufReader::new(file);
+            let mut magic = [0u8; 8];
+            if reader.read_exact(&mut magic).is_err() || &magic != b"FURRYFMT" {
+                println!(r#"{{"valid":false,"error":"bad_magic"}}"#);
+                std::process::exit(3);
+            }
+
+            // reopen for full parse (FurryReader expects start from 0)
+            let file = match File::open(&input_path) {
+                Ok(f) => f,
+                Err(_) => {
+                    println!(r#"{{"valid":false,"error":"open_failed"}}"#);
+                    std::process::exit(2);
+                }
+            };
+
+            let reader = match FurryReader::open(file, &master_key) {
+                Ok(r) => r,
+                Err(_) => {
+                    println!(r#"{{"valid":false,"error":"parse_failed"}}"#);
+                    std::process::exit(4);
+                }
+            };
+
+            let ext = match reader.index.header.original_format {
+                furry_format::OriginalFormat::Mp3 => "mp3",
+                furry_format::OriginalFormat::Wav => "wav",
+                furry_format::OriginalFormat::Ogg => "ogg",
+                furry_format::OriginalFormat::Flac => "flac",
+                furry_format::OriginalFormat::Unknown => "",
+            };
+
+            println!(r#"{{"valid":true,"original_format":"{}"}}"#, ext);
         }
         _ => {
             eprintln!("Unknown command: {}", command);
