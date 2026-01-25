@@ -9,14 +9,10 @@ import 'furry_api.dart';
 
 class FurryApiFfi implements FurryApi {
   FurryApiFfi()
-      : _lib = _openLib(),
-        _isValid = _openLib().lookupFunction<_IsValidC, _IsValidDart>('furry_is_valid_furry_file'),
-        _getOriginalFormat =
-            _openLib().lookupFunction<_GetOriginalFormatC, _GetOriginalFormatDart>(
+      : _isValid = _openLib().lookupFunction<_IsValidC, _IsValidDart>('furry_is_valid_furry_file'),
+        _getOriginalFormat = _openLib().lookupFunction<_GetOriginalFormatC, _GetOriginalFormatDart>(
           'furry_get_original_format',
         );
-
-  final ffi.DynamicLibrary _lib;
 
   late final _IsValidDart _isValid;
   late final _GetOriginalFormatDart _getOriginalFormat;

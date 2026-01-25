@@ -50,6 +50,9 @@ if [ -d "$TEMPLATES_DIR/test" ]; then
   mkdir -p "$OUT_DIR/test"
   cp -a "$TEMPLATES_DIR/test/." "$OUT_DIR/test/"
 fi
+if [ -f "$TEMPLATES_DIR/analysis_options.yaml" ]; then
+  cp -f "$TEMPLATES_DIR/analysis_options.yaml" "$OUT_DIR/analysis_options.yaml"
+fi
 
 if [ "$BUILD_ANDROID" -eq 1 ]; then
   echo "[INFO] 构建 Rust Android 动态库（需要 ANDROID_NDK_HOME）"
