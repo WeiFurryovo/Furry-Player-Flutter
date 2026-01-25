@@ -5,7 +5,7 @@
   - Android：`app-release.apk`、`app-release.aab`（**需要正式签名**）
   - Linux：Flutter 桌面 bundle（tar.gz）
   - Windows：Flutter 桌面 Release（zip）
-- 自动创建 GitHub Release 并上传上述产物 + SHA256 校验文件
+- 自动创建 GitHub Release 并上传上述产物 + SHA256 校验文件（各平台文件会放在对应子目录下，避免 `SHA256SUMS.txt` 重名覆盖）
 
 同时提供 `.github/workflows/ci.yml`：
 - 每次 push/PR 自动构建 **测试用 Artifacts**
