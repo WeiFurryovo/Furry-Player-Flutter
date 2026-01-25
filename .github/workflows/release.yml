@@ -39,6 +39,9 @@ jobs:
       - name: Install Android NDK (sdkmanager)
         run: |
           set -euxo pipefail
+          mkdir -p ~/.android
+          touch ~/.android/repositories.cfg
+          sdkmanager --version
           sdkmanager --install "ndk;26.1.10909125"
           yes | sdkmanager --licenses >/dev/null
 
@@ -68,8 +71,8 @@ jobs:
           storeFile=upload-keystore.jks
           EOF
 
-          flutter build apk --release
-          flutter build appbundle --release
+          flutter build apk --release --verbose
+          flutter build appbundle --release --verbose
 
           mkdir -p ../../../../dist/android/flutter
           cp -f build/app/outputs/flutter-apk/app-release.apk ../../../../dist/android/flutter/
@@ -124,7 +127,7 @@ jobs:
           cargo build --release -p furry_ffi
           cd apps/furry_flutter/furry_flutter_app
           flutter config --enable-linux-desktop
-          flutter build linux --release
+          flutter build linux --release --verbose
           cp -f ../../../../target/release/libfurry_ffi.so build/linux/x64/release/bundle/ || true
 
           mkdir -p ../../../../dist/desktop/flutter/linux
@@ -164,6 +167,9 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Setup MSVC dev cmd
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Create Flutter app (Windows)
         shell: pwsh
         run: |
@@ -190,10 +196,11 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
+          $env:RUST_BACKTRACE = "1"
           cargo build --release -p furry_ffi
           cd apps/furry_flutter/furry_flutter_app
           flutter config --enable-windows-desktop
-          flutter build windows --release
+          flutter build windows --release --verbose
 
           New-Item -ItemType Directory -Force -Path ..\..\..\..\dist\desktop\flutter\windows | Out-Null
           Copy-Item -Force ..\..\..\..\target\release\furry_ffi.dll build\windows\x64\runner\Release\ -ErrorAction SilentlyContinue
