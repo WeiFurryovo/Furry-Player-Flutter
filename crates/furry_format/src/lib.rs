@@ -1,13 +1,13 @@
 //! furry_format - .furry 文件格式读写库
 
-mod header;
 mod chunk;
+mod header;
 mod index;
 mod reader;
 mod writer;
 
-pub use header::*;
 pub use chunk::*;
+pub use header::*;
 pub use index::*;
 pub use reader::*;
 pub use writer::*;

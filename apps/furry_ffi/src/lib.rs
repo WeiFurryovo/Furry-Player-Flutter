@@ -52,7 +52,14 @@ pub extern "C" fn furry_pack_to_furry(
         ..Default::default()
     };
 
-    match pack_to_furry(&mut input, &mut output, Some(&input_path), format, &master_key, &options) {
+    match pack_to_furry(
+        &mut input,
+        &mut output,
+        Some(&input_path),
+        format,
+        &master_key,
+        &options,
+    ) {
         Ok(_) => 0,
         Err(_) => -5,
     }
@@ -92,8 +99,12 @@ fn original_ext(path: &PathBuf, master_key: &MasterKey) -> Result<&'static str, 
 
 /// Writes original format extension (without dot) into `out_buf` (NUL-terminated).
 /// Returns 0 on success, negative on failure.
+///
+/// # Safety
+/// - `file_path` must be a valid NUL-terminated C string pointer (or NULL).
+/// - `out_buf` must point to at least `out_len` writable bytes.
 #[no_mangle]
-pub extern "C" fn furry_get_original_format(
+pub unsafe extern "C" fn furry_get_original_format(
     file_path: *const c_char,
     out_buf: *mut c_char,
     out_len: usize,
@@ -129,8 +140,12 @@ pub extern "C" fn furry_get_original_format(
 
 /// Decrypts `.furry` to in-memory bytes.
 /// On success returns 0 and sets `*out_ptr`/`*out_len`. Caller must call `furry_free_bytes`.
+///
+/// # Safety
+/// - `input_path` must be a valid NUL-terminated C string pointer (or NULL).
+/// - `out_ptr` and `out_len` must be valid writable pointers.
 #[no_mangle]
-pub extern "C" fn furry_unpack_from_furry_to_bytes(
+pub unsafe extern "C" fn furry_unpack_from_furry_to_bytes(
     input_path: *const c_char,
     out_ptr: *mut *mut c_uchar,
     out_len: *mut usize,
@@ -168,8 +183,12 @@ pub extern "C" fn furry_unpack_from_furry_to_bytes(
 
 /// Returns embedded tags JSON (UTF-8) from `.furry` META chunk.
 /// On success returns 0 and sets `*out_ptr`/`*out_len`. Caller must call `furry_free_bytes`.
+///
+/// # Safety
+/// - `input_path` must be a valid NUL-terminated C string pointer (or NULL).
+/// - `out_ptr` and `out_len` must be valid writable pointers.
 #[no_mangle]
-pub extern "C" fn furry_get_tags_json_to_bytes(
+pub unsafe extern "C" fn furry_get_tags_json_to_bytes(
     input_path: *const c_char,
     out_ptr: *mut *mut c_uchar,
     out_len: *mut usize,
@@ -215,8 +234,12 @@ pub extern "C" fn furry_get_tags_json_to_bytes(
 /// Returns embedded cover art payload bytes from `.furry` META chunk.
 /// Payload format: `mime\\0<image-bytes>`.
 /// On success returns 0 and sets `*out_ptr`/`*out_len`. Caller must call `furry_free_bytes`.
+///
+/// # Safety
+/// - `input_path` must be a valid NUL-terminated C string pointer (or NULL).
+/// - `out_ptr` and `out_len` must be valid writable pointers.
 #[no_mangle]
-pub extern "C" fn furry_get_cover_art_to_bytes(
+pub unsafe extern "C" fn furry_get_cover_art_to_bytes(
     input_path: *const c_char,
     out_ptr: *mut *mut c_uchar,
     out_len: *mut usize,
@@ -260,8 +283,11 @@ pub extern "C" fn furry_get_cover_art_to_bytes(
 }
 
 /// Frees bytes allocated by `furry_unpack_from_furry_to_bytes`.
+///
+/// # Safety
+/// - `ptr`/`len` must come from this library (via `*_to_bytes` functions), and be freed exactly once.
 #[no_mangle]
-pub extern "C" fn furry_free_bytes(ptr: *mut c_uchar, len: usize) {
+pub unsafe extern "C" fn furry_free_bytes(ptr: *mut c_uchar, len: usize) {
     if ptr.is_null() || len == 0 {
         return;
     }

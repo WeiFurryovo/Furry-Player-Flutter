@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, SampleFormat, Stream, StreamConfig};
-use crossbeam_channel::{Sender, bounded};
+use crossbeam_channel::{bounded, Sender};
 
 /// 音频输出错误
 #[derive(thiserror::Error, Debug)]
@@ -53,9 +53,7 @@ impl AudioOutput {
     /// 创建音频输出
     pub fn new(config: OutputConfig) -> Result<Self, OutputError> {
         let host = cpal::default_host();
-        let device = host
-            .default_output_device()
-            .ok_or(OutputError::NoDevice)?;
+        let device = host.default_output_device().ok_or(OutputError::NoDevice)?;
 
         Self::with_device(&device, config)
     }
@@ -122,7 +120,9 @@ impl AudioOutput {
             )
             .map_err(|e| OutputError::Stream(e.to_string()))?;
 
-        stream.play().map_err(|e| OutputError::Stream(e.to_string()))?;
+        stream
+            .play()
+            .map_err(|e| OutputError::Stream(e.to_string()))?;
 
         Ok(Self {
             _stream: stream,

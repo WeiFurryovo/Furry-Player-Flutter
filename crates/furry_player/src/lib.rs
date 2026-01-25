@@ -2,14 +2,14 @@
 //!
 //! 提供 .furry 文件的解码和播放功能。
 
-mod virtual_stream;
-mod decoder;
-mod output;
-mod engine;
 mod command;
+mod decoder;
+mod engine;
+mod output;
+mod virtual_stream;
 
-pub use virtual_stream::*;
-pub use decoder::*;
-pub use output::*;
-pub use engine::*;
 pub use command::*;
+pub use decoder::*;
+pub use engine::*;
+pub use output::*;
+pub use virtual_stream::*;

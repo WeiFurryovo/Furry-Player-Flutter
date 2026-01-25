@@ -5,8 +5,8 @@ use std::io::{Seek, SeekFrom, Write};
 use furry_crypto::{FileKeys, MasterKey};
 
 use crate::{
-    ChunkRecordHeaderV1, ChunkType, FormatError, FurryHeaderV1, FurryIndexV1,
-    IndexEntryV1, OriginalFormat, FURRY_HEADER_LEN,
+    ChunkRecordHeaderV1, ChunkType, FormatError, FurryHeaderV1, FurryIndexV1, IndexEntryV1,
+    OriginalFormat, FURRY_HEADER_LEN,
 };
 
 /// .furry 文件写入器
@@ -49,7 +49,11 @@ impl<W: Write + Seek> FurryWriter<W> {
     }
 
     /// 写入 AUDIO chunk
-    pub fn write_audio_chunk(&mut self, data: &[u8], virtual_offset: u64) -> Result<(), FormatError> {
+    pub fn write_audio_chunk(
+        &mut self,
+        data: &[u8],
+        virtual_offset: u64,
+    ) -> Result<(), FormatError> {
         self.write_chunk_internal(ChunkType::Audio, data, virtual_offset, 0, 0)
     }
 
@@ -81,12 +85,8 @@ impl<W: Write + Seek> FurryWriter<W> {
         let chunk_seq = self.chunk_seq;
         self.chunk_seq += 1;
 
-        let mut chunk_header = ChunkRecordHeaderV1::new(
-            chunk_type,
-            chunk_seq,
-            virtual_offset,
-            data.len() as u32,
-        );
+        let mut chunk_header =
+            ChunkRecordHeaderV1::new(chunk_type, chunk_seq, virtual_offset, data.len() as u32);
         chunk_header.chunk_flags = chunk_flags;
 
         // 加密数据
@@ -121,7 +121,13 @@ impl<W: Write + Seek> FurryWriter<W> {
         let entry = match chunk_type {
             ChunkType::Audio => {
                 self.index.header.audio_stream_len += data.len() as u64;
-                IndexEntryV1::new_audio(chunk_seq, file_offset, record_len, data.len() as u32, virtual_offset)
+                IndexEntryV1::new_audio(
+                    chunk_seq,
+                    file_offset,
+                    record_len,
+                    data.len() as u32,
+                    virtual_offset,
+                )
             }
             ChunkType::Meta => {
                 let kind = crate::MetaKind::from_u16(meta_kind);
@@ -152,12 +158,8 @@ impl<W: Write + Seek> FurryWriter<W> {
         let index_plain_len = index_data.len() as u32;
 
         let chunk_seq = self.chunk_seq;
-        let chunk_header = ChunkRecordHeaderV1::new(
-            ChunkType::Index,
-            chunk_seq,
-            0,
-            index_plain_len,
-        );
+        let chunk_header =
+            ChunkRecordHeaderV1::new(ChunkType::Index, chunk_seq, 0, index_plain_len);
 
         let mut ciphertext = index_data;
         let nonce = furry_crypto::nonce_for_chunk(&self.keys.nonce_prefix, chunk_seq);

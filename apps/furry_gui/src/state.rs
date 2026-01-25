@@ -318,8 +318,15 @@ impl AppState {
 
                 let mut input = std::fs::File::open(&input_path).map_err(|e| e.to_string())?;
                 let mut output = std::fs::File::create(&output_path).map_err(|e| e.to_string())?;
-                pack_to_furry(&mut input, &mut output, Some(&input_path), format, &master_key, &options)
-                    .map_err(|e| e.to_string())?;
+                pack_to_furry(
+                    &mut input,
+                    &mut output,
+                    Some(&input_path),
+                    format,
+                    &master_key,
+                    &options,
+                )
+                .map_err(|e| e.to_string())?;
 
                 let input_size = std::fs::metadata(&input_path)
                     .map(|m| m.len())

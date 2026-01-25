@@ -11,7 +11,9 @@ use serde::Serialize;
 use symphonia::core::codecs::CODEC_TYPE_NULL;
 use symphonia::core::formats::FormatOptions;
 use symphonia::core::io::MediaSourceStream;
-use symphonia::core::meta::{MetadataOptions, StandardTagKey, Value as MetaValue};
+use symphonia::core::meta::{
+    MetadataOptions, MetadataRevision, StandardTagKey, Value as MetaValue,
+};
 use symphonia::core::probe::Hint;
 
 /// 转换器错误
@@ -207,8 +209,13 @@ fn extract_meta_from_path(path: &Path, original_format: OriginalFormat) -> Optio
     }
 
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
-    let probed = symphonia::default::get_probe()
-        .format(&hint, mss, &FormatOptions::default(), &MetadataOptions::default())
+    let mut probed = symphonia::default::get_probe()
+        .format(
+            &hint,
+            mss,
+            &FormatOptions::default(),
+            &MetadataOptions::default(),
+        )
         .ok()?;
 
     let mut raw_tags: Vec<(String, String)> = Vec::new();
@@ -246,11 +253,8 @@ fn extract_meta_from_path(path: &Path, original_format: OriginalFormat) -> Optio
     }
 
     // Tags/visuals from both metadata blocks (best-effort)
-    for meta in [probed.format.metadata().current(), probed.metadata.get().current()]
-        .into_iter()
-        .flatten()
-    {
-        for tag in meta.tags() {
+    let mut process_revision = |rev: &MetadataRevision| {
+        for tag in rev.tags() {
             let key = tag
                 .std_key
                 .map(|k| format!("{:?}", k))
@@ -294,17 +298,33 @@ fn extract_meta_from_path(path: &Path, original_format: OriginalFormat) -> Optio
         }
 
         if cover.is_none() {
-            for v in meta.visuals() {
+            for v in rev.visuals() {
                 if v.data.is_empty() {
                     continue;
                 }
-                let mime = if v.media_type.is_empty() { "image/*" } else { v.media_type };
+                let mime = if v.media_type.is_empty() {
+                    "image/*"
+                } else {
+                    &v.media_type
+                };
                 cover = Some(CoverArt {
                     mime: mime.to_string(),
                     bytes: v.data.to_vec(),
                 });
                 break;
             }
+        }
+    };
+
+    {
+        let format_meta = probed.format.metadata();
+        if let Some(rev) = format_meta.current() {
+            process_revision(rev);
+        }
+    }
+    if let Some(meta) = probed.metadata.get() {
+        if let Some(rev) = meta.current() {
+            process_revision(rev);
         }
     }
 
@@ -346,6 +366,7 @@ fn meta_value_to_string(v: &MetaValue) -> String {
         MetaValue::Binary(b) => format!("(binary:{} bytes)", b.len()),
         MetaValue::Boolean(b) => b.to_string(),
         MetaValue::Float(f) => f.to_string(),
+        MetaValue::Flag => "true".to_string(),
         MetaValue::SignedInt(i) => i.to_string(),
         MetaValue::String(s) => s.to_string(),
         MetaValue::UnsignedInt(u) => u.to_string(),
@@ -386,7 +407,8 @@ mod tests {
         let mut furry_input = Cursor::new(&furry_data);
         let mut unpacked_output = Cursor::new(Vec::new());
 
-        let format = unpack_from_furry(&mut furry_input, &mut unpacked_output, &master_key).unwrap();
+        let format =
+            unpack_from_furry(&mut furry_input, &mut unpacked_output, &master_key).unwrap();
 
         assert_eq!(format, OriginalFormat::Mp3);
         assert_eq!(unpacked_output.into_inner(), original_data);
@@ -410,6 +432,7 @@ mod tests {
                 chunk_size: 1024,
                 padding_bytes: 10000, // 添加 10KB padding
                 padding_chunk_size: 2000,
+                include_meta: true,
             },
         )
         .unwrap();

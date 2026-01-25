@@ -40,7 +40,9 @@ impl<R: Read + Seek> FurryReader<R> {
 
         let chunk_header = ChunkRecordHeaderV1::read_from(inner)?;
         if chunk_header.chunk_type != ChunkType::Index {
-            return Err(FormatError::CorruptIndex("index_offset not pointing to INDEX chunk"));
+            return Err(FormatError::CorruptIndex(
+                "index_offset not pointing to INDEX chunk",
+            ));
         }
 
         let mut ciphertext = vec![0u8; chunk_header.plain_len as usize];
@@ -57,7 +59,13 @@ impl<R: Read + Seek> FurryReader<R> {
             &chunk_header.to_bytes(),
         );
 
-        furry_crypto::decrypt_in_place_detached(&keys.aead_key, &nonce, &aad, &mut ciphertext, &tag)?;
+        furry_crypto::decrypt_in_place_detached(
+            &keys.aead_key,
+            &nonce,
+            &aad,
+            &mut ciphertext,
+            &tag,
+        )?;
 
         FurryIndexV1::parse(&ciphertext)
     }
@@ -82,13 +90,22 @@ impl<R: Read + Seek> FurryReader<R> {
             &chunk_header.to_bytes(),
         );
 
-        furry_crypto::decrypt_in_place_detached(&self.keys.aead_key, &nonce, &aad, &mut ciphertext, &tag)?;
+        furry_crypto::decrypt_in_place_detached(
+            &self.keys.aead_key,
+            &nonce,
+            &aad,
+            &mut ciphertext,
+            &tag,
+        )?;
 
         Ok(ciphertext)
     }
 
     /// 读取指定 kind 的最新 META chunk（按 chunk_seq 最大）
-    pub fn read_latest_meta(&mut self, kind: crate::MetaKind) -> Result<Option<Vec<u8>>, FormatError> {
+    pub fn read_latest_meta(
+        &mut self,
+        kind: crate::MetaKind,
+    ) -> Result<Option<Vec<u8>>, FormatError> {
         let entry = self
             .index
             .meta_entries_by_kind(kind)

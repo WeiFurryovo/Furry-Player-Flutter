@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 
-use furry_converter::{pack_to_furry, unpack_from_furry, PackOptions, detect_format};
+use furry_converter::{detect_format, pack_to_furry, unpack_from_furry, PackOptions};
 use furry_crypto::MasterKey;
 use furry_format::FurryReader;
 
@@ -17,7 +17,10 @@ fn main() {
         eprintln!("Usage:");
         eprintln!("  {} pack <input.mp3> <output.furry> [padding_kb]", args[0]);
         eprintln!("  {} unpack <input.furry> <output.mp3>", args[0]);
-        eprintln!("  {} info <input.furry>   # prints JSON (valid/original_format)", args[0]);
+        eprintln!(
+            "  {} info <input.furry>   # prints JSON (valid/original_format)",
+            args[0]
+        );
         std::process::exit(1);
     }
 
@@ -27,7 +30,10 @@ fn main() {
     match command.as_str() {
         "pack" => {
             if args.len() < 4 {
-                eprintln!("Usage: {} pack <input> <output.furry> [padding_kb]", args[0]);
+                eprintln!(
+                    "Usage: {} pack <input> <output.furry> [padding_kb]",
+                    args[0]
+                );
                 std::process::exit(1);
             }
 
@@ -46,8 +52,15 @@ fn main() {
                 ..Default::default()
             };
 
-            pack_to_furry(&mut input, &mut output, Some(&input_path), format, &master_key, &options)
-                .expect("Failed to pack");
+            pack_to_furry(
+                &mut input,
+                &mut output,
+                Some(&input_path),
+                format,
+                &master_key,
+                &options,
+            )
+            .expect("Failed to pack");
 
             let input_size = std::fs::metadata(&input_path).unwrap().len();
             let output_size = std::fs::metadata(&output_path).unwrap().len();
@@ -69,8 +82,8 @@ fn main() {
             let mut input = File::open(&input_path).expect("Failed to open input file");
             let mut output = File::create(&output_path).expect("Failed to create output file");
 
-            let format = unpack_from_furry(&mut input, &mut output, &master_key)
-                .expect("Failed to unpack");
+            let format =
+                unpack_from_furry(&mut input, &mut output, &master_key).expect("Failed to unpack");
 
             println!("Unpacked successfully!");
             println!("  Original format: {:?}", format);

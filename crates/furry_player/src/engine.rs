@@ -4,12 +4,12 @@ use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 
-use crossbeam_channel::{Receiver, Sender, bounded};
+use crossbeam_channel::{bounded, Receiver, Sender};
 use furry_crypto::MasterKey;
 
 use crate::{
-    AudioDecoder, AudioOutput, OutputConfig, PlaybackState, PlayerCommand, PlayerEvent,
-    TrackInfo, VirtualAudioStream,
+    AudioDecoder, AudioOutput, OutputConfig, PlaybackState, PlayerCommand, PlayerEvent, TrackInfo,
+    VirtualAudioStream,
 };
 
 /// 播放引擎句柄
@@ -30,11 +30,7 @@ pub fn spawn_player(master_key: MasterKey) -> PlayerHandle {
     PlayerHandle { cmd_tx, evt_rx }
 }
 
-fn run_engine(
-    cmd_rx: Receiver<PlayerCommand>,
-    evt_tx: Sender<PlayerEvent>,
-    master_key: MasterKey,
-) {
+fn run_engine(cmd_rx: Receiver<PlayerCommand>, evt_tx: Sender<PlayerEvent>, master_key: MasterKey) {
     let mut state = EngineState::new(master_key, evt_tx);
 
     let _ = state
@@ -131,7 +127,9 @@ impl EngineState {
         let stream = match VirtualAudioStream::open(&path, &self.master_key) {
             Ok(s) => s,
             Err(e) => {
-                let _ = self.evt_tx.send(PlayerEvent::Error(format!("Failed to open file: {}", e)));
+                let _ = self
+                    .evt_tx
+                    .send(PlayerEvent::Error(format!("Failed to open file: {}", e)));
                 self.set_state(PlaybackState::Idle);
                 return;
             }
@@ -150,7 +148,9 @@ impl EngineState {
         let decoder = match AudioDecoder::new(stream, format_hint) {
             Ok(d) => d,
             Err(e) => {
-                let _ = self.evt_tx.send(PlayerEvent::Error(format!("Failed to decode: {}", e)));
+                let _ = self
+                    .evt_tx
+                    .send(PlayerEvent::Error(format!("Failed to decode: {}", e)));
                 self.set_state(PlaybackState::Idle);
                 return;
             }
@@ -169,7 +169,9 @@ impl EngineState {
         let output = match AudioOutput::new(output_config) {
             Ok(o) => o,
             Err(e) => {
-                let _ = self.evt_tx.send(PlayerEvent::Error(format!("Audio output error: {}", e)));
+                let _ = self
+                    .evt_tx
+                    .send(PlayerEvent::Error(format!("Audio output error: {}", e)));
                 self.set_state(PlaybackState::Idle);
                 return;
             }
@@ -225,7 +227,9 @@ impl EngineState {
     fn seek(&mut self, pos: Duration) {
         if let Some(track) = &mut self.current_track {
             if let Err(e) = track.decoder.seek(pos) {
-                let _ = self.evt_tx.send(PlayerEvent::Error(format!("Seek error: {}", e)));
+                let _ = self
+                    .evt_tx
+                    .send(PlayerEvent::Error(format!("Seek error: {}", e)));
             } else {
                 track.output.reset_position();
                 let _ = self.evt_tx.send(PlayerEvent::Position(pos));
@@ -253,7 +257,9 @@ impl EngineState {
                     let _ = self.evt_tx.send(PlayerEvent::TrackEnded);
                 }
                 Err(e) => {
-                    let _ = self.evt_tx.send(PlayerEvent::Error(format!("Decode error: {}", e)));
+                    let _ = self
+                        .evt_tx
+                        .send(PlayerEvent::Error(format!("Decode error: {}", e)));
                 }
             }
         }
@@ -264,7 +270,9 @@ impl EngineState {
         if self.last_position_update.elapsed() >= Duration::from_millis(100) {
             if let Some(track) = &self.current_track {
                 let pos = track.output.position();
-                let _ = self.evt_tx.send(PlayerEvent::Position(Duration::from_secs_f64(pos)));
+                let _ = self
+                    .evt_tx
+                    .send(PlayerEvent::Position(Duration::from_secs_f64(pos)));
             }
             self.last_position_update = std::time::Instant::now();
         }

@@ -87,14 +87,11 @@ impl AudioDecoder {
 
         // 获取音频信息
         let sample_rate = codec_params.sample_rate.unwrap_or(44100);
-        let channels = codec_params
-            .channels
-            .map(|c| c.count())
-            .unwrap_or(2);
+        let channels = codec_params.channels.map(|c| c.count()).unwrap_or(2);
 
-        let duration = codec_params.n_frames.map(|frames| {
-            Duration::from_secs_f64(frames as f64 / sample_rate as f64)
-        });
+        let duration = codec_params
+            .n_frames
+            .map(|frames| Duration::from_secs_f64(frames as f64 / sample_rate as f64));
 
         let codec = format!("{:?}", codec_params.codec);
 

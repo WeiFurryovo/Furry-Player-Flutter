@@ -111,7 +111,8 @@ impl VirtualAudioStream {
         };
 
         if need_load {
-            let chunk_idx = self.find_chunk_index(self.position)
+            let chunk_idx = self
+                .find_chunk_index(self.position)
                 .ok_or(StreamError::SeekOutOfBounds)?;
 
             let entry = &self.audio_entries[chunk_idx];
@@ -134,8 +135,7 @@ impl Read for VirtualAudioStream {
             return Ok(0);
         }
 
-        self.ensure_chunk_loaded()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        self.ensure_chunk_loaded().map_err(std::io::Error::other)?;
 
         let cache = self.current_chunk.as_ref().unwrap();
         let offset_in_chunk = (self.position - cache.virtual_start) as usize;

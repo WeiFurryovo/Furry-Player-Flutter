@@ -34,7 +34,10 @@ pub extern "system" fn Java_com_furry_player_NativeLib_init(_env: JNIEnv, _class
 
 /// JNI: 初始化库（Flutter 模板包名：com.furry.furry_flutter_app.NativeLib）
 #[no_mangle]
-pub extern "system" fn Java_com_furry_furry_1flutter_1app_NativeLib_init(_env: JNIEnv, _class: JClass) {
+pub extern "system" fn Java_com_furry_furry_1flutter_1app_NativeLib_init(
+    _env: JNIEnv,
+    _class: JClass,
+) {
     init_logging();
 }
 
@@ -104,7 +107,14 @@ fn pack_to_furry_impl(
         ..Default::default()
     };
 
-    match pack_to_furry(&mut input, &mut output, Some(&input_path), format, &master_key, &options) {
+    match pack_to_furry(
+        &mut input,
+        &mut output,
+        Some(&input_path),
+        format,
+        &master_key,
+        &options,
+    ) {
         Ok(_) => 0,
         Err(_) => -5,
     }
@@ -125,7 +135,9 @@ pub extern "system" fn Java_com_furry_player_NativeLib_unpackFromFurryToBytes<'l
 
 /// JNI: 解密 .furry 到内存（Flutter 模板包名：com.furry.furry_flutter_app.NativeLib）
 #[no_mangle]
-pub extern "system" fn Java_com_furry_furry_1flutter_1app_NativeLib_unpackFromFurryToBytes<'local>(
+pub extern "system" fn Java_com_furry_furry_1flutter_1app_NativeLib_unpackFromFurryToBytes<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     input_path: JString<'local>,
@@ -164,7 +176,8 @@ fn unpack_from_furry_to_bytes_impl(env: &mut JNIEnv<'_>, input_path: JString<'_>
     };
 
     // jbyte 在 JNI 中是 i8，这里用零拷贝的方式重解释为 &[i8]
-    let output_i8: &[i8] = unsafe { std::slice::from_raw_parts(output.as_ptr() as *const i8, output.len()) };
+    let output_i8: &[i8] =
+        unsafe { std::slice::from_raw_parts(output.as_ptr() as *const i8, output.len()) };
     if env.set_byte_array_region(&arr, 0, output_i8).is_err() {
         return std::ptr::null_mut();
     }
@@ -326,10 +339,7 @@ fn get_tags_json_impl(env: &mut JNIEnv<'_>, file_path: JString<'_>) -> jstring {
         _ => Vec::new(),
     };
 
-    let s = match String::from_utf8(bytes) {
-        Ok(v) => v,
-        Err(_) => String::new(),
-    };
+    let s = String::from_utf8(bytes).unwrap_or_default();
 
     to_jstring(env, &s)
 }
@@ -388,7 +398,8 @@ fn get_cover_art_impl(env: &mut JNIEnv<'_>, file_path: JString<'_>) -> jbyteArra
         Ok(a) => a,
         Err(_) => return std::ptr::null_mut(),
     };
-    let bytes_i8: &[i8] = unsafe { std::slice::from_raw_parts(bytes.as_ptr() as *const i8, bytes.len()) };
+    let bytes_i8: &[i8] =
+        unsafe { std::slice::from_raw_parts(bytes.as_ptr() as *const i8, bytes.len()) };
     if env.set_byte_array_region(&arr, 0, bytes_i8).is_err() {
         return std::ptr::null_mut();
     }
