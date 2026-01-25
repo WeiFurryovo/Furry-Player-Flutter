@@ -250,19 +250,19 @@ fn get_original_format_impl(env: &mut JNIEnv<'_>, file_path: JString<'_>) -> jst
 
     let path_str: String = match env.get_string(&file_path) {
         Ok(s) => s.into(),
-        Err(_) => return to_jstring(&mut env, ""),
+        Err(_) => return to_jstring(env, ""),
     };
 
     let path = PathBuf::from(path_str);
     let file = match File::open(&path) {
         Ok(f) => f,
-        Err(_) => return to_jstring(&mut env, ""),
+        Err(_) => return to_jstring(env, ""),
     };
 
     let master_key = MasterKey::default_key();
     let reader = match FurryReader::open(file, &master_key) {
         Ok(r) => r,
-        Err(_) => return to_jstring(&mut env, ""),
+        Err(_) => return to_jstring(env, ""),
     };
 
     let ext = match reader.index.header.original_format {
