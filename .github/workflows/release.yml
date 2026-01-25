@@ -247,11 +247,12 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p release-assets
-          find artifacts -type f -maxdepth 3 -print -exec cp -f {} release-assets/ \;
-          ls -la release-assets
+          # Keep per-artifact subfolders to avoid filename collisions (e.g. multiple SHA256SUMS.txt).
+          cp -a artifacts/. release-assets/
+          find release-assets -type f -maxdepth 4 -print
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release-assets/*
+          files: release-assets/**/*
           generate_release_notes: true
