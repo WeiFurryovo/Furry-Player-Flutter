@@ -392,8 +392,23 @@ class _AppController {
             appendLog('Unpack-to-bytes failed: null');
             return;
           }
+          String? mime;
+          switch (originalExt.trim().toLowerCase()) {
+            case 'mp3':
+              mime = 'audio/mpeg';
+              break;
+            case 'wav':
+              mime = 'audio/wav';
+              break;
+            case 'ogg':
+              mime = 'audio/ogg';
+              break;
+            case 'flac':
+              mime = 'audio/flac';
+              break;
+          }
           await player.setAudioSource(
-            InMemoryAudioSource(bytes: bytes),
+            InMemoryAudioSource(bytes: bytes, contentType: mime, tag: mediaItem),
           );
         }
         await player.play();

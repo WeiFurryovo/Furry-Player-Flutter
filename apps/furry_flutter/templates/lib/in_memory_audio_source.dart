@@ -10,6 +10,7 @@ class InMemoryAudioSource extends StreamAudioSource {
   InMemoryAudioSource({
     required this.bytes,
     this.contentType,
+    super.tag,
   });
 
   @override
