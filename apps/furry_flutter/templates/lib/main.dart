@@ -485,7 +485,7 @@ class _ConverterPageState extends State<ConverterPage> {
                         icon: const Icon(Icons.folder_open),
                         label: const Text('选择并播放'),
                       ),
-                      FilledTonalButton.icon(
+                      FilledButton.tonalIcon(
                         onPressed: controller.stop,
                         icon: const Icon(Icons.stop),
                         label: const Text('停止'),
