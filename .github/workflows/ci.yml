@@ -202,13 +202,13 @@ jobs:
             rustc --version
             cargo build --release -p furry_ffi -v
             cd apps/furry_flutter/furry_flutter_app
-	            flutter config --enable-windows-desktop
-	            flutter build windows --release --verbose
+            flutter config --enable-windows-desktop
+            flutter build windows --release --verbose
 
-	            New-Item -ItemType Directory -Force -Path ..\..\..\dist\desktop\flutter\windows | Out-Null
-	            Copy-Item -Force ..\..\..\target\release\furry_ffi.dll build\windows\x64\runner\Release\ -ErrorAction SilentlyContinue
-	            Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath ..\..\..\dist\desktop\flutter\windows\furry_flutter_windows.zip -Force
-	          } 2>&1 | Tee-Object -FilePath $log
+            New-Item -ItemType Directory -Force -Path ..\..\..\dist\desktop\flutter\windows | Out-Null
+            Copy-Item -Force ..\..\..\target\release\furry_ffi.dll build\windows\x64\runner\Release\ -ErrorAction SilentlyContinue
+            Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath ..\..\..\dist\desktop\flutter\windows\furry_flutter_windows.zip -Force
+          } 2>&1 | Tee-Object -FilePath $log
 
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
