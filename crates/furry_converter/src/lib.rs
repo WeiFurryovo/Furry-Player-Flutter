@@ -112,7 +112,8 @@ where
     let original_format = reader.index.header.original_format;
 
     // 按 virtual_offset 顺序读取所有 AUDIO chunks
-    for entry in reader.index.audio_entries() {
+    let audio_entries: Vec<_> = reader.index.audio_entries().into_iter().cloned().collect();
+    for entry in &audio_entries {
         let data = reader.read_chunk(entry)?;
         output.write_all(&data)?;
     }
