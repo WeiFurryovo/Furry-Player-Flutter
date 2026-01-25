@@ -16,11 +16,15 @@ import 'system_media_bridge.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (!kIsWeb && Platform.isAndroid) {
-    await JustAudioBackground.init(
-      androidNotificationChannelId: 'com.furry.furry_flutter_app.channel.audio',
-      androidNotificationChannelName: 'Furry Player',
-      androidNotificationOngoing: true,
-    );
+    try {
+      await JustAudioBackground.init(
+        androidNotificationChannelId: 'com.furry.furry_flutter_app.channel.audio',
+        androidNotificationChannelName: 'Furry Player',
+        androidNotificationOngoing: true,
+      );
+    } catch (e) {
+      debugPrint('JustAudioBackground init failed: $e');
+    }
   }
   runApp(const FurryApp());
 }
