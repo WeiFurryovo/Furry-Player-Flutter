@@ -65,7 +65,7 @@ impl<W: Write + Seek> FurryWriter<W> {
         chunk_type: ChunkType,
         data: &[u8],
         virtual_offset: u64,
-        meta_kind: u16,
+        _meta_kind: u16,
         chunk_flags: u8,
     ) -> Result<(), FormatError> {
         let chunk_seq = self.chunk_seq;

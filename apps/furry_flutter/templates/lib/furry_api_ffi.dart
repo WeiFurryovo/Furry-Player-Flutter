@@ -80,7 +80,7 @@ class FurryApiFfi implements FurryApi {
   @override
   Future<Uint8List?> unpackFromFurryToBytes({required String inputPath}) async {
     final p = inputPath.toNativeUtf8();
-    final outPtr = calloc<ffi.Pointer<ffi.UnsignedChar>>();
+    final outPtr = calloc<ffi.Pointer<ffi.Uint8>>();
     final outLen = calloc<ffi.Size>();
     try {
       final rc = _unpackToBytes(p.cast(), outPtr, outLen);
@@ -127,15 +127,14 @@ typedef _GetOriginalFormatDart = int Function(
 
 typedef _UnpackToBytesC = ffi.Int32 Function(
   ffi.Pointer<ffi.Char>,
-  ffi.Pointer<ffi.Pointer<ffi.UnsignedChar>>,
+  ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
   ffi.Pointer<ffi.Size>,
 );
 typedef _UnpackToBytesDart = int Function(
   ffi.Pointer<ffi.Char>,
-  ffi.Pointer<ffi.Pointer<ffi.UnsignedChar>>,
+  ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
   ffi.Pointer<ffi.Size>,
 );
 
-typedef _FreeBytesC = ffi.Void Function(ffi.Pointer<ffi.UnsignedChar>, ffi.Size);
-typedef _FreeBytesDart = void Function(ffi.Pointer<ffi.UnsignedChar>, int);
-
+typedef _FreeBytesC = ffi.Void Function(ffi.Pointer<ffi.Uint8>, ffi.Size);
+typedef _FreeBytesDart = void Function(ffi.Pointer<ffi.Uint8>, int);

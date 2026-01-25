@@ -1,7 +1,7 @@
 //! 索引定义
 
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use std::io::{Cursor, Read, Write};
+use byteorder::{LittleEndian, ReadBytesExt};
+use std::io::{Cursor, Read};
 
 use crate::{ChunkType, FormatError};
 

@@ -22,9 +22,8 @@ class InMemoryAudioSource extends StreamAudioSource {
       sourceLength: bytes.length,
       contentLength: chunk.length,
       offset: effectiveStart,
-      contentType: contentType,
+      contentType: contentType ?? 'audio/mpeg',
       stream: Stream<Uint8List>.value(chunk),
     );
   }
 }
-
