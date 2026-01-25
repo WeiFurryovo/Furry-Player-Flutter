@@ -8,34 +8,18 @@ import 'package:ffi/ffi.dart';
 import 'furry_api.dart';
 
 class FurryApiFfi implements FurryApi {
-  FurryApiFfi() : _lib = _openLib() {
-    _packToFurry = _lib.lookupFunction<_PackToFurryC, _PackToFurryDart>('furry_pack_to_furry');
-    _isValid =
-        _lib.lookupFunction<_IsValidC, _IsValidDart>('furry_is_valid_furry_file');
-    _getOriginalFormat = _lib.lookupFunction<_GetOriginalFormatC, _GetOriginalFormatDart>(
-      'furry_get_original_format',
-    );
-    _unpackToBytes =
-        _lib.lookupFunction<_UnpackToBytesC, _UnpackToBytesDart>('furry_unpack_from_furry_to_bytes');
-    _unpackToFile =
-        _lib.lookupFunction<_UnpackToFileC, _UnpackToFileDart>('furry_unpack_from_furry_to_file');
-    _getTagsJsonToBytes =
-        _lib.lookupFunction<_GetTagsJsonToBytesC, _GetTagsJsonToBytesDart>('furry_get_tags_json_to_bytes');
-    _getCoverArtToBytes =
-        _lib.lookupFunction<_GetCoverArtToBytesC, _GetCoverArtToBytesDart>('furry_get_cover_art_to_bytes');
-    _freeBytes = _lib.lookupFunction<_FreeBytesC, _FreeBytesDart>('furry_free_bytes');
-  }
+  FurryApiFfi()
+      : _lib = _openLib(),
+        _isValid = _openLib().lookupFunction<_IsValidC, _IsValidDart>('furry_is_valid_furry_file'),
+        _getOriginalFormat =
+            _openLib().lookupFunction<_GetOriginalFormatC, _GetOriginalFormatDart>(
+          'furry_get_original_format',
+        );
 
   final ffi.DynamicLibrary _lib;
 
-  late final _PackToFurryDart _packToFurry;
   late final _IsValidDart _isValid;
   late final _GetOriginalFormatDart _getOriginalFormat;
-  late final _UnpackToBytesDart _unpackToBytes;
-  late final _UnpackToFileDart _unpackToFile;
-  late final _GetTagsJsonToBytesDart _getTagsJsonToBytes;
-  late final _GetCoverArtToBytesDart _getCoverArtToBytes;
-  late final _FreeBytesDart _freeBytes;
 
   static ffi.DynamicLibrary _openLib() {
     if (Platform.isWindows) return ffi.DynamicLibrary.open('furry_ffi.dll');

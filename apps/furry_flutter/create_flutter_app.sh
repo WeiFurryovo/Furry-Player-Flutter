@@ -46,6 +46,10 @@ echo "[INFO] 添加依赖（pub add）"
 echo "[INFO] 覆盖模板代码"
 cp -a "$TEMPLATES_DIR/lib/." "$OUT_DIR/lib/"
 cp -a "$TEMPLATES_DIR/android/." "$OUT_DIR/android/"
+if [ -d "$TEMPLATES_DIR/test" ]; then
+  mkdir -p "$OUT_DIR/test"
+  cp -a "$TEMPLATES_DIR/test/." "$OUT_DIR/test/"
+fi
 
 if [ "$BUILD_ANDROID" -eq 1 ]; then
   echo "[INFO] 构建 Rust Android 动态库（需要 ANDROID_NDK_HOME）"
