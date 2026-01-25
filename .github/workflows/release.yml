@@ -41,9 +41,12 @@ jobs:
           set -euxo pipefail
           mkdir -p ~/.android
           touch ~/.android/repositories.cfg
+          export ANDROID_SDK_ROOT="${ANDROID_HOME}"
           sdkmanager --version
-          sdkmanager --install "ndk;26.1.10909125"
-          yes | sdkmanager --licenses >/dev/null
+          sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --install "cmdline-tools;latest"
+          yes | sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --licenses >/dev/null
+          sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --install "ndk;26.1.10909125"
+          sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --list | sed -n '1,120p'
 
       - name: Build Flutter Android (signed)
         env:
@@ -124,7 +127,9 @@ jobs:
         run: |
           set -euxo pipefail
           ./apps/furry_flutter/create_flutter_app.sh --no-android
-          cargo build --release -p furry_ffi
+          cargo --version
+          rustc --version
+          cargo build --release -p furry_ffi -v
           cd apps/furry_flutter/furry_flutter_app
           flutter config --enable-linux-desktop
           flutter build linux --release --verbose
@@ -197,7 +202,9 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $env:RUST_BACKTRACE = "1"
-          cargo build --release -p furry_ffi
+          cargo --version
+          rustc --version
+          cargo build --release -p furry_ffi -v
           cd apps/furry_flutter/furry_flutter_app
           flutter config --enable-windows-desktop
           flutter build windows --release --verbose
