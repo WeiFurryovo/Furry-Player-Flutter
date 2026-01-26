@@ -226,6 +226,7 @@ class _AppController {
     if (persisted.trim().isNotEmpty) {
       log.value = persisted;
     }
+    appendLog('Process: pid=$pid');
     try {
       await api.init();
       await systemMedia.init();
@@ -362,6 +363,11 @@ class _AppController {
 
   void appendLog(String msg) {
     log.value = '${DateTime.now().toIso8601String()}  $msg\n${log.value}';
+    // Keep in-memory log bounded; otherwise the UI string can grow without limit and bloat RSS.
+    const maxChars = 200000; // ~200KB (chars), conservative for mobile
+    if (log.value.length > maxChars) {
+      log.value = log.value.substring(0, maxChars);
+    }
     unawaited(_DiagnosticsLog.appendLine(msg));
   }
 

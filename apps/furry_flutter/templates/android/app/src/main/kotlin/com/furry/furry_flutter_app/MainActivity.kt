@@ -5,6 +5,7 @@ import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import android.os.Process
 import java.io.File
 import java.io.FileWriter
 import java.util.concurrent.Executors
@@ -35,7 +36,7 @@ class MainActivity : AudioServiceActivity() {
 
   override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
     super.configureFlutterEngine(flutterEngine)
-    appendDiagnostics("Activity: configureFlutterEngine")
+    appendDiagnostics("Activity: configureFlutterEngine pid=${Process.myPid()} uid=${Process.myUid()}")
     MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
       .setMethodCallHandler { call, result ->
         try {
