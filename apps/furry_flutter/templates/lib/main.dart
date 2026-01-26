@@ -21,6 +21,11 @@ _AndroidAudioHandler? _androidAudioHandler;
 Color _withOpacityCompat(Color color, double opacity) =>
     color.withAlpha((opacity * 255).round().clamp(0, 255));
 
+// audio_service needs a top-level entry-point builder on Android (especially for
+// background isolate / release tree-shaking).
+@pragma('vm:entry-point')
+AudioHandler _androidAudioHandlerBuilder() => _AndroidAudioHandler();
+
 void _startupLog(String msg) {
   _startupDiagnostics.add(msg);
   debugPrint(msg);
@@ -79,6 +84,7 @@ class _DiagnosticsLog {
   }
 }
 
+@pragma('vm:entry-point')
 class _AndroidAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler {
   final AudioPlayer player = AudioPlayer();
@@ -212,7 +218,7 @@ Future<void> main() async {
   if (!kIsWeb && Platform.isAndroid) {
     try {
       final handler = await AudioService.init(
-        builder: () => _AndroidAudioHandler(),
+        builder: _androidAudioHandlerBuilder,
         config: AudioServiceConfig(
           androidNotificationChannelId:
               'com.furry.furry_flutter_app.channel.audio',
