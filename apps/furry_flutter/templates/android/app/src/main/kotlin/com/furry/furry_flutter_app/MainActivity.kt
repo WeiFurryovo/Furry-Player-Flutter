@@ -5,6 +5,8 @@ import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
+import java.io.FileWriter
 import java.util.concurrent.Executors
 
 class MainActivity : AudioServiceActivity() {
@@ -12,12 +14,20 @@ class MainActivity : AudioServiceActivity() {
   private var inited = false
   private val executor = Executors.newFixedThreadPool(2)
 
+  private fun appendDiagnostics(line: String) {
+    try {
+      val f = File(applicationContext.filesDir, "diagnostics.log")
+      FileWriter(f, true).use { it.appendLine("${System.currentTimeMillis()}  $line") }
+    } catch (_: Throwable) {}
+  }
+
   private fun <T> runAsync(result: MethodChannel.Result, block: () -> T) {
     executor.execute {
       try {
         val v = block()
         runOnUiThread { result.success(v) }
       } catch (t: Throwable) {
+        appendDiagnostics("JNI call failed: ${t.javaClass.simpleName}: $t")
         runOnUiThread { result.error("native_error", t.toString(), null) }
       }
     }
@@ -25,11 +35,13 @@ class MainActivity : AudioServiceActivity() {
 
   override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
     super.configureFlutterEngine(flutterEngine)
+    appendDiagnostics("Activity: configureFlutterEngine")
     MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
       .setMethodCallHandler { call, result ->
         try {
           handleCall(call, result)
         } catch (t: Throwable) {
+          appendDiagnostics("MethodChannel handler failed: ${t.javaClass.simpleName}: $t")
           result.error("native_error", t.toString(), null)
         }
       }
@@ -39,6 +51,7 @@ class MainActivity : AudioServiceActivity() {
     if (inited) return
     NativeLib.init()
     inited = true
+    appendDiagnostics("NativeLib.init ok")
   }
 
   private fun handleCall(call: MethodCall, result: MethodChannel.Result) {
@@ -97,7 +110,18 @@ class MainActivity : AudioServiceActivity() {
     }
   }
 
+  override fun onLowMemory() {
+    super.onLowMemory()
+    appendDiagnostics("Activity: onLowMemory")
+  }
+
+  override fun onTrimMemory(level: Int) {
+    super.onTrimMemory(level)
+    appendDiagnostics("Activity: onTrimMemory level=$level")
+  }
+
   override fun onDestroy() {
+    appendDiagnostics("Activity: onDestroy")
     super.onDestroy()
     executor.shutdown()
   }
