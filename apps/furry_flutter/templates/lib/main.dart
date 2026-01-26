@@ -337,11 +337,6 @@ class _AppController {
     required Uint8List bytes,
   }) async {
     if (bytes.isEmpty) return null;
-    // Avoid huge cover art causing OOM (e.g., lockscreen/notification bitmap decode on Android).
-    if (!kIsWeb && Platform.isAndroid && bytes.length > 2 * 1024 * 1024) {
-      appendLog('Cover art skipped (too large): ${bytes.length} bytes');
-      return null;
-    }
 
     final tmp = await getTemporaryDirectory();
     final artDir = Directory(p.join(tmp.path, 'furry_media_art'));
@@ -522,12 +517,18 @@ class _AppController {
         }
 
         final meta = await getMetaPreviewForFurry(file);
-        final artUri = meta.artUri;
+        final artUriUi = meta.artUri;
+        final artUriSystem = meta.coverBytesLen != null && meta.coverBytesLen! <= 2 * 1024 * 1024
+            ? artUriUi
+            : null;
+        if (artUriUi != null && artUriSystem == null) {
+          appendLog('Cover art skipped for system controls (too large): ${meta.coverBytesLen} bytes');
+        }
         final mediaItem = MediaItem(
           id: file.path,
           title: meta.title.isEmpty ? name : meta.title,
           artist: meta.subtitle,
-          artUri: artUri,
+          artUri: artUriSystem,
         );
         if (unpacked != null) {
           await player.setAudioSource(AudioSource.uri(unpacked.uri, tag: mediaItem));
@@ -574,13 +575,14 @@ class _AppController {
           title: meta.title.isEmpty ? name : meta.title,
           subtitle: meta.subtitle.isEmpty ? '.furry → $originalExt' : meta.subtitle,
           sourcePath: file.path,
+          artUri: artUriUi,
         );
         await systemMedia.setMetadata(
           SystemMediaMetadata(
             title: nowPlaying.value!.title,
             artist: meta.subtitle,
             album: '',
-            artUri: artUri,
+            artUri: artUriSystem,
             duration: player.duration,
           ),
         );
@@ -598,7 +600,7 @@ class _AppController {
         );
         await player.setAudioSource(AudioSource.uri(file.uri, tag: mediaItem));
         await player.play();
-        nowPlaying.value = _NowPlaying(title: name, subtitle: '本地文件', sourcePath: file.path);
+        nowPlaying.value = _NowPlaying(title: name, subtitle: '本地文件', sourcePath: file.path, artUri: null);
         await systemMedia.setMetadata(
           SystemMediaMetadata(
             title: name,
@@ -651,6 +653,7 @@ class _AppController {
       } catch (_) {}
 
       Uri? artUri;
+      int? coverBytesLen;
       try {
         final payload = await api.getCoverArt(filePath: furryFile.path);
         if (payload != null && payload.isNotEmpty) {
@@ -661,10 +664,13 @@ class _AppController {
             if (sep > 0 && sep < payload.length - 1) {
               final coverMime = String.fromCharCodes(payload.sublist(0, sep));
               final bytes = payload.sublist(sep + 1);
-              // Also cap the raw image bytes (compressed). Keep this conservative on mobile.
-              const maxCoverBytes = 1024 * 1024; // 1 MiB
+              coverBytesLen = bytes.length;
+              // Cap the raw image bytes (compressed). Keep this bounded on mobile.
+              const maxCoverBytes = 6 * 1024 * 1024; // 6 MiB
               if (bytes.length <= maxCoverBytes) {
                 artUri = await _writeCoverPayloadToTempUri(mime: coverMime, bytes: bytes);
+              } else {
+                coverBytesLen = null;
               }
             }
           }
@@ -680,6 +686,7 @@ class _AppController {
         title: title.isNotEmpty ? title : fallbackTitle,
         subtitle: subtitleParts.join(' · '),
         artUri: artUri,
+        coverBytesLen: coverBytesLen,
       );
     }();
 
@@ -696,11 +703,13 @@ class _NowPlaying {
   final String title;
   final String subtitle;
   final String sourcePath;
+  final Uri? artUri;
 
   _NowPlaying({
     required this.title,
     required this.subtitle,
     required this.sourcePath,
+    required this.artUri,
   });
 }
 
@@ -708,11 +717,13 @@ class _MetaPreview {
   final String title;
   final String subtitle;
   final Uri? artUri;
+  final int? coverBytesLen;
 
   _MetaPreview({
     required this.title,
     required this.subtitle,
     required this.artUri,
+    required this.coverBytesLen,
   });
 }
 
@@ -1020,15 +1031,7 @@ class MiniPlayerBar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Row(
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: cs.primaryContainer,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(Icons.music_note, color: cs.onPrimaryContainer),
-                  ),
+                  _CoverThumb(artUri: np.artUri),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -1080,10 +1083,17 @@ class MiniPlayerBar extends StatelessWidget {
   }
 }
 
-class NowPlayingSheet extends StatelessWidget {
+class NowPlayingSheet extends StatefulWidget {
   final _AppController controller;
   final _NowPlaying np;
   const NowPlayingSheet({super.key, required this.controller, required this.np});
+
+  @override
+  State<NowPlayingSheet> createState() => _NowPlayingSheetState();
+}
+
+class _NowPlayingSheetState extends State<NowPlayingSheet> {
+  double? _dragMs;
 
   @override
   Widget build(BuildContext context) {
@@ -1118,36 +1128,53 @@ class NowPlayingSheet extends StatelessWidget {
                     color: cs.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(24),
                   ),
-                  child: Icon(Icons.album, size: 96, color: cs.primary),
+                  clipBehavior: Clip.antiAlias,
+                  child: widget.np.artUri == null
+                      ? Icon(Icons.album, size: 96, color: cs.primary)
+                      : Image.file(
+                          File.fromUri(widget.np.artUri!),
+                          fit: BoxFit.cover,
+                          cacheWidth: 1200,
+                          cacheHeight: 1200,
+                        ),
                 ),
               ),
               const SizedBox(height: 16),
-              Text(np.title, style: Theme.of(context).textTheme.titleLarge, maxLines: 2, overflow: TextOverflow.ellipsis),
+              Text(widget.np.title,
+                  style: Theme.of(context).textTheme.titleLarge,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis),
               const SizedBox(height: 4),
-              Text(np.subtitle, style: Theme.of(context).textTheme.bodyMedium),
+              Text(widget.np.subtitle, style: Theme.of(context).textTheme.bodyMedium),
               const SizedBox(height: 16),
               StreamBuilder<Duration?>(
-                stream: controller.player.durationStream,
+                stream: widget.controller.player.durationStream,
                 builder: (context, durSnap) {
                   final duration = durSnap.data ?? Duration.zero;
                   return StreamBuilder<Duration>(
-                    stream: controller.player.positionStream,
+                    stream: widget.controller.player.positionStream,
                     builder: (context, posSnap) {
                       final position = posSnap.data ?? Duration.zero;
                       final max = duration.inMilliseconds > 0 ? duration.inMilliseconds.toDouble() : 1.0;
-                      final value = position.inMilliseconds.clamp(0, max.toInt()).toDouble();
+                      final current = position.inMilliseconds.clamp(0, max.toInt()).toDouble();
+                      final value = (_dragMs ?? current).clamp(0, max).toDouble();
                       return Column(
                         children: [
                           Slider(
                             value: value,
                             max: max,
-                            onChanged: (v) => controller.player.seek(Duration(milliseconds: v.round())),
+                            onChanged: (v) => setState(() => _dragMs = v),
+                            onChangeEnd: (v) async {
+                              setState(() => _dragMs = null);
+                              await widget.controller.player.seek(Duration(milliseconds: v.round()));
+                            },
                           ),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(controller._fmt(position), style: Theme.of(context).textTheme.bodySmall),
-                              Text(controller._fmt(duration), style: Theme.of(context).textTheme.bodySmall),
+                              Text(widget.controller._fmt(Duration(milliseconds: value.round())),
+                                  style: Theme.of(context).textTheme.bodySmall),
+                              Text(widget.controller._fmt(duration), style: Theme.of(context).textTheme.bodySmall),
                             ],
                           ),
                         ],
@@ -1162,12 +1189,12 @@ class NowPlayingSheet extends StatelessWidget {
                 children: [
                   IconButton(
                     tooltip: '停止',
-                    onPressed: controller.stop,
+                    onPressed: widget.controller.stop,
                     icon: const Icon(Icons.stop),
                   ),
                   const SizedBox(width: 12),
                   StreamBuilder<PlayerState>(
-                    stream: controller.player.playerStateStream,
+                    stream: widget.controller.player.playerStateStream,
                     builder: (context, snap) {
                       final playing = snap.data?.playing ?? false;
                       final processing = snap.data?.processingState ?? ProcessingState.idle;
@@ -1177,9 +1204,9 @@ class NowPlayingSheet extends StatelessWidget {
                             ? null
                             : () async {
                                 if (playing) {
-                                  await controller.player.pause();
+                                  await widget.controller.player.pause();
                                 } else {
-                                  await controller.player.play();
+                                  await widget.controller.player.play();
                                 }
                               },
                         icon: busy
@@ -1201,7 +1228,7 @@ class NowPlayingSheet extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          np.sourcePath,
+                          widget.np.sourcePath,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodySmall,
