@@ -186,7 +186,18 @@ jobs:
           }
 
           Push-Location $outDir
-          flutter pub add file_picker path_provider just_audio just_audio_platform_interface path ffi just_audio_background audio_service smtc_windows dbus
+          # Pin versions to avoid breaking API changes in dependencies (e.g. file_picker v10 removed FilePicker.platform).
+          flutter pub add `
+            file_picker:^8.3.2 `
+            path_provider:^2.1.5 `
+            just_audio:^0.9.46 `
+            just_audio_platform_interface:^4.6.0 `
+            path:^1.9.0 `
+            ffi:^2.1.3 `
+            just_audio_background:^0.0.1-beta.15 `
+            audio_service:^0.18.17 `
+            smtc_windows:^1.0.0 `
+            dbus:^0.7.11
           Pop-Location
 
           Copy-Item -Recurse -Force (Join-Path $templates "lib\*") (Join-Path $outDir "lib")
