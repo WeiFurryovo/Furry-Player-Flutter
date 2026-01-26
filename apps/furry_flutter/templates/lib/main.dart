@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path/path.dart' as p;
@@ -115,6 +116,16 @@ Future<void> main() async {
       _startupLog('JustAudioBackground init ok');
     } catch (e, st) {
       _startupLog('JustAudioBackground init failed: $e\n$st');
+    }
+  }
+
+  if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
+      _startupLog('AudioSession configured');
+    } catch (e, st) {
+      _startupLog('AudioSession configure failed: $e\n$st');
     }
   }
   runApp(const FurryApp());
