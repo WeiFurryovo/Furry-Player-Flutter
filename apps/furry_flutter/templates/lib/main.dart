@@ -17,6 +17,7 @@ import 'system_media_bridge.dart';
 
 final List<String> _startupDiagnostics = <String>[];
 AudioHandler? _androidAudioHandler;
+_AndroidAudioHandler? _androidConcreteHandler;
 
 Color _withOpacityCompat(Color color, double opacity) =>
     color.withAlpha((opacity * 255).round().clamp(0, 255));
@@ -304,6 +305,8 @@ Future<void> main() async {
         ),
       );
       _androidAudioHandler = handler;
+      _androidConcreteHandler =
+          handler is _AndroidAudioHandler ? handler : null;
       _startupLog('AudioService init ok');
     } catch (e, st) {
       _startupLog('AudioService init failed: $e\n$st');
@@ -503,59 +506,25 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 }
 
 class _AppController {
-  _AppController() : player = AudioPlayer();
+  _AppController()
+      : player = (!kIsWeb && Platform.isAndroid && _androidConcreteHandler != null)
+            ? _androidConcreteHandler!.player
+            : AudioPlayer();
 
   final AudioPlayer player;
   final FurryApi api = createFurryApi();
   late final SystemMediaBridge systemMedia = SystemMediaBridge(player);
 
   bool get _useAndroidAudioHandler =>
-      !kIsWeb && Platform.isAndroid && _androidAudioHandler != null;
+      !kIsWeb &&
+      Platform.isAndroid &&
+      _androidAudioHandler != null &&
+      _androidConcreteHandler != null &&
+      identical(player, _androidConcreteHandler!.player);
 
-  static ProcessingState _toJustAudioProcessingState(
-    AudioProcessingState state,
-  ) {
-    switch (state) {
-      case AudioProcessingState.idle:
-        return ProcessingState.idle;
-      case AudioProcessingState.loading:
-        return ProcessingState.loading;
-      case AudioProcessingState.buffering:
-        return ProcessingState.buffering;
-      case AudioProcessingState.ready:
-        return ProcessingState.ready;
-      case AudioProcessingState.completed:
-        return ProcessingState.completed;
-      case AudioProcessingState.error:
-        return ProcessingState.idle;
-    }
-  }
-
-  Stream<PlayerState> get playerStateStream {
-    if (_useAndroidAudioHandler) {
-      final handler = _androidAudioHandler!;
-      return handler.playbackState.map((s) {
-        return PlayerState(s.playing, _toJustAudioProcessingState(s.processingState));
-      });
-    }
-    return player.playerStateStream;
-  }
-
-  Stream<Duration?> get durationStream {
-    if (_useAndroidAudioHandler) {
-      final handler = _androidAudioHandler!;
-      return handler.mediaItem.map((m) => m?.duration).distinct();
-    }
-    return player.durationStream;
-  }
-
-  Stream<Duration> get positionStream {
-    if (_useAndroidAudioHandler) {
-      final handler = _androidAudioHandler!;
-      return handler.playbackState.map((s) => s.updatePosition);
-    }
-    return player.positionStream;
-  }
+  Stream<PlayerState> get playerStateStream => player.playerStateStream;
+  Stream<Duration?> get durationStream => player.durationStream;
+  Stream<Duration> get positionStream => player.positionStream;
 
   StreamSubscription<dynamic>? _playbackErrorsSub;
   StreamSubscription<dynamic>? _playerStateSub;
@@ -667,7 +636,9 @@ class _AppController {
     _playerStateSub?.cancel();
     _currentIndexSub?.cancel();
     _rssTimer?.cancel();
-    player.dispose();
+    if (!(_useAndroidAudioHandler && identical(player, _androidConcreteHandler!.player))) {
+      player.dispose();
+    }
     systemMedia.dispose();
     nowPlaying.dispose();
     furryOutputs.dispose();
@@ -996,87 +967,52 @@ class _AppController {
           artist: meta.subtitle,
           artUri: artUriSystem,
         );
-        if (_useAndroidAudioHandler) {
-          if (unpacked == null) {
-            final bytes =
-                await api.unpackFromFurryToBytes(inputPath: file.path);
-            if (bytes == null) {
-              appendLog('Unpack-to-bytes failed: null');
-              return;
-            }
-            final fallbackPath = p.join(
-              outDir.path,
-              'unpacked_mem_${file.path.hashCode}_${DateTime.now().millisecondsSinceEpoch}.$outExt',
-            );
-            try {
-              final f = File(fallbackPath);
-              await f.writeAsBytes(bytes, flush: true);
-              unpacked = f;
-            } catch (e, st) {
-              appendLog('Write-bytes fallback failed: $e\n$st');
-              return;
-            }
-          }
-          await _androidAudioHandler!.customAction(
-            'setAudioSource',
-            <String, dynamic>{
-              'uri': unpacked.uri.toString(),
-              'id': mediaItem.id,
-              'title': mediaItem.title,
-              'artist': mediaItem.artist,
-              'album': mediaItem.album,
-              'artUri': mediaItem.artUri?.toString(),
-            },
+        if (unpacked != null) {
+          await player.setAudioSource(
+            AudioSource.uri(unpacked.uri, tag: mediaItem),
           );
         } else {
-          if (unpacked != null) {
+          final bytes = await api.unpackFromFurryToBytes(inputPath: file.path);
+          if (bytes == null) {
+            appendLog('Unpack-to-bytes failed: null');
+            return;
+          }
+          // Prefer writing to a temp file to avoid OOM for large audio.
+          final fallbackPath = p.join(
+            outDir.path,
+            'unpacked_mem_${file.path.hashCode}_${DateTime.now().millisecondsSinceEpoch}.$outExt',
+          );
+          try {
+            final f = File(fallbackPath);
+            await f.writeAsBytes(bytes, flush: true);
+            unpacked = f;
             await player.setAudioSource(
               AudioSource.uri(unpacked.uri, tag: mediaItem),
             );
-          } else {
-            final bytes =
-                await api.unpackFromFurryToBytes(inputPath: file.path);
-            if (bytes == null) {
-              appendLog('Unpack-to-bytes failed: null');
-              return;
+          } catch (e, st) {
+            appendLog('Write-bytes fallback failed: $e\n$st');
+            String? mime;
+            switch (originalExt.trim().toLowerCase()) {
+              case 'mp3':
+                mime = 'audio/mpeg';
+                break;
+              case 'wav':
+                mime = 'audio/wav';
+                break;
+              case 'ogg':
+                mime = 'audio/ogg';
+                break;
+              case 'flac':
+                mime = 'audio/flac';
+                break;
             }
-            // Prefer writing to a temp file to avoid OOM for large audio.
-            final fallbackPath = p.join(
-              outDir.path,
-              'unpacked_mem_${file.path.hashCode}_${DateTime.now().millisecondsSinceEpoch}.$outExt',
+            await player.setAudioSource(
+              InMemoryAudioSource(
+                bytes: bytes,
+                contentType: mime,
+                tag: mediaItem,
+              ),
             );
-            try {
-              final f = File(fallbackPath);
-              await f.writeAsBytes(bytes, flush: true);
-              unpacked = f;
-              await player.setAudioSource(
-                AudioSource.uri(unpacked.uri, tag: mediaItem),
-              );
-            } catch (e, st) {
-              appendLog('Write-bytes fallback failed: $e\n$st');
-              String? mime;
-              switch (originalExt.trim().toLowerCase()) {
-                case 'mp3':
-                  mime = 'audio/mpeg';
-                  break;
-                case 'wav':
-                  mime = 'audio/wav';
-                  break;
-                case 'ogg':
-                  mime = 'audio/ogg';
-                  break;
-                case 'flac':
-                  mime = 'audio/flac';
-                  break;
-              }
-              await player.setAudioSource(
-                InMemoryAudioSource(
-                  bytes: bytes,
-                  contentType: mime,
-                  tag: mediaItem,
-                ),
-              );
-            }
           }
         }
         await play();
@@ -1093,7 +1029,7 @@ class _AppController {
             artist: meta.subtitle,
             album: '',
             artUri: artUriSystem,
-            duration: _useAndroidAudioHandler ? null : player.duration,
+            duration: player.duration,
           ),
         );
         if (unpacked != null) {
@@ -1109,21 +1045,7 @@ class _AppController {
           artist: '',
           artUri: null,
         );
-        if (_useAndroidAudioHandler) {
-          await _androidAudioHandler!.customAction(
-            'setAudioSource',
-            <String, dynamic>{
-              'uri': file.uri.toString(),
-              'id': mediaItem.id,
-              'title': mediaItem.title,
-              'artist': mediaItem.artist,
-              'album': mediaItem.album,
-              'artUri': mediaItem.artUri?.toString(),
-            },
-          );
-        } else {
-          await player.setAudioSource(AudioSource.uri(file.uri, tag: mediaItem));
-        }
+        await player.setAudioSource(AudioSource.uri(file.uri, tag: mediaItem));
         await play();
         nowPlaying.value = _NowPlaying(
             title: name, subtitle: '本地文件', sourcePath: file.path, artUri: null);
@@ -1133,7 +1055,7 @@ class _AppController {
             artist: '',
             album: '',
             artUri: null,
-            duration: _useAndroidAudioHandler ? null : player.duration,
+            duration: player.duration,
           ),
         );
         appendLog('Playing (raw): $name');
@@ -1153,7 +1075,7 @@ class _AppController {
 
     // On Android, use a playlist so audio_service can expose next/previous in the
     // system notification/lockscreen controls.
-    if (_useAndroidAudioHandler && queue.length > 1) {
+    if (!kIsWeb && Platform.isAndroid && queue.length > 1) {
       _queue = List<File>.from(queue);
       _queueIndex = index;
       _androidPlaylistActive = true;
@@ -1197,7 +1119,7 @@ class _AppController {
         return f;
       }
 
-      final items = <Map<String, dynamic>>[];
+      final sources = <AudioSource>[];
       for (final f in queue) {
         final base = p.basename(f.path);
         final ext = p.extension(base).toLowerCase();
@@ -1223,24 +1145,23 @@ class _AppController {
           artUri = null;
         }
 
-        items.add(
-          <String, dynamic>{
-            'uri': uri.toString(),
-            'id': f.path,
-            'title': title,
-            'artist': artist,
-            'album': '',
-            'artUri': artUri?.toString(),
-          },
+        sources.add(
+          AudioSource.uri(
+            uri,
+            tag: MediaItem(
+              id: f.path,
+              title: title,
+              artist: artist,
+              artUri: artUri,
+            ),
+          ),
         );
       }
 
-      await _androidAudioHandler!.customAction(
-        'setPlaylist',
-        <String, dynamic>{
-          'items': items,
-          'initialIndex': index,
-        },
+      await player.setAudioSource(
+        ConcatenatingAudioSource(children: sources),
+        initialIndex: index,
+        initialPosition: Duration.zero,
       );
       await play();
 
@@ -1354,18 +1275,8 @@ class _AppController {
 
   Future<void> seekBy(Duration delta) async {
     try {
-      final duration = _useAndroidAudioHandler
-          ? await durationStream.first.timeout(
-              const Duration(milliseconds: 250),
-              onTimeout: () => null,
-            )
-          : player.duration;
-      final position = _useAndroidAudioHandler
-          ? await positionStream.first.timeout(
-              const Duration(milliseconds: 250),
-              onTimeout: () => Duration.zero,
-            )
-          : player.position;
+      final duration = player.duration;
+      final position = player.position;
       final target = position + delta;
       var clamped = target;
       if (clamped.isNegative) clamped = Duration.zero;
