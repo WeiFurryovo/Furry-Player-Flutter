@@ -257,9 +257,11 @@ class _AppController {
     });
   }
 
-  Future<Uri?> _writeCoverToTempUri(_MetaPreview meta) async {
-    final bytes = meta.coverBytes;
-    if (bytes == null || bytes.isEmpty) return null;
+  Future<Uri?> _writeCoverPayloadToTempUri({
+    required String mime,
+    required Uint8List bytes,
+  }) async {
+    if (bytes.isEmpty) return null;
     // Avoid huge cover art causing OOM (e.g., lockscreen/notification bitmap decode on Android).
     if (!kIsWeb && Platform.isAndroid && bytes.length > 2 * 1024 * 1024) {
       appendLog('Cover art skipped (too large): ${bytes.length} bytes');
@@ -270,10 +272,10 @@ class _AppController {
     final artDir = Directory(p.join(tmp.path, 'furry_media_art'));
     if (!await artDir.exists()) await artDir.create(recursive: true);
 
-    final mime = (meta.coverMime ?? '').toLowerCase();
-    final ext = mime.contains('png')
+    final m = mime.toLowerCase();
+    final ext = m.contains('png')
         ? 'png'
-        : mime.contains('webp')
+        : m.contains('webp')
             ? 'webp'
             : 'jpg';
 
@@ -439,7 +441,7 @@ class _AppController {
         }
 
         final meta = await getMetaPreviewForFurry(file);
-        final artUri = await _writeCoverToTempUri(meta);
+        final artUri = meta.artUri;
         final mediaItem = MediaItem(
           id: file.path,
           title: meta.title.isEmpty ? name : meta.title,
@@ -567,25 +569,23 @@ class _AppController {
         }
       } catch (_) {}
 
-      Uint8List? coverBytes;
-      String? coverMime;
+      Uri? artUri;
       try {
         final payload = await api.getCoverArt(filePath: furryFile.path);
         if (payload != null && payload.isNotEmpty) {
           // Hard cap to avoid OOM in Dart and Android bitmap decoding. Payload includes `mime\0...`.
           const maxPayload = 8 * 1024 * 1024;
-          if (payload.length > maxPayload) {
-            coverBytes = null;
-            coverMime = null;
-          } else {
-          final sep = payload.indexOf(0);
-          if (sep > 0 && sep < payload.length - 1) {
-            coverMime = String.fromCharCodes(payload.sublist(0, sep));
-            final bytes = payload.sublist(sep + 1);
-            // Also cap the raw image bytes (compressed).
-            const maxCoverBytes = 4 * 1024 * 1024;
-            coverBytes = bytes.length > maxCoverBytes ? null : bytes;
-          }
+          if (payload.length <= maxPayload) {
+            final sep = payload.indexOf(0);
+            if (sep > 0 && sep < payload.length - 1) {
+              final coverMime = String.fromCharCodes(payload.sublist(0, sep));
+              final bytes = payload.sublist(sep + 1);
+              // Also cap the raw image bytes (compressed). Keep this conservative on mobile.
+              const maxCoverBytes = 1024 * 1024; // 1 MiB
+              if (bytes.length <= maxCoverBytes) {
+                artUri = await _writeCoverPayloadToTempUri(mime: coverMime, bytes: bytes);
+              }
+            }
           }
         }
       } catch (_) {}
@@ -598,8 +598,7 @@ class _AppController {
       return _MetaPreview(
         title: title.isNotEmpty ? title : fallbackTitle,
         subtitle: subtitleParts.join(' · '),
-        coverBytes: coverBytes,
-        coverMime: coverMime,
+        artUri: artUri,
       );
     }();
 
@@ -627,14 +626,12 @@ class _NowPlaying {
 class _MetaPreview {
   final String title;
   final String subtitle;
-  final Uint8List? coverBytes;
-  final String? coverMime;
+  final Uri? artUri;
 
   _MetaPreview({
     required this.title,
     required this.subtitle,
-    required this.coverBytes,
-    required this.coverMime,
+    required this.artUri,
   });
 }
 
@@ -703,7 +700,7 @@ class _LibraryPageState extends State<LibraryPage> {
                       builder: (context, snap) {
                         final meta = snap.data;
                         return ListTile(
-                          leading: _CoverThumb(bytes: meta?.coverBytes),
+                          leading: _CoverThumb(artUri: meta?.artUri),
                           title: Text(meta?.title ?? p.basename(f.path), maxLines: 1, overflow: TextOverflow.ellipsis),
                           subtitle: Text(
                             meta == null || meta.subtitle.isEmpty
@@ -736,23 +733,23 @@ class _LibraryPageState extends State<LibraryPage> {
 }
 
 class _CoverThumb extends StatelessWidget {
-  final Uint8List? bytes;
-  const _CoverThumb({required this.bytes});
+  final Uri? artUri;
+  const _CoverThumb({required this.artUri});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final b = bytes;
+    final uri = artUri;
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: Container(
         width: 44,
         height: 44,
         color: cs.surfaceContainerHighest,
-        child: b == null || b.isEmpty
+        child: uri == null
             ? Icon(Icons.music_note, color: cs.primary)
-            : Image.memory(
-                b,
+            : Image.file(
+                File.fromUri(uri),
                 fit: BoxFit.cover,
                 // Hint decoder to avoid full-res bitmap allocations on Android.
                 cacheWidth: 96,
