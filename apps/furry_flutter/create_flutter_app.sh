@@ -44,6 +44,7 @@ service_snippet = (
 )
 
 permissions = [
+  f"{app_indent}<uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />\n",
   f"{app_indent}<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />\n",
   f"{app_indent}<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK\" />\n",
   f"{app_indent}<uses-permission android:name=\"android.permission.WAKE_LOCK\" />\n",

@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path/path.dart' as p;
@@ -37,6 +38,16 @@ List<String> _takeStartupDiagnostics() {
   final out = List<String>.from(_startupDiagnostics);
   _startupDiagnostics.clear();
   return out;
+}
+
+Future<void> _requestAndroidNotificationPermission() async {
+  if (kIsWeb || !Platform.isAndroid) return;
+  try {
+    const ch = MethodChannel('furry.notifications');
+    await ch.invokeMethod<bool>('request');
+  } catch (_) {
+    // Best-effort. If this fails, user can still enable notifications in system settings.
+  }
 }
 
 class _DiagnosticsLog {
@@ -312,6 +323,8 @@ Future<void> main() async {
       _startupLog('AudioService init failed: $e\n$st');
     }
   }
+
+  unawaited(_requestAndroidNotificationPermission());
   runApp(const FurryApp());
 }
 
