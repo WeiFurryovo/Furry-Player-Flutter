@@ -31,6 +31,16 @@ List<String> _takeStartupDiagnostics() {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    _startupLog('FlutterError: ${details.exception}\n${details.stack}');
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    _startupLog('Uncaught error: $error\n$stack');
+    return true;
+  };
+
   if (!kIsWeb && Platform.isAndroid) {
     final prevPlatform = JustAudioPlatform.instance;
     try {
@@ -146,7 +156,9 @@ class _AppController {
   final ValueNotifier<List<File>> furryOutputs = ValueNotifier<List<File>>(<File>[]);
   final ValueNotifier<String> log = ValueNotifier<String>('');
 
+  // Keep this bounded to avoid unbounded RAM growth (cover bytes can be large).
   final Map<String, Future<_MetaPreview>> _metaPreviewCache = <String, Future<_MetaPreview>>{};
+  static const int _metaPreviewCacheLimit = 64;
 
   int paddingKb = 0;
 
@@ -533,7 +545,10 @@ class _AppController {
   }
 
   Future<_MetaPreview> getMetaPreviewForFurry(File furryFile) {
-    return _metaPreviewCache.putIfAbsent(furryFile.path, () async {
+    final key = furryFile.path;
+    final existing = _metaPreviewCache[key];
+    if (existing != null) return existing;
+    final future = () async {
       final fallbackTitle = p.basename(furryFile.path);
 
       String title = '';
@@ -557,10 +572,20 @@ class _AppController {
       try {
         final payload = await api.getCoverArt(filePath: furryFile.path);
         if (payload != null && payload.isNotEmpty) {
+          // Hard cap to avoid OOM in Dart and Android bitmap decoding. Payload includes `mime\0...`.
+          const maxPayload = 8 * 1024 * 1024;
+          if (payload.length > maxPayload) {
+            coverBytes = null;
+            coverMime = null;
+          } else {
           final sep = payload.indexOf(0);
           if (sep > 0 && sep < payload.length - 1) {
             coverMime = String.fromCharCodes(payload.sublist(0, sep));
-            coverBytes = payload.sublist(sep + 1);
+            final bytes = payload.sublist(sep + 1);
+            // Also cap the raw image bytes (compressed).
+            const maxCoverBytes = 4 * 1024 * 1024;
+            coverBytes = bytes.length > maxCoverBytes ? null : bytes;
+          }
           }
         }
       } catch (_) {}
@@ -576,7 +601,14 @@ class _AppController {
         coverBytes: coverBytes,
         coverMime: coverMime,
       );
-    });
+    }();
+
+    _metaPreviewCache[key] = future;
+    if (_metaPreviewCache.length > _metaPreviewCacheLimit) {
+      final firstKey = _metaPreviewCache.keys.first;
+      _metaPreviewCache.remove(firstKey);
+    }
+    return future;
   }
 }
 
@@ -719,7 +751,13 @@ class _CoverThumb extends StatelessWidget {
         color: cs.surfaceContainerHighest,
         child: b == null || b.isEmpty
             ? Icon(Icons.music_note, color: cs.primary)
-            : Image.memory(b, fit: BoxFit.cover),
+            : Image.memory(
+                b,
+                fit: BoxFit.cover,
+                // Hint decoder to avoid full-res bitmap allocations on Android.
+                cacheWidth: 96,
+                cacheHeight: 96,
+              ),
       ),
     );
   }
