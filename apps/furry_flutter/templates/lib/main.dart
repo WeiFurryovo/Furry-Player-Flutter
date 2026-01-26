@@ -15,6 +15,19 @@ import 'furry_api_selector.dart';
 import 'in_memory_audio_source.dart';
 import 'system_media_bridge.dart';
 
+final List<String> _startupDiagnostics = <String>[];
+
+void _startupLog(String msg) {
+  _startupDiagnostics.add(msg);
+  debugPrint(msg);
+}
+
+List<String> _takeStartupDiagnostics() {
+  final out = List<String>.from(_startupDiagnostics);
+  _startupDiagnostics.clear();
+  return out;
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (!kIsWeb && Platform.isAndroid) {
@@ -25,11 +38,12 @@ Future<void> main() async {
         androidNotificationChannelName: 'Furry Player',
         androidNotificationOngoing: true,
       );
-    } catch (e) {
+      _startupLog('JustAudioBackground init ok');
+    } catch (e, st) {
       // If AudioService init fails, just_audio_background may have already replaced the platform.
       // Restore the previous platform so playback still works (without system controls).
       JustAudioPlatform.instance = prevPlatform;
-      debugPrint('JustAudioBackground init failed: $e');
+      _startupLog('JustAudioBackground init failed: $e\n$st');
     }
   }
   runApp(const FurryApp());
@@ -139,6 +153,9 @@ class _AppController {
     try {
       await api.init();
       await systemMedia.init();
+      for (final line in _takeStartupDiagnostics()) {
+        appendLog(line);
+      }
       await cleanupTempArtifacts();
       await refreshOutputs();
       appendLog('Native init ok');
