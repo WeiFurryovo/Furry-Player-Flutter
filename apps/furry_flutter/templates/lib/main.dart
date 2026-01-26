@@ -218,6 +218,7 @@ class _AppController {
 
   StreamSubscription<dynamic>? _playbackErrorsSub;
   StreamSubscription<dynamic>? _playerStateSub;
+  StreamSubscription<int?>? _currentIndexSub;
   Timer? _rssTimer;
 
   final ValueNotifier<_NowPlaying?> nowPlaying =
@@ -228,6 +229,7 @@ class _AppController {
 
   List<File>? _queue;
   int _queueIndex = -1;
+  bool _androidPlaylistActive = false;
 
   // Keep this bounded to avoid unbounded RAM growth (cover bytes can be large).
   final Map<String, Future<_MetaPreview>> _metaPreviewCache =
@@ -322,6 +324,7 @@ class _AppController {
   void dispose() {
     _playbackErrorsSub?.cancel();
     _playerStateSub?.cancel();
+    _currentIndexSub?.cancel();
     _rssTimer?.cancel();
     player.dispose();
     systemMedia.dispose();
@@ -333,6 +336,7 @@ class _AppController {
   void _wirePlayerDiagnostics() {
     _playbackErrorsSub?.cancel();
     _playerStateSub?.cancel();
+    _currentIndexSub?.cancel();
     _playbackErrorsSub = player.playbackEventStream.listen(
       (_) {},
       onError: (Object e, StackTrace st) {
@@ -358,6 +362,53 @@ class _AppController {
         _rssTimer = null;
       }
     });
+
+    _currentIndexSub = player.currentIndexStream.distinct().listen((idx) {
+      final queue = _queue;
+      if (queue == null) return;
+      if (idx == null) return;
+      if (idx < 0 || idx >= queue.length) return;
+      if (idx == _queueIndex) return;
+      _queueIndex = idx;
+      unawaited(_syncNowPlayingFromQueueIndex(idx));
+      unawaited(systemMedia.setQueueAvailability(
+        canGoNext: canPlayNextTrack,
+        canGoPrevious: canPlayPreviousTrack,
+      ));
+    });
+  }
+
+  Future<void> _syncNowPlayingFromQueueIndex(int idx) async {
+    final queue = _queue;
+    if (queue == null) return;
+    if (idx < 0 || idx >= queue.length) return;
+    final f = queue[idx];
+    final name = p.basename(f.path);
+    try {
+      final ext = p.extension(name).toLowerCase();
+      final isFurry =
+          ext == '.furry' || await api.isValidFurryFile(filePath: f.path);
+      if (isFurry) {
+        final originalExt = await api.getOriginalFormat(filePath: f.path);
+        final meta = await getMetaPreviewForFurry(f);
+        nowPlaying.value = _NowPlaying(
+          title: meta.title.isEmpty ? name : meta.title,
+          subtitle:
+              meta.subtitle.isEmpty ? '.furry → $originalExt' : meta.subtitle,
+          sourcePath: f.path,
+          artUri: meta.artUri,
+        );
+      } else {
+        nowPlaying.value = _NowPlaying(
+          title: name,
+          subtitle: '本地文件',
+          sourcePath: f.path,
+          artUri: null,
+        );
+      }
+    } catch (e, st) {
+      appendLog('Queue sync failed: $e\n$st');
+    }
   }
 
   Future<Uri?> _writeCoverPayloadToTempUri({
@@ -534,9 +585,11 @@ class _AppController {
       } else {
         _queue = null;
         _queueIndex = -1;
+        _androidPlaylistActive = false;
       }
     } else {
       _queueIndex = -1;
+      _androidPlaylistActive = false;
     }
     unawaited(systemMedia.setQueueAvailability(
       canGoNext: canPlayNextTrack,
@@ -699,6 +752,105 @@ class _AppController {
   }) async {
     if (queue.isEmpty) return;
     if (index < 0 || index >= queue.length) return;
+
+    // On Android, use a playlist so just_audio_background can expose next/previous
+    // in the system notification/lockscreen controls.
+    if (!kIsWeb && Platform.isAndroid && queue.length > 1) {
+      _queue = List<File>.from(queue);
+      _queueIndex = index;
+      _androidPlaylistActive = true;
+      unawaited(systemMedia.setQueueAvailability(
+        canGoNext: canPlayNextTrack,
+        canGoPrevious: canPlayPreviousTrack,
+      ));
+
+      final name = displayName ?? p.basename(queue[index].path);
+      nowPlaying.value = _NowPlaying(
+        title: name,
+        subtitle: '正在加载…',
+        sourcePath: queue[index].path,
+        artUri: null,
+      );
+
+      await cleanupTempArtifacts();
+      final tmp = await getTemporaryDirectory();
+      final outDir = Directory(p.join(tmp.path, 'furry_unpacked'));
+      if (!await outDir.exists()) await outDir.create(recursive: true);
+
+      Future<File> ensurePlayableFileForFurry(File furryFile) async {
+        final originalExt =
+            await api.getOriginalFormat(filePath: furryFile.path);
+        final outExt = originalExt.trim().isEmpty ? 'bin' : originalExt.trim();
+        final outPath = p.join(
+          outDir.path,
+          'unpacked_${furryFile.path.hashCode}_${DateTime.now().millisecondsSinceEpoch}.$outExt',
+        );
+        final rc = await api.unpackToFile(
+            inputPath: furryFile.path, outputPath: outPath);
+        final f = File(outPath);
+        if (rc == 0 && await f.exists()) return f;
+
+        final bytes =
+            await api.unpackFromFurryToBytes(inputPath: furryFile.path);
+        if (bytes == null) {
+          throw StateError('Unpack-to-bytes failed: null');
+        }
+        await f.writeAsBytes(bytes, flush: true);
+        return f;
+      }
+
+      final sources = <AudioSource>[];
+      for (final f in queue) {
+        final base = p.basename(f.path);
+        final ext = p.extension(base).toLowerCase();
+        final isFurry =
+            ext == '.furry' || await api.isValidFurryFile(filePath: f.path);
+
+        Uri uri;
+        String title;
+        String artist;
+        Uri? artUri;
+
+        if (isFurry) {
+          final playable = await ensurePlayableFileForFurry(f);
+          uri = playable.uri;
+          final meta = await getMetaPreviewForFurry(f);
+          title = meta.title.isEmpty ? base : meta.title;
+          artist = meta.subtitle;
+          artUri = meta.artUri;
+        } else {
+          uri = f.uri;
+          title = base;
+          artist = '';
+          artUri = null;
+        }
+
+        sources.add(
+          AudioSource.uri(
+            uri,
+            tag: MediaItem(
+              id: f.path,
+              title: title,
+              artist: artist,
+              artUri: artUri,
+            ),
+          ),
+        );
+      }
+
+      await player.setAudioSource(
+        ConcatenatingAudioSource(children: sources),
+        initialIndex: index,
+        initialPosition: Duration.zero,
+      );
+      await player.play();
+
+      // Update UI immediately (system controls update via MediaItem tags).
+      await _syncNowPlayingFromQueueIndex(index);
+      return;
+    }
+
+    _androidPlaylistActive = false;
     _queue = List<File>.from(queue);
     _queueIndex = index;
     unawaited(systemMedia.setQueueAvailability(
@@ -719,14 +871,38 @@ class _AppController {
     final queue = _queue;
     if (queue == null) return;
     if (_queueIndex <= 0) return;
-    await playFromQueue(queue: queue, index: _queueIndex - 1);
+    final nextIdx = _queueIndex - 1;
+    if (_androidPlaylistActive && !kIsWeb && Platform.isAndroid) {
+      _queueIndex = nextIdx;
+      unawaited(systemMedia.setQueueAvailability(
+        canGoNext: canPlayNextTrack,
+        canGoPrevious: canPlayPreviousTrack,
+      ));
+      await player.seek(Duration.zero, index: nextIdx);
+      await player.play();
+      await _syncNowPlayingFromQueueIndex(nextIdx);
+      return;
+    }
+    await playFromQueue(queue: queue, index: nextIdx);
   }
 
   Future<void> playNextTrack() async {
     final queue = _queue;
     if (queue == null) return;
     if (_queueIndex < 0 || _queueIndex >= queue.length - 1) return;
-    await playFromQueue(queue: queue, index: _queueIndex + 1);
+    final nextIdx = _queueIndex + 1;
+    if (_androidPlaylistActive && !kIsWeb && Platform.isAndroid) {
+      _queueIndex = nextIdx;
+      unawaited(systemMedia.setQueueAvailability(
+        canGoNext: canPlayNextTrack,
+        canGoPrevious: canPlayPreviousTrack,
+      ));
+      await player.seek(Duration.zero, index: nextIdx);
+      await player.play();
+      await _syncNowPlayingFromQueueIndex(nextIdx);
+      return;
+    }
+    await playFromQueue(queue: queue, index: nextIdx);
   }
 
   Future<void> stop() async {
