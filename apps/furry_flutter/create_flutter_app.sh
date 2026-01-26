@@ -180,6 +180,8 @@ echo "[INFO] 添加依赖（pub add）"
 echo "[INFO] 覆盖模板代码"
 cp -a "$TEMPLATES_DIR/lib/." "$OUT_DIR/lib/"
 cp -a "$TEMPLATES_DIR/android/." "$OUT_DIR/android/"
+# Ensure Flutter generates plugin registrant for the current dependency set.
+rm -f "$OUT_DIR/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java" || true
 if [ -d "$TEMPLATES_DIR/test" ]; then
   mkdir -p "$OUT_DIR/test"
   cp -a "$TEMPLATES_DIR/test/." "$OUT_DIR/test/"
