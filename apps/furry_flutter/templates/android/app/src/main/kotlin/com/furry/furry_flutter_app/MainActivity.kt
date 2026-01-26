@@ -5,20 +5,22 @@ import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.util.concurrent.Executors
 
 class MainActivity : AudioServiceActivity() {
   private val channelName = "furry/native"
   private var inited = false
+  private val executor = Executors.newFixedThreadPool(2)
 
   private fun <T> runAsync(result: MethodChannel.Result, block: () -> T) {
-    Thread {
+    executor.execute {
       try {
         val v = block()
         runOnUiThread { result.success(v) }
       } catch (t: Throwable) {
         runOnUiThread { result.error("native_error", t.toString(), null) }
       }
-    }.start()
+    }
   }
 
   override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
@@ -57,13 +59,13 @@ class MainActivity : AudioServiceActivity() {
       "isValidFurryFile" -> {
         ensureInit()
         val filePath = call.argument<String>("filePath") ?: ""
-        result.success(NativeLib.isValidFurryFile(filePath))
+        runAsync(result) { NativeLib.isValidFurryFile(filePath) }
       }
 
       "getOriginalFormat" -> {
         ensureInit()
         val filePath = call.argument<String>("filePath") ?: ""
-        result.success(NativeLib.getOriginalFormat(filePath))
+        runAsync(result) { NativeLib.getOriginalFormat(filePath) }
       }
 
       "unpackFromFurryToBytes" -> {
@@ -82,16 +84,21 @@ class MainActivity : AudioServiceActivity() {
       "getTagsJson" -> {
         ensureInit()
         val filePath = call.argument<String>("filePath") ?: ""
-        result.success(NativeLib.getTagsJson(filePath))
+        runAsync(result) { NativeLib.getTagsJson(filePath) }
       }
 
       "getCoverArt" -> {
         ensureInit()
         val filePath = call.argument<String>("filePath") ?: ""
-        result.success(NativeLib.getCoverArt(filePath))
+        runAsync(result) { NativeLib.getCoverArt(filePath) }
       }
 
       else -> result.notImplemented()
     }
+  }
+
+  override fun onDestroy() {
+    super.onDestroy()
+    executor.shutdown()
   }
 }
