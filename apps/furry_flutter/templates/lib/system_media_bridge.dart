@@ -99,7 +99,7 @@ class _WindowsSmtc {
         pauseEnabled: true,
         nextEnabled: false,
         prevEnabled: false,
-        stopEnabled: true,
+        stopEnabled: false,
         fastForwardEnabled: false,
         rewindEnabled: false,
       ),
@@ -142,7 +142,6 @@ class _WindowsSmtc {
           await _player.pause();
           break;
         case PressedButton.stop:
-          await _player.stop();
           break;
         case PressedButton.next:
           final fn = _onNext;
