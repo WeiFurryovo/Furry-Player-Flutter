@@ -62,6 +62,73 @@ if text != original:
 PY
 }
 
+patch_android_gradle_for_release_shrink() {
+  local gradle_file="$OUT_DIR/android/app/build.gradle"
+  if [ ! -f "$gradle_file" ]; then
+    echo "[WARN] 未找到 android/app/build.gradle，跳过 R8/资源压缩配置：$gradle_file" >&2
+    return 0
+  fi
+
+  # Ensure a proguard rules file exists (required when enabling minify).
+  local proguard_file="$OUT_DIR/android/app/proguard-rules.pro"
+  if [ ! -f "$proguard_file" ]; then
+    cat >"$proguard_file" <<'EOF'
+# Keep Flutter classes referenced via reflection.
+-keep class io.flutter.app.** { *; }
+-keep class io.flutter.plugin.** { *; }
+-keep class io.flutter.util.** { *; }
+-keep class io.flutter.view.** { *; }
+-keep class io.flutter.** { *; }
+-keep class io.flutter.plugins.** { *; }
+EOF
+  fi
+
+  python3 - "$gradle_file" <<'PY'
+import re
+import sys
+
+path = sys.argv[1]
+text = open(path, "r", encoding="utf-8").read()
+original = text
+
+def ensure_in_release_block(lines_to_ensure):
+  global text
+  m = re.search(r"buildTypes\\s*\\{", text)
+  if not m:
+    return
+  # Find release { ... } block (simple heuristic).
+  m_rel = re.search(r"release\\s*\\{", text)
+  if not m_rel:
+    return
+  # Insert after the opening brace line.
+  # Find end of that line.
+  line_end = text.find("\\n", m_rel.end())
+  if line_end == -1:
+    return
+  insert_at = line_end + 1
+  # Determine indentation from the next line or from "release {" line.
+  indent = re.search(r"(^[ \\t]*)release\\s*\\{", text[m_rel.start()-50:m_rel.start()+50], re.M)
+  base_indent = "        "
+  if indent:
+    base_indent = indent.group(1) + "    "
+
+  for l in lines_to_ensure:
+    if l.strip() in text:
+      continue
+    text = text[:insert_at] + f"{base_indent}{l}\\n" + text[insert_at:]
+    insert_at += len(base_indent) + len(l) + 1
+
+ensure_in_release_block([
+  "minifyEnabled true",
+  "shrinkResources true",
+  "proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'",
+])
+
+if text != original:
+  open(path, "w", encoding="utf-8").write(text)
+PY
+}
+
 usage() {
   cat <<EOF
 Usage: $0 [--no-android] [--no-ffi]
@@ -110,6 +177,9 @@ fi
 
 echo "[INFO] 配置 Android AudioService（用于 just_audio_background / audio_service）"
 patch_android_manifest_for_audio_service
+
+echo "[INFO] 配置 Android release 体积优化（R8 + 资源压缩）"
+patch_android_gradle_for_release_shrink
 
 if [ "$BUILD_ANDROID" -eq 1 ]; then
   echo "[INFO] 构建 Rust Android 动态库（需要 ANDROID_NDK_HOME）"

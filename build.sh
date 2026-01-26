@@ -85,6 +85,10 @@ build_android() {
 
     # 设置 NDK 工具链路径
     export PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
+    local STRIP_BIN=""
+    if command -v llvm-strip >/dev/null 2>&1; then
+        STRIP_BIN="llvm-strip"
+    fi
 
     mkdir -p dist/android
 
@@ -92,6 +96,11 @@ build_android() {
     for target in aarch64-linux-android armv7-linux-androideabi x86_64-linux-android; do
         info "构建 $target..."
         cargo build --release --target "$target" --lib -p furry_android
+        if [ -n "$STRIP_BIN" ]; then
+            # Ensure the produced .so is stripped (cargo's strip may not run for cross targets).
+            "$STRIP_BIN" --strip-unneeded "target/$target/release/libfurry_android.so" 2>/dev/null || \
+              "$STRIP_BIN" -S "target/$target/release/libfurry_android.so" 2>/dev/null || true
+        fi
 
         case "$target" in
             aarch64-linux-android)

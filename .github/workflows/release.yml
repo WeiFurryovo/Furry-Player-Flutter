@@ -80,25 +80,25 @@ jobs:
           EOF
 
           flutter analyze
-          flutter build apk --release --verbose
+          flutter build apk --release --split-per-abi --verbose
           flutter build appbundle --release --verbose
 
           mkdir -p ../../../dist/android/flutter
-          cp -f build/app/outputs/flutter-apk/app-release.apk ../../../dist/android/flutter/
+          cp -f build/app/outputs/flutter-apk/app-*-release.apk ../../../dist/android/flutter/ || true
           cp -f build/app/outputs/bundle/release/app-release.aab ../../../dist/android/flutter/
 
       - name: Checksums
         run: |
           set -euxo pipefail
           cd dist/android/flutter
-          sha256sum app-release.apk app-release.aab > SHA256SUMS.txt
+          sha256sum app-*-release.apk app-release.aab > SHA256SUMS.txt
 
       - name: Upload artifact (android)
         uses: actions/upload-artifact@v4
         with:
           name: android
           path: |
-            dist/android/flutter/app-release.apk
+            dist/android/flutter/app-*-release.apk
             dist/android/flutter/app-release.aab
             dist/android/flutter/SHA256SUMS.txt
 

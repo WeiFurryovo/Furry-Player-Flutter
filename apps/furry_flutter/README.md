@@ -32,6 +32,13 @@ cd apps/furry_flutter/furry_flutter_app
 flutter run
 ```
 
+### Android 安装包体积优化建议
+Android 包体积通常会比 Windows/Linux 大（包含 Flutter 引擎 + 多 ABI 原生库）。建议：
+- 优先发布/安装 `AAB`：`flutter build appbundle --release`（Google Play 会按设备 ABI/密度拆分）
+- 需要 APK 侧载时，用按 ABI 拆分：`flutter build apk --release --split-per-abi`
+  - 生成的 `app-arm64-v8a-release.apk` / `app-armeabi-v7a-release.apk` 会比通用 `app-release.apk` 小很多
+- 本仓库生成脚本会为 release 打开 `minifyEnabled` + `shrinkResources`（R8/资源压缩），并尝试 `llvm-strip` 去掉 Rust `.so` 符号表
+
 ### 常见问题
 - `./build.sh android` 提示找不到 NDK：设置 `ANDROID_NDK_HOME`，例如 `export ANDROID_NDK_HOME=~/Android/Sdk/ndk/26.1.10909125`
 - Flutter 端文件选择为 `withData: true`（直接读入内存再写入临时文件），大文件会占用较多内存；要做“真·流式”读取，需要在 Android 侧处理 `content://` URI（后续可以加）
