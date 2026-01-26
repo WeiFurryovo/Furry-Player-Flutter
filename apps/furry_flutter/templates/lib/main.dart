@@ -1145,7 +1145,7 @@ class MiniPlayerBar extends StatelessWidget {
         return Material(
           color: cs.surfaceContainerHighest,
           child: InkWell(
-            onTap: () => _showNowPlaying(context, controller, np),
+            onTap: () => _showNowPlaying(context, controller),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Row(
@@ -1216,22 +1216,19 @@ class MiniPlayerBar extends StatelessWidget {
     );
   }
 
-  void _showNowPlaying(
-      BuildContext context, _AppController controller, _NowPlaying np) {
+  void _showNowPlaying(BuildContext context, _AppController controller) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (context) => NowPlayingSheet(controller: controller, np: np),
+      builder: (context) => NowPlayingSheet(controller: controller),
     );
   }
 }
 
 class NowPlayingSheet extends StatefulWidget {
   final _AppController controller;
-  final _NowPlaying np;
-  const NowPlayingSheet(
-      {super.key, required this.controller, required this.np});
+  const NowPlayingSheet({super.key, required this.controller});
 
   @override
   State<NowPlayingSheet> createState() => _NowPlayingSheetState();
@@ -1243,174 +1240,193 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return DraggableScrollableSheet(
-      initialChildSize: 0.70,
-      minChildSize: 0.45,
-      maxChildSize: 0.98,
-      expand: false,
-      builder: (context, scrollController) {
-        return Material(
-          color: cs.surface,
-          child: ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-            children: [
-              Center(
-                child: Container(
-                  width: 48,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: cs.outlineVariant,
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              AspectRatio(
-                aspectRatio: 1,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: widget.np.artUri == null
-                      ? Icon(Icons.album, size: 96, color: cs.primary)
-                      : Image.file(
-                          File.fromUri(widget.np.artUri!),
-                          fit: BoxFit.cover,
-                          cacheWidth: 1200,
-                          cacheHeight: 1200,
-                        ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(widget.np.title,
-                  style: Theme.of(context).textTheme.titleLarge,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis),
-              const SizedBox(height: 4),
-              Text(widget.np.subtitle,
-                  style: Theme.of(context).textTheme.bodyMedium),
-              const SizedBox(height: 16),
-              StreamBuilder<Duration?>(
-                stream: widget.controller.player.durationStream,
-                builder: (context, durSnap) {
-                  final duration = durSnap.data ?? Duration.zero;
-                  return StreamBuilder<Duration>(
-                    stream: widget.controller.player.positionStream,
-                    builder: (context, posSnap) {
-                      final position = posSnap.data ?? Duration.zero;
-                      final max = duration.inMilliseconds > 0
-                          ? duration.inMilliseconds.toDouble()
-                          : 1.0;
-                      final current = position.inMilliseconds
-                          .clamp(0, max.toInt())
-                          .toDouble();
-                      final value =
-                          (_dragMs ?? current).clamp(0, max).toDouble();
-                      return Column(
-                        children: [
-                          Slider(
-                            value: value,
-                            max: max,
-                            onChanged: (v) => setState(() => _dragMs = v),
-                            onChangeEnd: (v) async {
-                              setState(() => _dragMs = null);
-                              await widget.controller.player
-                                  .seek(Duration(milliseconds: v.round()));
-                            },
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                  widget.controller._fmt(
-                                      Duration(milliseconds: value.round())),
-                                  style: Theme.of(context).textTheme.bodySmall),
-                              Text(widget.controller._fmt(duration),
-                                  style: Theme.of(context).textTheme.bodySmall),
-                            ],
-                          ),
-                        ],
-                      );
-                    },
-                  );
-                },
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+    return ValueListenableBuilder<_NowPlaying?>(
+      valueListenable: widget.controller.nowPlaying,
+      builder: (context, np, _) {
+        if (np == null) {
+          return const SizedBox.shrink();
+        }
+
+        return DraggableScrollableSheet(
+          initialChildSize: 0.70,
+          minChildSize: 0.45,
+          maxChildSize: 0.98,
+          expand: false,
+          builder: (context, scrollController) {
+            return Material(
+              color: cs.surface,
+              child: ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 children: [
-                  IconButton(
-                    tooltip: '上一首',
-                    onPressed: widget.controller.canPlayPreviousTrack
-                        ? widget.controller.playPreviousTrack
-                        : null,
-                    icon: const Icon(Icons.skip_previous),
+                  Center(
+                    child: Container(
+                      width: 48,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: cs.outlineVariant,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 12),
-                  StreamBuilder<PlayerState>(
-                    stream: widget.controller.player.playerStateStream,
-                    builder: (context, snap) {
-                      final playing = snap.data?.playing ?? false;
-                      final processing =
-                          snap.data?.processingState ?? ProcessingState.idle;
-                      final busy = processing == ProcessingState.loading ||
-                          processing == ProcessingState.buffering;
-                      return FilledButton.tonalIcon(
-                        onPressed: busy
-                            ? null
-                            : () async {
-                                if (playing) {
-                                  await widget.controller.player.pause();
-                                } else {
-                                  await widget.controller.player.play();
-                                }
-                              },
-                        icon: busy
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2))
-                            : Icon(playing ? Icons.pause : Icons.play_arrow),
-                        label: Text(playing ? '暂停' : '播放'),
+                  const SizedBox(height: 16),
+                  AspectRatio(
+                    aspectRatio: 1,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: np.artUri == null
+                          ? Icon(Icons.album, size: 96, color: cs.primary)
+                          : Image.file(
+                              File.fromUri(np.artUri!),
+                              fit: BoxFit.cover,
+                              cacheWidth: 1200,
+                              cacheHeight: 1200,
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    np.title,
+                    style: Theme.of(context).textTheme.titleLarge,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(np.subtitle,
+                      style: Theme.of(context).textTheme.bodyMedium),
+                  const SizedBox(height: 16),
+                  StreamBuilder<Duration?>(
+                    stream: widget.controller.player.durationStream,
+                    builder: (context, durSnap) {
+                      final duration = durSnap.data ?? Duration.zero;
+                      return StreamBuilder<Duration>(
+                        stream: widget.controller.player.positionStream,
+                        builder: (context, posSnap) {
+                          final position = posSnap.data ?? Duration.zero;
+                          final max = duration.inMilliseconds > 0
+                              ? duration.inMilliseconds.toDouble()
+                              : 1.0;
+                          final current = position.inMilliseconds
+                              .clamp(0, max.toInt())
+                              .toDouble();
+                          final value =
+                              (_dragMs ?? current).clamp(0, max).toDouble();
+                          return Column(
+                            children: [
+                              Slider(
+                                value: value,
+                                max: max,
+                                onChanged: (v) => setState(() => _dragMs = v),
+                                onChangeEnd: (v) async {
+                                  setState(() => _dragMs = null);
+                                  await widget.controller.player
+                                      .seek(Duration(milliseconds: v.round()));
+                                },
+                              ),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    widget.controller._fmt(
+                                        Duration(milliseconds: value.round())),
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  Text(
+                                    widget.controller._fmt(duration),
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          );
+                        },
                       );
                     },
                   ),
-                  const SizedBox(width: 12),
-                  IconButton(
-                    tooltip: '下一首',
-                    onPressed: widget.controller.canPlayNextTrack
-                        ? widget.controller.playNextTrack
-                        : null,
-                    icon: const Icon(Icons.skip_next),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.info_outline),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          widget.np.sourcePath,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
+                      IconButton(
+                        tooltip: '上一首',
+                        onPressed: widget.controller.canPlayPreviousTrack
+                            ? widget.controller.playPreviousTrack
+                            : null,
+                        icon: const Icon(Icons.skip_previous),
+                      ),
+                      const SizedBox(width: 12),
+                      StreamBuilder<PlayerState>(
+                        stream: widget.controller.player.playerStateStream,
+                        builder: (context, snap) {
+                          final playing = snap.data?.playing ?? false;
+                          final processing = snap.data?.processingState ??
+                              ProcessingState.idle;
+                          final busy = processing == ProcessingState.loading ||
+                              processing == ProcessingState.buffering;
+                          return FilledButton.tonalIcon(
+                            onPressed: busy
+                                ? null
+                                : () async {
+                                    if (playing) {
+                                      await widget.controller.player.pause();
+                                    } else {
+                                      await widget.controller.player.play();
+                                    }
+                                  },
+                            icon: busy
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : Icon(
+                                    playing ? Icons.pause : Icons.play_arrow),
+                            label: Text(playing ? '暂停' : '播放'),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 12),
+                      IconButton(
+                        tooltip: '下一首',
+                        onPressed: widget.controller.canPlayNextTrack
+                            ? widget.controller.playNextTrack
+                            : null,
+                        icon: const Icon(Icons.skip_next),
                       ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              np.sourcePath,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
