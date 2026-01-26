@@ -1343,12 +1343,6 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   IconButton(
-                    tooltip: '停止',
-                    onPressed: widget.controller.stop,
-                    icon: const Icon(Icons.stop),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
                     tooltip: '上一首',
                     onPressed: widget.controller.canPlayPreviousTrack
                         ? widget.controller.playPreviousTrack
