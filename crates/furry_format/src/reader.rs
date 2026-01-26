@@ -118,7 +118,9 @@ impl<R: Read + Seek> FurryReader<R> {
         // Cover art can be large, but should still be bounded.
         const MAX_TAGS_BYTES: u32 = 256 * 1024; // 256 KiB
         const MAX_LYRICS_BYTES: u32 = 2 * 1024 * 1024; // 2 MiB
-        const MAX_COVER_BYTES: u32 = 8 * 1024 * 1024; // 8 MiB (includes mime\0 prefix)
+        // Cover art can be large; keep this high to avoid unexpectedly dropping art.
+        // NOTE: Very large covers may increase memory usage on mobile.
+        const MAX_COVER_BYTES: u32 = 64 * 1024 * 1024; // 64 MiB (includes mime\0 prefix)
         let max_plain_len = match kind {
             crate::MetaKind::Tags => MAX_TAGS_BYTES,
             crate::MetaKind::Lyrics => MAX_LYRICS_BYTES,

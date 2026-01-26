@@ -518,12 +518,7 @@ class _AppController {
 
         final meta = await getMetaPreviewForFurry(file);
         final artUriUi = meta.artUri;
-        final artUriSystem = meta.coverBytesLen != null && meta.coverBytesLen! <= 2 * 1024 * 1024
-            ? artUriUi
-            : null;
-        if (artUriUi != null && artUriSystem == null) {
-          appendLog('Cover art skipped for system controls (too large): ${meta.coverBytesLen} bytes');
-        }
+        final artUriSystem = artUriUi;
         final mediaItem = MediaItem(
           id: file.path,
           title: meta.title.isEmpty ? name : meta.title,
@@ -657,22 +652,12 @@ class _AppController {
       try {
         final payload = await api.getCoverArt(filePath: furryFile.path);
         if (payload != null && payload.isNotEmpty) {
-          // Hard cap to avoid OOM in Dart and Android bitmap decoding. Payload includes `mime\0...`.
-          const maxPayload = 8 * 1024 * 1024;
-          if (payload.length <= maxPayload) {
-            final sep = payload.indexOf(0);
-            if (sep > 0 && sep < payload.length - 1) {
-              final coverMime = String.fromCharCodes(payload.sublist(0, sep));
-              final bytes = payload.sublist(sep + 1);
-              coverBytesLen = bytes.length;
-              // Cap the raw image bytes (compressed). Keep this bounded on mobile.
-              const maxCoverBytes = 6 * 1024 * 1024; // 6 MiB
-              if (bytes.length <= maxCoverBytes) {
-                artUri = await _writeCoverPayloadToTempUri(mime: coverMime, bytes: bytes);
-              } else {
-                coverBytesLen = null;
-              }
-            }
+          final sep = payload.indexOf(0);
+          if (sep > 0 && sep < payload.length - 1) {
+            final coverMime = String.fromCharCodes(payload.sublist(0, sep));
+            final bytes = payload.sublist(sep + 1);
+            coverBytesLen = bytes.length;
+            artUri = await _writeCoverPayloadToTempUri(mime: coverMime, bytes: bytes);
           }
         }
       } catch (_) {}
