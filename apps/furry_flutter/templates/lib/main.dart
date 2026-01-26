@@ -21,6 +21,7 @@ final List<String> _startupDiagnostics = <String>[];
 void _startupLog(String msg) {
   _startupDiagnostics.add(msg);
   debugPrint(msg);
+  unawaited(_DiagnosticsLog.appendLine(msg));
 }
 
 List<String> _takeStartupDiagnostics() {
@@ -29,8 +30,55 @@ List<String> _takeStartupDiagnostics() {
   return out;
 }
 
+class _DiagnosticsLog {
+  static File? _file;
+  static Future<void> _writeChain = Future<void>.value();
+
+  static const int _maxBytes = 512 * 1024; // 512 KiB
+  static const int _keepBytes = 256 * 1024; // 256 KiB
+
+  static Future<void> init() async {
+    if (_file != null) return;
+    final dir = await getApplicationSupportDirectory();
+    await dir.create(recursive: true);
+    _file = File(p.join(dir.path, 'diagnostics.log'));
+  }
+
+  static Future<String> readAll() async {
+    try {
+      await init();
+      final f = _file!;
+      if (!await f.exists()) return '';
+      final bytes = await f.readAsBytes();
+      if (bytes.isEmpty) return '';
+      final start = bytes.length > _keepBytes ? bytes.length - _keepBytes : 0;
+      return utf8.decode(bytes.sublist(start), allowMalformed: true);
+    } catch (_) {
+      return '';
+    }
+  }
+
+  static Future<void> appendLine(String msg) async {
+    try {
+      await init();
+      final line = '${DateTime.now().toIso8601String()}  $msg\n';
+      _writeChain = _writeChain.then((_) async {
+        final f = _file!;
+        await f.writeAsString(line, mode: FileMode.append, flush: true);
+        final len = await f.length();
+        if (len <= _maxBytes) return;
+        final bytes = await f.readAsBytes();
+        final start = bytes.length > _keepBytes ? bytes.length - _keepBytes : 0;
+        await f.writeAsBytes(bytes.sublist(start), flush: true);
+      });
+      await _writeChain;
+    } catch (_) {}
+  }
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await _DiagnosticsLog.init();
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
@@ -174,6 +222,10 @@ class _AppController {
   String? pickedForPackName;
 
   Future<void> init() async {
+    final persisted = await _DiagnosticsLog.readAll();
+    if (persisted.trim().isNotEmpty) {
+      log.value = persisted;
+    }
     try {
       await api.init();
       await systemMedia.init();
@@ -310,6 +362,7 @@ class _AppController {
 
   void appendLog(String msg) {
     log.value = '${DateTime.now().toIso8601String()}  $msg\n${log.value}';
+    unawaited(_DiagnosticsLog.appendLine(msg));
   }
 
   Future<Directory> outputsDir() async {
