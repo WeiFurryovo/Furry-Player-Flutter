@@ -93,7 +93,8 @@ Future<void> main() async {
     final prevPlatform = JustAudioPlatform.instance;
     try {
       await JustAudioBackground.init(
-        androidNotificationChannelId: 'com.furry.furry_flutter_app.channel.audio',
+        androidNotificationChannelId:
+            'com.furry.furry_flutter_app.channel.audio',
         androidNotificationChannelName: 'Furry Player',
         androidNotificationOngoing: true,
       );
@@ -120,11 +121,13 @@ class FurryApp extends StatelessWidget {
       themeMode: ThemeMode.system,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light),
+        colorScheme:
+            ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark),
+        colorScheme:
+            ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark),
       ),
       home: const AppShell(),
     );
@@ -164,9 +167,18 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final destinations = <NavigationDestination>[
-      const NavigationDestination(icon: Icon(Icons.library_music_outlined), selectedIcon: Icon(Icons.library_music), label: '本地'),
-      const NavigationDestination(icon: Icon(Icons.swap_horiz_outlined), selectedIcon: Icon(Icons.swap_horiz), label: '转换'),
-      const NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: '设置'),
+      const NavigationDestination(
+          icon: Icon(Icons.library_music_outlined),
+          selectedIcon: Icon(Icons.library_music),
+          label: '本地'),
+      const NavigationDestination(
+          icon: Icon(Icons.swap_horiz_outlined),
+          selectedIcon: Icon(Icons.swap_horiz),
+          label: '转换'),
+      const NavigationDestination(
+          icon: Icon(Icons.settings_outlined),
+          selectedIcon: Icon(Icons.settings),
+          label: '设置'),
     ];
 
     return Scaffold(
@@ -208,12 +220,15 @@ class _AppController {
   StreamSubscription<dynamic>? _playerStateSub;
   Timer? _rssTimer;
 
-  final ValueNotifier<_NowPlaying?> nowPlaying = ValueNotifier<_NowPlaying?>(null);
-  final ValueNotifier<List<File>> furryOutputs = ValueNotifier<List<File>>(<File>[]);
+  final ValueNotifier<_NowPlaying?> nowPlaying =
+      ValueNotifier<_NowPlaying?>(null);
+  final ValueNotifier<List<File>> furryOutputs =
+      ValueNotifier<List<File>>(<File>[]);
   final ValueNotifier<String> log = ValueNotifier<String>('');
 
   // Keep this bounded to avoid unbounded RAM growth (cover bytes can be large).
-  final Map<String, Future<_MetaPreview>> _metaPreviewCache = <String, Future<_MetaPreview>>{};
+  final Map<String, Future<_MetaPreview>> _metaPreviewCache =
+      <String, Future<_MetaPreview>>{};
   static const int _metaPreviewCacheLimit = 64;
 
   int paddingKb = 0;
@@ -250,7 +265,8 @@ class _AppController {
       final unpackDir = Directory(p.join(tmp.path, 'furry_unpacked'));
       if (await unpackDir.exists()) {
         final files = unpackDir.listSync().whereType<File>().toList()
-          ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+          ..sort(
+              (a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
         const keep = 12;
         final cutoff = DateTime.now().subtract(const Duration(days: 2));
         for (var i = 0; i < files.length; i++) {
@@ -322,7 +338,8 @@ class _AppController {
         _rssTimer ??= Timer.periodic(const Duration(seconds: 5), (_) {
           try {
             final rss = ProcessInfo.currentRss;
-            appendLog('Mem: rss=${(rss / (1024 * 1024)).toStringAsFixed(1)}MiB');
+            appendLog(
+                'Mem: rss=${(rss / (1024 * 1024)).toStringAsFixed(1)}MiB');
           } catch (_) {}
         });
       } else {
@@ -349,7 +366,8 @@ class _AppController {
             ? 'webp'
             : 'jpg';
 
-    final out = File(p.join(artDir.path, 'cover_${bytes.length}_${bytes.hashCode}.$ext'));
+    final out = File(
+        p.join(artDir.path, 'cover_${bytes.length}_${bytes.hashCode}.$ext'));
     if (!await out.exists()) {
       await out.writeAsBytes(bytes, flush: true);
     }
@@ -379,7 +397,8 @@ class _AppController {
   }) async {
     final tmp = await getTemporaryDirectory();
     final safeName = filenameHint.isEmpty ? 'input.bin' : filenameHint;
-    final out = File(p.join(tmp.path, 'import_${DateTime.now().millisecondsSinceEpoch}_$safeName'));
+    final out = File(p.join(
+        tmp.path, 'import_${DateTime.now().millisecondsSinceEpoch}_$safeName'));
     await out.writeAsBytes(bytes, flush: true);
     return out;
   }
@@ -390,7 +409,8 @@ class _AppController {
   }) async {
     final tmp = await getTemporaryDirectory();
     final safeName = filenameHint.isEmpty ? 'input.bin' : filenameHint;
-    final out = File(p.join(tmp.path, 'import_${DateTime.now().millisecondsSinceEpoch}_$safeName'));
+    final out = File(p.join(
+        tmp.path, 'import_${DateTime.now().millisecondsSinceEpoch}_$safeName'));
     final sink = out.openWrite();
     await sink.addStream(stream);
     await sink.flush();
@@ -402,10 +422,12 @@ class _AppController {
     final path = file.path;
     if (path != null && path.isNotEmpty) return File(path);
     if (file.readStream != null) {
-      return writePickedStreamToTemp(filenameHint: file.name, stream: file.readStream!);
+      return writePickedStreamToTemp(
+          filenameHint: file.name, stream: file.readStream!);
     }
     if (file.bytes != null) {
-      return writePickedBytesToTemp(filenameHint: file.name, bytes: file.bytes!);
+      return writePickedBytesToTemp(
+          filenameHint: file.name, bytes: file.bytes!);
     }
     return null;
   }
@@ -420,11 +442,13 @@ class _AppController {
     if (file == null) return;
     final realFile = await materializePickedFile(file);
     if (realFile == null) {
-      appendLog('Pick failed: file path/stream unavailable (try a different picker / storage)');
+      appendLog(
+          'Pick failed: file path/stream unavailable (try a different picker / storage)');
       return;
     }
     pickedForPack = realFile;
-    pickedForPackName = file.name.isEmpty ? p.basename(realFile.path) : file.name;
+    pickedForPackName =
+        file.name.isEmpty ? p.basename(realFile.path) : file.name;
     appendLog('Picked for pack: ${pickedForPackName!}');
   }
 
@@ -475,10 +499,12 @@ class _AppController {
     if (file == null) return null;
     final realFile = await materializePickedFile(file);
     if (realFile == null) {
-      appendLog('Pick failed: file path/stream unavailable (try a different picker / storage)');
+      appendLog(
+          'Pick failed: file path/stream unavailable (try a different picker / storage)');
       return null;
     }
-    appendLog('Picked for play: ${file.name.isEmpty ? p.basename(realFile.path) : file.name}');
+    appendLog(
+        'Picked for play: ${file.name.isEmpty ? p.basename(realFile.path) : file.name}');
     return realFile;
   }
 
@@ -487,9 +513,18 @@ class _AppController {
     String? displayName,
   }) async {
     final name = displayName ?? p.basename(file.path);
+    nowPlaying.value = _NowPlaying(
+      title: name,
+      subtitle: '正在加载…',
+      sourcePath: file.path,
+      artUri: nowPlaying.value?.sourcePath == file.path
+          ? nowPlaying.value?.artUri
+          : null,
+    );
     try {
       final ext = p.extension(name).toLowerCase();
-      final isFurry = ext == '.furry' || await api.isValidFurryFile(filePath: file.path);
+      final isFurry =
+          ext == '.furry' || await api.isValidFurryFile(filePath: file.path);
 
       if (isFurry) {
         await cleanupTempArtifacts();
@@ -503,7 +538,8 @@ class _AppController {
           'unpacked_${file.path.hashCode}_${DateTime.now().millisecondsSinceEpoch}.$outExt',
         );
         appendLog('Unpacking .furry → $outExt…');
-        final rc = await api.unpackToFile(inputPath: file.path, outputPath: outPath);
+        final rc =
+            await api.unpackToFile(inputPath: file.path, outputPath: outPath);
         File? unpacked;
         if (rc == 0) {
           final f = File(outPath);
@@ -519,6 +555,14 @@ class _AppController {
         final meta = await getMetaPreviewForFurry(file);
         final artUriUi = meta.artUri;
         final artUriSystem = artUriUi;
+        nowPlaying.value = _NowPlaying(
+          title: meta.title.isEmpty ? name : meta.title,
+          subtitle: meta.subtitle.isEmpty
+              ? '.furry → $originalExt（准备播放…）'
+              : meta.subtitle,
+          sourcePath: file.path,
+          artUri: artUriUi,
+        );
         final mediaItem = MediaItem(
           id: file.path,
           title: meta.title.isEmpty ? name : meta.title,
@@ -526,7 +570,8 @@ class _AppController {
           artUri: artUriSystem,
         );
         if (unpacked != null) {
-          await player.setAudioSource(AudioSource.uri(unpacked.uri, tag: mediaItem));
+          await player
+              .setAudioSource(AudioSource.uri(unpacked.uri, tag: mediaItem));
         } else {
           final bytes = await api.unpackFromFurryToBytes(inputPath: file.path);
           if (bytes == null) {
@@ -542,7 +587,8 @@ class _AppController {
             final f = File(fallbackPath);
             await f.writeAsBytes(bytes, flush: true);
             unpacked = f;
-            await player.setAudioSource(AudioSource.uri(unpacked.uri, tag: mediaItem));
+            await player
+                .setAudioSource(AudioSource.uri(unpacked.uri, tag: mediaItem));
           } catch (e, st) {
             appendLog('Write-bytes fallback failed: $e\n$st');
             String? mime;
@@ -561,14 +607,16 @@ class _AppController {
                 break;
             }
             await player.setAudioSource(
-              InMemoryAudioSource(bytes: bytes, contentType: mime, tag: mediaItem),
+              InMemoryAudioSource(
+                  bytes: bytes, contentType: mime, tag: mediaItem),
             );
           }
         }
         await player.play();
         nowPlaying.value = _NowPlaying(
           title: meta.title.isEmpty ? name : meta.title,
-          subtitle: meta.subtitle.isEmpty ? '.furry → $originalExt' : meta.subtitle,
+          subtitle:
+              meta.subtitle.isEmpty ? '.furry → $originalExt' : meta.subtitle,
           sourcePath: file.path,
           artUri: artUriUi,
         );
@@ -582,7 +630,8 @@ class _AppController {
           ),
         );
         if (unpacked != null) {
-          appendLog('Playing (.furry → $originalExt): ${p.basename(unpacked.path)}');
+          appendLog(
+              'Playing (.furry → $originalExt): ${p.basename(unpacked.path)}');
         } else {
           appendLog('Playing (.furry → $originalExt): in-memory');
         }
@@ -595,7 +644,8 @@ class _AppController {
         );
         await player.setAudioSource(AudioSource.uri(file.uri, tag: mediaItem));
         await player.play();
-        nowPlaying.value = _NowPlaying(title: name, subtitle: '本地文件', sourcePath: file.path, artUri: null);
+        nowPlaying.value = _NowPlaying(
+            title: name, subtitle: '本地文件', sourcePath: file.path, artUri: null);
         await systemMedia.setMetadata(
           SystemMediaMetadata(
             title: name,
@@ -657,7 +707,8 @@ class _AppController {
             final coverMime = String.fromCharCodes(payload.sublist(0, sep));
             final bytes = payload.sublist(sep + 1);
             coverBytesLen = bytes.length;
-            artUri = await _writeCoverPayloadToTempUri(mime: coverMime, bytes: bytes);
+            artUri = await _writeCoverPayloadToTempUri(
+                mime: coverMime, bytes: bytes);
           }
         }
       } catch (_) {}
@@ -762,7 +813,10 @@ class _LibraryPageState extends State<LibraryPage> {
             builder: (context, files, _) {
               final filtered = files.where((f) {
                 if (_query.isEmpty) return true;
-                return p.basename(f.path).toLowerCase().contains(_query.toLowerCase());
+                return p
+                    .basename(f.path)
+                    .toLowerCase()
+                    .contains(_query.toLowerCase());
               }).toList();
 
               if (filtered.isEmpty) {
@@ -778,7 +832,8 @@ class _LibraryPageState extends State<LibraryPage> {
                         final meta = snap.data;
                         return ListTile(
                           leading: _CoverThumb(artUri: meta?.artUri),
-                          title: Text(meta?.title ?? p.basename(f.path), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          title: Text(meta?.title ?? p.basename(f.path),
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
                           subtitle: Text(
                             meta == null || meta.subtitle.isEmpty
                                 ? '${_fmtBytes(f.lengthSync())} · ${f.lastModifiedSync().toLocal()}'
@@ -787,7 +842,8 @@ class _LibraryPageState extends State<LibraryPage> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           trailing: const Icon(Icons.chevron_right),
-                          onTap: () => controller.playFile(file: f, displayName: p.basename(f.path)),
+                          onTap: () => controller.playFile(
+                              file: f, displayName: p.basename(f.path)),
                         );
                       },
                     ),
@@ -866,7 +922,8 @@ class _ConverterPageState extends State<ConverterPage> {
                     children: [
                       Icon(Icons.lock, color: cs.primary),
                       const SizedBox(width: 8),
-                      const Text('打包（音频 → .furry）', style: TextStyle(fontWeight: FontWeight.w700)),
+                      const Text('打包（音频 → .furry）',
+                          style: TextStyle(fontWeight: FontWeight.w700)),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -890,7 +947,9 @@ class _ConverterPageState extends State<ConverterPage> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Text(controller.pickedForPackName == null ? '未选择输入文件' : '输入：${controller.pickedForPackName}'),
+                  Text(controller.pickedForPackName == null
+                      ? '未选择输入文件'
+                      : '输入：${controller.pickedForPackName}'),
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -903,12 +962,14 @@ class _ConverterPageState extends State<ConverterPage> {
                           max: 1024,
                           divisions: 64,
                           label: '${controller.paddingKb} KB',
-                          onChanged: (v) => setState(() => controller.paddingKb = v.round()),
+                          onChanged: (v) =>
+                              setState(() => controller.paddingKb = v.round()),
                         ),
                       ),
                     ],
                   ),
-                  Text('当前 padding: ${controller.paddingKb} KB', style: Theme.of(context).textTheme.bodySmall),
+                  Text('当前 padding: ${controller.paddingKb} KB',
+                      style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),
             ),
@@ -924,7 +985,8 @@ class _ConverterPageState extends State<ConverterPage> {
                     children: [
                       Icon(Icons.play_circle, color: cs.primary),
                       const SizedBox(width: 8),
-                      const Text('播放（文件或 .furry）', style: TextStyle(fontWeight: FontWeight.w700)),
+                      const Text('播放（文件或 .furry）',
+                          style: TextStyle(fontWeight: FontWeight.w700)),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -975,14 +1037,18 @@ class SettingsPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('诊断日志', style: TextStyle(fontWeight: FontWeight.w700)),
+                  const Text('诊断日志',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
                   ValueListenableBuilder<String>(
                     valueListenable: controller.log,
                     builder: (context, log, _) {
                       return SelectableText(
                         log.isEmpty ? '(empty)' : log,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(fontFamily: 'monospace'),
                       );
                     },
                   ),
@@ -1022,8 +1088,12 @@ class MiniPlayerBar extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(np.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                        Text(np.subtitle, style: Theme.of(context).textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text(np.title,
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text(np.subtitle,
+                            style: Theme.of(context).textTheme.bodySmall,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
                       ],
                     ),
                   ),
@@ -1031,8 +1101,10 @@ class MiniPlayerBar extends StatelessWidget {
                     stream: controller.player.playerStateStream,
                     builder: (context, snap) {
                       final playing = snap.data?.playing ?? false;
-                      final processing = snap.data?.processingState ?? ProcessingState.idle;
-                      final busy = processing == ProcessingState.loading || processing == ProcessingState.buffering;
+                      final processing =
+                          snap.data?.processingState ?? ProcessingState.idle;
+                      final busy = processing == ProcessingState.loading ||
+                          processing == ProcessingState.buffering;
                       return IconButton.filledTonal(
                         onPressed: busy
                             ? null
@@ -1044,7 +1116,11 @@ class MiniPlayerBar extends StatelessWidget {
                                 }
                               },
                         icon: busy
-                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
                             : Icon(playing ? Icons.pause : Icons.play_arrow),
                       );
                     },
@@ -1058,7 +1134,8 @@ class MiniPlayerBar extends StatelessWidget {
     );
   }
 
-  void _showNowPlaying(BuildContext context, _AppController controller, _NowPlaying np) {
+  void _showNowPlaying(
+      BuildContext context, _AppController controller, _NowPlaying np) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -1071,7 +1148,8 @@ class MiniPlayerBar extends StatelessWidget {
 class NowPlayingSheet extends StatefulWidget {
   final _AppController controller;
   final _NowPlaying np;
-  const NowPlayingSheet({super.key, required this.controller, required this.np});
+  const NowPlayingSheet(
+      {super.key, required this.controller, required this.np});
 
   @override
   State<NowPlayingSheet> createState() => _NowPlayingSheetState();
@@ -1130,7 +1208,8 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis),
               const SizedBox(height: 4),
-              Text(widget.np.subtitle, style: Theme.of(context).textTheme.bodyMedium),
+              Text(widget.np.subtitle,
+                  style: Theme.of(context).textTheme.bodyMedium),
               const SizedBox(height: 16),
               StreamBuilder<Duration?>(
                 stream: widget.controller.player.durationStream,
@@ -1140,9 +1219,14 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
                     stream: widget.controller.player.positionStream,
                     builder: (context, posSnap) {
                       final position = posSnap.data ?? Duration.zero;
-                      final max = duration.inMilliseconds > 0 ? duration.inMilliseconds.toDouble() : 1.0;
-                      final current = position.inMilliseconds.clamp(0, max.toInt()).toDouble();
-                      final value = (_dragMs ?? current).clamp(0, max).toDouble();
+                      final max = duration.inMilliseconds > 0
+                          ? duration.inMilliseconds.toDouble()
+                          : 1.0;
+                      final current = position.inMilliseconds
+                          .clamp(0, max.toInt())
+                          .toDouble();
+                      final value =
+                          (_dragMs ?? current).clamp(0, max).toDouble();
                       return Column(
                         children: [
                           Slider(
@@ -1151,15 +1235,19 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
                             onChanged: (v) => setState(() => _dragMs = v),
                             onChangeEnd: (v) async {
                               setState(() => _dragMs = null);
-                              await widget.controller.player.seek(Duration(milliseconds: v.round()));
+                              await widget.controller.player
+                                  .seek(Duration(milliseconds: v.round()));
                             },
                           ),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(widget.controller._fmt(Duration(milliseconds: value.round())),
+                              Text(
+                                  widget.controller._fmt(
+                                      Duration(milliseconds: value.round())),
                                   style: Theme.of(context).textTheme.bodySmall),
-                              Text(widget.controller._fmt(duration), style: Theme.of(context).textTheme.bodySmall),
+                              Text(widget.controller._fmt(duration),
+                                  style: Theme.of(context).textTheme.bodySmall),
                             ],
                           ),
                         ],
@@ -1182,8 +1270,10 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
                     stream: widget.controller.player.playerStateStream,
                     builder: (context, snap) {
                       final playing = snap.data?.playing ?? false;
-                      final processing = snap.data?.processingState ?? ProcessingState.idle;
-                      final busy = processing == ProcessingState.loading || processing == ProcessingState.buffering;
+                      final processing =
+                          snap.data?.processingState ?? ProcessingState.idle;
+                      final busy = processing == ProcessingState.loading ||
+                          processing == ProcessingState.buffering;
                       return FilledButton.tonalIcon(
                         onPressed: busy
                             ? null
@@ -1195,7 +1285,11 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
                                 }
                               },
                         icon: busy
-                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
                             : Icon(playing ? Icons.pause : Icons.play_arrow),
                         label: Text(playing ? '暂停' : '播放'),
                       );
