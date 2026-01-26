@@ -118,6 +118,7 @@ impl<R: Read + Seek> FurryReader<R> {
         // Cover art can be large, but should still be bounded.
         const MAX_TAGS_BYTES: u32 = 256 * 1024; // 256 KiB
         const MAX_LYRICS_BYTES: u32 = 2 * 1024 * 1024; // 2 MiB
+
         // Cover art can be large; keep this high to avoid unexpectedly dropping art.
         // NOTE: Very large covers may increase memory usage on mobile.
         const MAX_COVER_BYTES: u32 = 64 * 1024 * 1024; // 64 MiB (includes mime\0 prefix)
