@@ -104,7 +104,6 @@ Future<void> main() async {
   };
 
   if (!kIsWeb && Platform.isAndroid) {
-    unawaited(_requestAndroidNotificationPermission());
     try {
       await JustAudioBackground.init(
         androidNotificationChannelId:
@@ -254,6 +253,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _controller.init();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_requestAndroidNotificationPermission());
+    });
   }
 
   @override
