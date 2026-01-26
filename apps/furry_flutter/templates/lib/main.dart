@@ -16,7 +16,7 @@ import 'in_memory_audio_source.dart';
 import 'system_media_bridge.dart';
 
 final List<String> _startupDiagnostics = <String>[];
-_AndroidAudioHandler? _androidAudioHandler;
+AudioHandler? _androidAudioHandler;
 
 Color _withOpacityCompat(Color color, double opacity) =>
     color.withAlpha((opacity * 255).round().clamp(0, 255));
@@ -122,6 +122,14 @@ class _AndroidAudioHandler extends BaseAudioHandler
     _subs.add(player.positionStream.listen((_) {
       _broadcastState();
     }));
+
+    _subs.add(player.durationStream.listen((d) {
+      if (d == null) return;
+      final item = mediaItem.value;
+      if (item == null) return;
+      if (item.duration == d) return;
+      mediaItem.add(item.copyWith(duration: d));
+    }));
   }
 
   void _broadcastState() {
@@ -191,6 +199,72 @@ class _AndroidAudioHandler extends BaseAudioHandler
     final prev = _currentIndex - 1;
     if (prev < 0 || prev >= _queueLength) return;
     await skipToQueueItem(prev);
+  }
+
+  @override
+  Future<dynamic> customAction(
+    String name, [
+    Map<String, dynamic>? extras,
+  ]) async {
+    switch (name) {
+      case 'setAudioSource':
+        final uriStr = extras?['uri'] as String?;
+        if (uriStr == null || uriStr.trim().isEmpty) return null;
+        final id = (extras?['id'] as String?)?.trim() ?? uriStr;
+        final title = (extras?['title'] as String?)?.trim() ?? id;
+        final artist = (extras?['artist'] as String?)?.trim() ?? '';
+        final album = (extras?['album'] as String?)?.trim() ?? '';
+        final artStr = (extras?['artUri'] as String?)?.trim();
+        final media = MediaItem(
+          id: id,
+          title: title,
+          artist: artist,
+          album: album,
+          artUri: artStr == null || artStr.isEmpty ? null : Uri.parse(artStr),
+        );
+        await player.setAudioSource(
+          AudioSource.uri(Uri.parse(uriStr), tag: media),
+          initialPosition: Duration.zero,
+        );
+        return null;
+
+      case 'setPlaylist':
+        final raw = extras?['items'];
+        if (raw is! List) return null;
+        final sources = <AudioSource>[];
+        for (final it in raw) {
+          if (it is! Map) continue;
+          final uriStr = it['uri'] as String?;
+          if (uriStr == null || uriStr.trim().isEmpty) continue;
+          final id = (it['id'] as String?)?.trim() ?? uriStr;
+          final title = (it['title'] as String?)?.trim() ?? id;
+          final artist = (it['artist'] as String?)?.trim() ?? '';
+          final album = (it['album'] as String?)?.trim() ?? '';
+          final artStr = (it['artUri'] as String?)?.trim();
+          sources.add(
+            AudioSource.uri(
+              Uri.parse(uriStr),
+              tag: MediaItem(
+                id: id,
+                title: title,
+                artist: artist,
+                album: album,
+                artUri:
+                    artStr == null || artStr.isEmpty ? null : Uri.parse(artStr),
+              ),
+            ),
+          );
+        }
+        if (sources.isEmpty) return null;
+        final initialIndex = extras?['initialIndex'] as int? ?? 0;
+        await player.setAudioSource(
+          ConcatenatingAudioSource(children: sources),
+          initialIndex: initialIndex.clamp(0, sources.length - 1),
+          initialPosition: Duration.zero,
+        );
+        return null;
+    }
+    return super.customAction(name, extras);
   }
 
   Future<void> dispose() async {
@@ -429,20 +503,59 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 }
 
 class _AppController {
-  _AppController()
-      : player = (!kIsWeb && Platform.isAndroid && _androidAudioHandler != null)
-            ? _androidAudioHandler!.player
-            : AudioPlayer();
+  _AppController() : player = AudioPlayer();
 
   final AudioPlayer player;
   final FurryApi api = createFurryApi();
   late final SystemMediaBridge systemMedia = SystemMediaBridge(player);
 
   bool get _useAndroidAudioHandler =>
-      !kIsWeb &&
-      Platform.isAndroid &&
-      _androidAudioHandler != null &&
-      identical(player, _androidAudioHandler!.player);
+      !kIsWeb && Platform.isAndroid && _androidAudioHandler != null;
+
+  static ProcessingState _toJustAudioProcessingState(
+    AudioProcessingState state,
+  ) {
+    switch (state) {
+      case AudioProcessingState.idle:
+        return ProcessingState.idle;
+      case AudioProcessingState.loading:
+        return ProcessingState.loading;
+      case AudioProcessingState.buffering:
+        return ProcessingState.buffering;
+      case AudioProcessingState.ready:
+        return ProcessingState.ready;
+      case AudioProcessingState.completed:
+        return ProcessingState.completed;
+      case AudioProcessingState.error:
+        return ProcessingState.idle;
+    }
+  }
+
+  Stream<PlayerState> get playerStateStream {
+    if (_useAndroidAudioHandler) {
+      final handler = _androidAudioHandler!;
+      return handler.playbackState.map((s) {
+        return PlayerState(s.playing, _toJustAudioProcessingState(s.processingState));
+      });
+    }
+    return player.playerStateStream;
+  }
+
+  Stream<Duration?> get durationStream {
+    if (_useAndroidAudioHandler) {
+      final handler = _androidAudioHandler!;
+      return handler.mediaItem.map((m) => m?.duration).distinct();
+    }
+    return player.durationStream;
+  }
+
+  Stream<Duration> get positionStream {
+    if (_useAndroidAudioHandler) {
+      final handler = _androidAudioHandler!;
+      return handler.playbackState.map((s) => s.updatePosition);
+    }
+    return player.positionStream;
+  }
 
   StreamSubscription<dynamic>? _playbackErrorsSub;
   StreamSubscription<dynamic>? _playerStateSub;
@@ -554,12 +667,7 @@ class _AppController {
     _playerStateSub?.cancel();
     _currentIndexSub?.cancel();
     _rssTimer?.cancel();
-    if (!(!kIsWeb &&
-        Platform.isAndroid &&
-        _androidAudioHandler != null &&
-        identical(player, _androidAudioHandler!.player))) {
-      player.dispose();
-    }
+    player.dispose();
     systemMedia.dispose();
     nowPlaying.dispose();
     furryOutputs.dispose();
@@ -596,7 +704,10 @@ class _AppController {
       }
     });
 
-    _currentIndexSub = player.currentIndexStream.distinct().listen((idx) {
+    final idxStream = _useAndroidAudioHandler
+        ? _androidAudioHandler!.playbackState.map((s) => s.queueIndex)
+        : player.currentIndexStream;
+    _currentIndexSub = idxStream.distinct().listen((idx) {
       final queue = _queue;
       if (queue == null) return;
       if (idx == null) return;
@@ -885,47 +996,87 @@ class _AppController {
           artist: meta.subtitle,
           artUri: artUriSystem,
         );
-        if (unpacked != null) {
-          await player
-              .setAudioSource(AudioSource.uri(unpacked.uri, tag: mediaItem));
-        } else {
-          final bytes = await api.unpackFromFurryToBytes(inputPath: file.path);
-          if (bytes == null) {
-            appendLog('Unpack-to-bytes failed: null');
-            return;
-          }
-          // Prefer writing to a temp file to avoid OOM for large audio.
-          final fallbackPath = p.join(
-            outDir.path,
-            'unpacked_mem_${file.path.hashCode}_${DateTime.now().millisecondsSinceEpoch}.$outExt',
-          );
-          try {
-            final f = File(fallbackPath);
-            await f.writeAsBytes(bytes, flush: true);
-            unpacked = f;
-            await player
-                .setAudioSource(AudioSource.uri(unpacked.uri, tag: mediaItem));
-          } catch (e, st) {
-            appendLog('Write-bytes fallback failed: $e\n$st');
-            String? mime;
-            switch (originalExt.trim().toLowerCase()) {
-              case 'mp3':
-                mime = 'audio/mpeg';
-                break;
-              case 'wav':
-                mime = 'audio/wav';
-                break;
-              case 'ogg':
-                mime = 'audio/ogg';
-                break;
-              case 'flac':
-                mime = 'audio/flac';
-                break;
+        if (_useAndroidAudioHandler) {
+          if (unpacked == null) {
+            final bytes =
+                await api.unpackFromFurryToBytes(inputPath: file.path);
+            if (bytes == null) {
+              appendLog('Unpack-to-bytes failed: null');
+              return;
             }
-            await player.setAudioSource(
-              InMemoryAudioSource(
-                  bytes: bytes, contentType: mime, tag: mediaItem),
+            final fallbackPath = p.join(
+              outDir.path,
+              'unpacked_mem_${file.path.hashCode}_${DateTime.now().millisecondsSinceEpoch}.$outExt',
             );
+            try {
+              final f = File(fallbackPath);
+              await f.writeAsBytes(bytes, flush: true);
+              unpacked = f;
+            } catch (e, st) {
+              appendLog('Write-bytes fallback failed: $e\n$st');
+              return;
+            }
+          }
+          await _androidAudioHandler!.customAction(
+            'setAudioSource',
+            <String, dynamic>{
+              'uri': unpacked!.uri.toString(),
+              'id': mediaItem.id,
+              'title': mediaItem.title,
+              'artist': mediaItem.artist,
+              'album': mediaItem.album,
+              'artUri': mediaItem.artUri?.toString(),
+            },
+          );
+        } else {
+          if (unpacked != null) {
+            await player.setAudioSource(
+              AudioSource.uri(unpacked.uri, tag: mediaItem),
+            );
+          } else {
+            final bytes =
+                await api.unpackFromFurryToBytes(inputPath: file.path);
+            if (bytes == null) {
+              appendLog('Unpack-to-bytes failed: null');
+              return;
+            }
+            // Prefer writing to a temp file to avoid OOM for large audio.
+            final fallbackPath = p.join(
+              outDir.path,
+              'unpacked_mem_${file.path.hashCode}_${DateTime.now().millisecondsSinceEpoch}.$outExt',
+            );
+            try {
+              final f = File(fallbackPath);
+              await f.writeAsBytes(bytes, flush: true);
+              unpacked = f;
+              await player.setAudioSource(
+                AudioSource.uri(unpacked.uri, tag: mediaItem),
+              );
+            } catch (e, st) {
+              appendLog('Write-bytes fallback failed: $e\n$st');
+              String? mime;
+              switch (originalExt.trim().toLowerCase()) {
+                case 'mp3':
+                  mime = 'audio/mpeg';
+                  break;
+                case 'wav':
+                  mime = 'audio/wav';
+                  break;
+                case 'ogg':
+                  mime = 'audio/ogg';
+                  break;
+                case 'flac':
+                  mime = 'audio/flac';
+                  break;
+              }
+              await player.setAudioSource(
+                InMemoryAudioSource(
+                  bytes: bytes,
+                  contentType: mime,
+                  tag: mediaItem,
+                ),
+              );
+            }
           }
         }
         await play();
@@ -942,7 +1093,7 @@ class _AppController {
             artist: meta.subtitle,
             album: '',
             artUri: artUriSystem,
-            duration: player.duration,
+            duration: _useAndroidAudioHandler ? null : player.duration,
           ),
         );
         if (unpacked != null) {
@@ -958,7 +1109,21 @@ class _AppController {
           artist: '',
           artUri: null,
         );
-        await player.setAudioSource(AudioSource.uri(file.uri, tag: mediaItem));
+        if (_useAndroidAudioHandler) {
+          await _androidAudioHandler!.customAction(
+            'setAudioSource',
+            <String, dynamic>{
+              'uri': file.uri.toString(),
+              'id': mediaItem.id,
+              'title': mediaItem.title,
+              'artist': mediaItem.artist,
+              'album': mediaItem.album,
+              'artUri': mediaItem.artUri?.toString(),
+            },
+          );
+        } else {
+          await player.setAudioSource(AudioSource.uri(file.uri, tag: mediaItem));
+        }
         await play();
         nowPlaying.value = _NowPlaying(
             title: name, subtitle: '本地文件', sourcePath: file.path, artUri: null);
@@ -968,7 +1133,7 @@ class _AppController {
             artist: '',
             album: '',
             artUri: null,
-            duration: player.duration,
+            duration: _useAndroidAudioHandler ? null : player.duration,
           ),
         );
         appendLog('Playing (raw): $name');
@@ -988,7 +1153,7 @@ class _AppController {
 
     // On Android, use a playlist so audio_service can expose next/previous in the
     // system notification/lockscreen controls.
-    if (!kIsWeb && Platform.isAndroid && queue.length > 1) {
+    if (_useAndroidAudioHandler && queue.length > 1) {
       _queue = List<File>.from(queue);
       _queueIndex = index;
       _androidPlaylistActive = true;
@@ -1032,7 +1197,7 @@ class _AppController {
         return f;
       }
 
-      final sources = <AudioSource>[];
+      final items = <Map<String, dynamic>>[];
       for (final f in queue) {
         final base = p.basename(f.path);
         final ext = p.extension(base).toLowerCase();
@@ -1058,23 +1223,24 @@ class _AppController {
           artUri = null;
         }
 
-        sources.add(
-          AudioSource.uri(
-            uri,
-            tag: MediaItem(
-              id: f.path,
-              title: title,
-              artist: artist,
-              artUri: artUri,
-            ),
-          ),
+        items.add(
+          <String, dynamic>{
+            'uri': uri.toString(),
+            'id': f.path,
+            'title': title,
+            'artist': artist,
+            'album': '',
+            'artUri': artUri?.toString(),
+          },
         );
       }
 
-      await player.setAudioSource(
-        ConcatenatingAudioSource(children: sources),
-        initialIndex: index,
-        initialPosition: Duration.zero,
+      await _androidAudioHandler!.customAction(
+        'setPlaylist',
+        <String, dynamic>{
+          'items': items,
+          'initialIndex': index,
+        },
       );
       await play();
 
@@ -1188,8 +1354,15 @@ class _AppController {
 
   Future<void> seekBy(Duration delta) async {
     try {
-      final duration = player.duration;
-      final target = player.position + delta;
+      final duration = _useAndroidAudioHandler
+          ? (_androidAudioHandler!.mediaItem.hasValue
+              ? _androidAudioHandler!.mediaItem.value.duration
+              : null)
+          : player.duration;
+      final position = _useAndroidAudioHandler
+          ? _androidAudioHandler!.playbackState.value.updatePosition
+          : player.position;
+      final target = position + delta;
       var clamped = target;
       if (clamped.isNegative) clamped = Duration.zero;
       if (duration != null && clamped > duration) clamped = duration;
@@ -1803,7 +1976,7 @@ class MiniPlayerBar extends StatelessWidget {
                           icon: const Icon(Icons.skip_previous_rounded),
                         ),
                         StreamBuilder<PlayerState>(
-                          stream: controller.player.playerStateStream,
+                          stream: controller.playerStateStream,
                           builder: (context, snap) {
                             final playing = snap.data?.playing ?? false;
                             final processing = snap.data?.processingState ??
@@ -1845,11 +2018,11 @@ class MiniPlayerBar extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     StreamBuilder<Duration?>(
-                      stream: controller.player.durationStream,
+                      stream: controller.durationStream,
                       builder: (context, durSnap) {
                         final duration = durSnap.data ?? Duration.zero;
                         return StreamBuilder<Duration>(
-                          stream: controller.player.positionStream,
+                          stream: controller.positionStream,
                           builder: (context, posSnap) {
                             final pos = posSnap.data ?? Duration.zero;
                             final maxMs = duration.inMilliseconds <= 0
@@ -1977,11 +2150,11 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
                   ),
                   const SizedBox(height: 18),
                   StreamBuilder<Duration?>(
-                    stream: widget.controller.player.durationStream,
+                    stream: widget.controller.durationStream,
                     builder: (context, durSnap) {
                       final duration = durSnap.data ?? Duration.zero;
                       return StreamBuilder<Duration>(
-                        stream: widget.controller.player.positionStream,
+                        stream: widget.controller.positionStream,
                         builder: (context, posSnap) {
                           final position = posSnap.data ?? Duration.zero;
                           final max = duration.inMilliseconds > 0
@@ -1994,13 +2167,13 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
                               (_dragMs ?? current).clamp(0, max).toDouble();
                           return Column(
                             children: [
-                              Slider(
+                                  Slider(
                                 value: value,
                                 max: max,
                                 onChanged: (v) => setState(() => _dragMs = v),
                                 onChangeEnd: (v) async {
                                   setState(() => _dragMs = null);
-                                  await widget.controller.player
+                                  await widget.controller
                                       .seek(Duration(milliseconds: v.round()));
                                 },
                               ),
@@ -2044,7 +2217,7 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
                       ),
                       const SizedBox(width: 12),
                       StreamBuilder<PlayerState>(
-                        stream: widget.controller.player.playerStateStream,
+                        stream: widget.controller.playerStateStream,
                         builder: (context, snap) {
                           final playing = snap.data?.playing ?? false;
                           final processing = snap.data?.processingState ??
