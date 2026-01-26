@@ -432,6 +432,12 @@ class _AppController {
   final FurryApi api = createFurryApi();
   late final SystemMediaBridge systemMedia = SystemMediaBridge(player);
 
+  bool get _useAndroidAudioHandler =>
+      !kIsWeb &&
+      Platform.isAndroid &&
+      _androidAudioHandler != null &&
+      identical(player, _androidAudioHandler!.player);
+
   StreamSubscription<dynamic>? _playbackErrorsSub;
   StreamSubscription<dynamic>? _playerStateSub;
   StreamSubscription<int?>? _currentIndexSub;
@@ -916,7 +922,7 @@ class _AppController {
             );
           }
         }
-        await player.play();
+        await play();
         nowPlaying.value = _NowPlaying(
           title: meta.title.isEmpty ? name : meta.title,
           subtitle:
@@ -947,7 +953,7 @@ class _AppController {
           artUri: null,
         );
         await player.setAudioSource(AudioSource.uri(file.uri, tag: mediaItem));
-        await player.play();
+        await play();
         nowPlaying.value = _NowPlaying(
             title: name, subtitle: '本地文件', sourcePath: file.path, artUri: null);
         await systemMedia.setMetadata(
@@ -974,8 +980,8 @@ class _AppController {
     if (queue.isEmpty) return;
     if (index < 0 || index >= queue.length) return;
 
-    // On Android, use a playlist so just_audio_background can expose next/previous
-    // in the system notification/lockscreen controls.
+    // On Android, use a playlist so audio_service can expose next/previous in the
+    // system notification/lockscreen controls.
     if (!kIsWeb && Platform.isAndroid && queue.length > 1) {
       _queue = List<File>.from(queue);
       _queueIndex = index;
@@ -1064,7 +1070,7 @@ class _AppController {
         initialIndex: index,
         initialPosition: Duration.zero,
       );
-      await player.play();
+      await play();
 
       // Update UI immediately (system controls update via MediaItem tags).
       await _syncNowPlayingFromQueueIndex(index);
@@ -1093,14 +1099,13 @@ class _AppController {
     if (queue == null) return;
     if (_queueIndex <= 0) return;
     final nextIdx = _queueIndex - 1;
-    if (_androidPlaylistActive && !kIsWeb && Platform.isAndroid) {
+    if (_androidPlaylistActive && _useAndroidAudioHandler) {
       _queueIndex = nextIdx;
       unawaited(systemMedia.setQueueAvailability(
         canGoNext: canPlayNextTrack,
         canGoPrevious: canPlayPreviousTrack,
       ));
-      await player.seek(Duration.zero, index: nextIdx);
-      await player.play();
+      await _androidAudioHandler!.skipToQueueItem(nextIdx);
       await _syncNowPlayingFromQueueIndex(nextIdx);
       return;
     }
@@ -1112,14 +1117,13 @@ class _AppController {
     if (queue == null) return;
     if (_queueIndex < 0 || _queueIndex >= queue.length - 1) return;
     final nextIdx = _queueIndex + 1;
-    if (_androidPlaylistActive && !kIsWeb && Platform.isAndroid) {
+    if (_androidPlaylistActive && _useAndroidAudioHandler) {
       _queueIndex = nextIdx;
       unawaited(systemMedia.setQueueAvailability(
         canGoNext: canPlayNextTrack,
         canGoPrevious: canPlayPreviousTrack,
       ));
-      await player.seek(Duration.zero, index: nextIdx);
-      await player.play();
+      await _androidAudioHandler!.skipToQueueItem(nextIdx);
       await _syncNowPlayingFromQueueIndex(nextIdx);
       return;
     }
@@ -1127,8 +1131,46 @@ class _AppController {
   }
 
   Future<void> stop() async {
+    if (_useAndroidAudioHandler) {
+      await _androidAudioHandler!.pause();
+      await seek(Duration.zero);
+      appendLog('Stopped');
+      return;
+    }
     await player.stop();
     appendLog('Stopped');
+  }
+
+  Future<void> play() async {
+    if (_useAndroidAudioHandler) {
+      await _androidAudioHandler!.play();
+      return;
+    }
+    await player.play();
+  }
+
+  Future<void> pause() async {
+    if (_useAndroidAudioHandler) {
+      await _androidAudioHandler!.pause();
+      return;
+    }
+    await player.pause();
+  }
+
+  Future<void> togglePlayPause(bool playing) async {
+    if (playing) {
+      await pause();
+    } else {
+      await play();
+    }
+  }
+
+  Future<void> seek(Duration position) async {
+    if (_useAndroidAudioHandler) {
+      await _androidAudioHandler!.seek(position);
+      return;
+    }
+    await player.seek(position);
   }
 
   String _fmt(Duration? d) {
@@ -1145,7 +1187,7 @@ class _AppController {
       var clamped = target;
       if (clamped.isNegative) clamped = Duration.zero;
       if (duration != null && clamped > duration) clamped = duration;
-      await player.seek(clamped);
+      await seek(clamped);
     } catch (e, st) {
       appendLog('Seek failed: $e\n$st');
     }
@@ -1768,9 +1810,9 @@ class MiniPlayerBar extends StatelessWidget {
                                   ? null
                                   : () async {
                                       if (playing) {
-                                        await controller.player.pause();
+                                        await controller.pause();
                                       } else {
-                                        await controller.player.play();
+                                        await controller.play();
                                       }
                                     },
                               icon: busy
@@ -2003,19 +2045,19 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
                               ProcessingState.idle;
                           final busy = processing == ProcessingState.loading ||
                               processing == ProcessingState.buffering;
-                          return FilledButton.icon(
-                            onPressed: busy
-                                ? null
-                                : () async {
-                                    if (playing) {
-                                      await widget.controller.player.pause();
-                                    } else {
-                                      await widget.controller.player.play();
-                                    }
-                                  },
-                            icon: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 180),
-                              child: busy
+                              return FilledButton.icon(
+                                onPressed: busy
+                                    ? null
+                                    : () async {
+                                        if (playing) {
+                                          await widget.controller.pause();
+                                        } else {
+                                          await widget.controller.play();
+                                        }
+                                      },
+                                icon: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 180),
+                                  child: busy
                                   ? const SizedBox(
                                       key: ValueKey('busy'),
                                       width: 18,
