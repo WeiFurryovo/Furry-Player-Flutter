@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -138,6 +139,9 @@ class _AppController {
   final FurryApi api = createFurryApi();
   late final SystemMediaBridge systemMedia = SystemMediaBridge(player);
 
+  StreamSubscription<dynamic>? _playbackErrorsSub;
+  StreamSubscription<dynamic>? _playerStateSub;
+
   final ValueNotifier<_NowPlaying?> nowPlaying = ValueNotifier<_NowPlaying?>(null);
   final ValueNotifier<List<File>> furryOutputs = ValueNotifier<List<File>>(<File>[]);
   final ValueNotifier<String> log = ValueNotifier<String>('');
@@ -153,6 +157,7 @@ class _AppController {
     try {
       await api.init();
       await systemMedia.init();
+      _wirePlayerDiagnostics();
       for (final line in _takeStartupDiagnostics()) {
         appendLog(line);
       }
@@ -215,6 +220,8 @@ class _AppController {
   }
 
   void dispose() {
+    _playbackErrorsSub?.cancel();
+    _playerStateSub?.cancel();
     player.dispose();
     systemMedia.dispose();
     nowPlaying.dispose();
@@ -222,9 +229,30 @@ class _AppController {
     log.dispose();
   }
 
+  void _wirePlayerDiagnostics() {
+    _playbackErrorsSub?.cancel();
+    _playerStateSub?.cancel();
+    _playbackErrorsSub = player.playbackEventStream.listen(
+      (_) {},
+      onError: (Object e, StackTrace st) {
+        appendLog('Playback event error: $e\n$st');
+      },
+    );
+    _playerStateSub = player.playerStateStream.listen((state) {
+      if (state.processingState == ProcessingState.completed) {
+        appendLog('Playback completed');
+      }
+    });
+  }
+
   Future<Uri?> _writeCoverToTempUri(_MetaPreview meta) async {
     final bytes = meta.coverBytes;
     if (bytes == null || bytes.isEmpty) return null;
+    // Avoid huge cover art causing OOM (e.g., lockscreen/notification bitmap decode on Android).
+    if (!kIsWeb && Platform.isAndroid && bytes.length > 2 * 1024 * 1024) {
+      appendLog('Cover art skipped (too large): ${bytes.length} bytes');
+      return null;
+    }
 
     final tmp = await getTemporaryDirectory();
     final artDir = Directory(p.join(tmp.path, 'furry_media_art'));
@@ -414,24 +442,37 @@ class _AppController {
             appendLog('Unpack-to-bytes failed: null');
             return;
           }
-          String? mime;
-          switch (originalExt.trim().toLowerCase()) {
-            case 'mp3':
-              mime = 'audio/mpeg';
-              break;
-            case 'wav':
-              mime = 'audio/wav';
-              break;
-            case 'ogg':
-              mime = 'audio/ogg';
-              break;
-            case 'flac':
-              mime = 'audio/flac';
-              break;
-          }
-          await player.setAudioSource(
-            InMemoryAudioSource(bytes: bytes, contentType: mime, tag: mediaItem),
+          // Prefer writing to a temp file to avoid OOM for large audio.
+          final fallbackPath = p.join(
+            outDir.path,
+            'unpacked_mem_${file.path.hashCode}_${DateTime.now().millisecondsSinceEpoch}.$outExt',
           );
+          try {
+            final f = File(fallbackPath);
+            await f.writeAsBytes(bytes, flush: true);
+            unpacked = f;
+            await player.setAudioSource(AudioSource.uri(unpacked.uri, tag: mediaItem));
+          } catch (e, st) {
+            appendLog('Write-bytes fallback failed: $e\n$st');
+            String? mime;
+            switch (originalExt.trim().toLowerCase()) {
+              case 'mp3':
+                mime = 'audio/mpeg';
+                break;
+              case 'wav':
+                mime = 'audio/wav';
+                break;
+              case 'ogg':
+                mime = 'audio/ogg';
+                break;
+              case 'flac':
+                mime = 'audio/flac';
+                break;
+            }
+            await player.setAudioSource(
+              InMemoryAudioSource(bytes: bytes, contentType: mime, tag: mediaItem),
+            );
+          }
         }
         await player.play();
         nowPlaying.value = _NowPlaying(

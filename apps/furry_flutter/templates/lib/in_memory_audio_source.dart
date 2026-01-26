@@ -16,15 +16,15 @@ class InMemoryAudioSource extends StreamAudioSource {
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
     final int effectiveStart = start ?? 0;
-    final int effectiveEnd = end ?? bytes.length;
-    final chunk = bytes.sublist(effectiveStart, effectiveEnd);
+    final int effectiveEnd = end == null ? bytes.length : end.clamp(0, bytes.length);
+    final view = Uint8List.sublistView(bytes, effectiveStart, effectiveEnd);
 
     return StreamAudioResponse(
       sourceLength: bytes.length,
-      contentLength: chunk.length,
+      contentLength: view.length,
       offset: effectiveStart,
       contentType: contentType ?? 'audio/mpeg',
-      stream: Stream<Uint8List>.value(chunk),
+      stream: Stream<Uint8List>.value(view),
     );
   }
 }
