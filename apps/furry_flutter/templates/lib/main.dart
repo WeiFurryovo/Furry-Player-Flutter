@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:audio_service/audio_service.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -17,16 +18,9 @@ import 'in_memory_audio_source.dart';
 import 'system_media_bridge.dart';
 
 final List<String> _startupDiagnostics = <String>[];
-AudioHandler? _androidAudioHandler;
-_AndroidAudioHandler? _androidConcreteHandler;
 
 Color _withOpacityCompat(Color color, double opacity) =>
     color.withAlpha((opacity * 255).round().clamp(0, 255));
-
-// audio_service needs a top-level entry-point builder on Android (especially for
-// background isolate / release tree-shaking).
-@pragma('vm:entry-point')
-AudioHandler _androidAudioHandlerBuilder() => _AndroidAudioHandler();
 
 void _startupLog(String msg) {
   _startupDiagnostics.add(msg);
@@ -96,198 +90,6 @@ class _DiagnosticsLog {
   }
 }
 
-@pragma('vm:entry-point')
-class _AndroidAudioHandler extends BaseAudioHandler
-    with QueueHandler, SeekHandler {
-  final AudioPlayer player = AudioPlayer();
-
-  final List<StreamSubscription<dynamic>> _subs =
-      <StreamSubscription<dynamic>>[];
-  PlaybackEvent? _lastEvent;
-  int _queueLength = 0;
-  int _currentIndex = -1;
-
-  _AndroidAudioHandler() {
-    _subs.add(player.sequenceStateStream.listen((s) {
-      final seq = s?.effectiveSequence ?? const <IndexedAudioSource>[];
-      final items = <MediaItem>[];
-      for (final src in seq) {
-        final tag = src.tag;
-        if (tag is MediaItem) items.add(tag);
-      }
-      _queueLength = items.length;
-      _currentIndex = s?.currentIndex ?? -1;
-      queue.add(items);
-
-      final idx = _currentIndex;
-      if (idx >= 0 && idx < items.length) {
-        mediaItem.add(items[idx]);
-      }
-      _broadcastState();
-    }));
-
-    _subs.add(player.playbackEventStream.listen((e) {
-      _lastEvent = e;
-      _broadcastState();
-    }));
-
-    _subs.add(player.positionStream.listen((_) {
-      _broadcastState();
-    }));
-
-    _subs.add(player.durationStream.listen((d) {
-      if (d == null) return;
-      final item = mediaItem.value;
-      if (item == null) return;
-      if (item.duration == d) return;
-      mediaItem.add(item.copyWith(duration: d));
-    }));
-  }
-
-  void _broadcastState() {
-    final hasPrevious = _currentIndex > 0;
-    final hasNext = _currentIndex >= 0 && _currentIndex < (_queueLength - 1);
-
-    final playing = player.playing;
-    final processingState = player.processingState;
-
-    final controls = <MediaControl>[
-      if (hasPrevious) MediaControl.skipToPrevious,
-      if (playing) MediaControl.pause else MediaControl.play,
-      if (hasNext) MediaControl.skipToNext,
-    ];
-
-    playbackState.add(
-      playbackState.value.copyWith(
-        controls: controls,
-        systemActions: const {MediaAction.seek},
-        androidCompactActionIndices:
-            List<int>.generate(controls.length, (i) => i),
-        processingState: const <ProcessingState, AudioProcessingState>{
-          ProcessingState.idle: AudioProcessingState.idle,
-          ProcessingState.loading: AudioProcessingState.loading,
-          ProcessingState.buffering: AudioProcessingState.buffering,
-          ProcessingState.ready: AudioProcessingState.ready,
-          ProcessingState.completed: AudioProcessingState.completed,
-        }[processingState]!,
-        playing: playing,
-        updatePosition: player.position,
-        bufferedPosition: _lastEvent?.bufferedPosition ?? Duration.zero,
-        speed: player.speed,
-        queueIndex: _currentIndex >= 0 ? _currentIndex : null,
-      ),
-    );
-  }
-
-  @override
-  Future<void> play() => player.play();
-
-  @override
-  Future<void> pause() => player.pause();
-
-  @override
-  Future<void> stop() async {
-    await player.pause();
-  }
-
-  @override
-  Future<void> seek(Duration position) => player.seek(position);
-
-  @override
-  Future<void> skipToQueueItem(int index) async {
-    await player.seek(Duration.zero, index: index);
-    await player.play();
-  }
-
-  @override
-  Future<void> skipToNext() async {
-    final next = _currentIndex + 1;
-    if (next < 0 || next >= _queueLength) return;
-    await skipToQueueItem(next);
-  }
-
-  @override
-  Future<void> skipToPrevious() async {
-    final prev = _currentIndex - 1;
-    if (prev < 0 || prev >= _queueLength) return;
-    await skipToQueueItem(prev);
-  }
-
-  @override
-  Future<dynamic> customAction(
-    String name, [
-    Map<String, dynamic>? extras,
-  ]) async {
-    switch (name) {
-      case 'setAudioSource':
-        final uriStr = extras?['uri'] as String?;
-        if (uriStr == null || uriStr.trim().isEmpty) return null;
-        final id = (extras?['id'] as String?)?.trim() ?? uriStr;
-        final title = (extras?['title'] as String?)?.trim() ?? id;
-        final artist = (extras?['artist'] as String?)?.trim() ?? '';
-        final album = (extras?['album'] as String?)?.trim() ?? '';
-        final artStr = (extras?['artUri'] as String?)?.trim();
-        final media = MediaItem(
-          id: id,
-          title: title,
-          artist: artist,
-          album: album,
-          artUri: artStr == null || artStr.isEmpty ? null : Uri.parse(artStr),
-        );
-        await player.setAudioSource(
-          AudioSource.uri(Uri.parse(uriStr), tag: media),
-          initialPosition: Duration.zero,
-        );
-        return null;
-
-      case 'setPlaylist':
-        final raw = extras?['items'];
-        if (raw is! List) return null;
-        final sources = <AudioSource>[];
-        for (final it in raw) {
-          if (it is! Map) continue;
-          final uriStr = it['uri'] as String?;
-          if (uriStr == null || uriStr.trim().isEmpty) continue;
-          final id = (it['id'] as String?)?.trim() ?? uriStr;
-          final title = (it['title'] as String?)?.trim() ?? id;
-          final artist = (it['artist'] as String?)?.trim() ?? '';
-          final album = (it['album'] as String?)?.trim() ?? '';
-          final artStr = (it['artUri'] as String?)?.trim();
-          sources.add(
-            AudioSource.uri(
-              Uri.parse(uriStr),
-              tag: MediaItem(
-                id: id,
-                title: title,
-                artist: artist,
-                album: album,
-                artUri:
-                    artStr == null || artStr.isEmpty ? null : Uri.parse(artStr),
-              ),
-            ),
-          );
-        }
-        if (sources.isEmpty) return null;
-        final initialIndex = extras?['initialIndex'] as int? ?? 0;
-        await player.setAudioSource(
-          ConcatenatingAudioSource(children: sources),
-          initialIndex: initialIndex.clamp(0, sources.length - 1),
-          initialPosition: Duration.zero,
-        );
-        return null;
-    }
-    return super.customAction(name, extras);
-  }
-
-  Future<void> dispose() async {
-    for (final s in _subs) {
-      await s.cancel();
-    }
-    _subs.clear();
-    await player.dispose();
-  }
-}
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _DiagnosticsLog.init();
@@ -302,29 +104,20 @@ Future<void> main() async {
   };
 
   if (!kIsWeb && Platform.isAndroid) {
+    unawaited(_requestAndroidNotificationPermission());
     try {
-      final handler = await AudioService.init(
-        builder: _androidAudioHandlerBuilder,
-        config: AudioServiceConfig(
-          androidNotificationChannelId:
-              'com.furry.furry_flutter_app.channel.audio',
-          androidNotificationChannelName: 'Furry Player',
-          androidNotificationOngoing: true,
-          androidStopForegroundOnPause: false,
-          fastForwardInterval: Duration(seconds: 10),
-          rewindInterval: Duration(seconds: 10),
-        ),
+      await JustAudioBackground.init(
+        androidNotificationChannelId:
+            'com.furry.furry_flutter_app.channel.audio',
+        androidNotificationChannelName: 'Furry Player',
+        androidNotificationOngoing: true,
+        androidStopForegroundOnPause: false,
       );
-      _androidAudioHandler = handler;
-      _androidConcreteHandler =
-          handler is _AndroidAudioHandler ? handler : null;
-      _startupLog('AudioService init ok');
+      _startupLog('JustAudioBackground init ok');
     } catch (e, st) {
-      _startupLog('AudioService init failed: $e\n$st');
+      _startupLog('JustAudioBackground init failed: $e\n$st');
     }
   }
-
-  unawaited(_requestAndroidNotificationPermission());
   runApp(const FurryApp());
 }
 
@@ -519,21 +312,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 }
 
 class _AppController {
-  _AppController()
-      : player = (!kIsWeb && Platform.isAndroid && _androidConcreteHandler != null)
-            ? _androidConcreteHandler!.player
-            : AudioPlayer();
+  _AppController() : player = AudioPlayer();
 
   final AudioPlayer player;
   final FurryApi api = createFurryApi();
   late final SystemMediaBridge systemMedia = SystemMediaBridge(player);
-
-  bool get _useAndroidAudioHandler =>
-      !kIsWeb &&
-      Platform.isAndroid &&
-      _androidAudioHandler != null &&
-      _androidConcreteHandler != null &&
-      identical(player, _androidConcreteHandler!.player);
 
   Stream<PlayerState> get playerStateStream => player.playerStateStream;
   Stream<Duration?> get durationStream => player.durationStream;
@@ -649,9 +432,7 @@ class _AppController {
     _playerStateSub?.cancel();
     _currentIndexSub?.cancel();
     _rssTimer?.cancel();
-    if (!(_useAndroidAudioHandler && identical(player, _androidConcreteHandler!.player))) {
-      player.dispose();
-    }
+    player.dispose();
     systemMedia.dispose();
     nowPlaying.dispose();
     furryOutputs.dispose();
@@ -688,10 +469,7 @@ class _AppController {
       }
     });
 
-    final idxStream = _useAndroidAudioHandler
-        ? _androidAudioHandler!.playbackState.map((s) => s.queueIndex)
-        : player.currentIndexStream;
-    _currentIndexSub = idxStream.distinct().listen((idx) {
+    _currentIndexSub = player.currentIndexStream.distinct().listen((idx) {
       final queue = _queue;
       if (queue == null) return;
       if (idx == null) return;
@@ -1205,13 +983,14 @@ class _AppController {
     if (queue == null) return;
     if (_queueIndex <= 0) return;
     final nextIdx = _queueIndex - 1;
-    if (_androidPlaylistActive && _useAndroidAudioHandler) {
+    if (_androidPlaylistActive && !kIsWeb && Platform.isAndroid) {
       _queueIndex = nextIdx;
       unawaited(systemMedia.setQueueAvailability(
         canGoNext: canPlayNextTrack,
         canGoPrevious: canPlayPreviousTrack,
       ));
-      await _androidAudioHandler!.skipToQueueItem(nextIdx);
+      await player.seek(Duration.zero, index: nextIdx);
+      await play();
       await _syncNowPlayingFromQueueIndex(nextIdx);
       return;
     }
@@ -1223,13 +1002,14 @@ class _AppController {
     if (queue == null) return;
     if (_queueIndex < 0 || _queueIndex >= queue.length - 1) return;
     final nextIdx = _queueIndex + 1;
-    if (_androidPlaylistActive && _useAndroidAudioHandler) {
+    if (_androidPlaylistActive && !kIsWeb && Platform.isAndroid) {
       _queueIndex = nextIdx;
       unawaited(systemMedia.setQueueAvailability(
         canGoNext: canPlayNextTrack,
         canGoPrevious: canPlayPreviousTrack,
       ));
-      await _androidAudioHandler!.skipToQueueItem(nextIdx);
+      await player.seek(Duration.zero, index: nextIdx);
+      await play();
       await _syncNowPlayingFromQueueIndex(nextIdx);
       return;
     }
@@ -1237,29 +1017,15 @@ class _AppController {
   }
 
   Future<void> stop() async {
-    if (_useAndroidAudioHandler) {
-      await _androidAudioHandler!.pause();
-      await seek(Duration.zero);
-      appendLog('Stopped');
-      return;
-    }
     await player.stop();
     appendLog('Stopped');
   }
 
   Future<void> play() async {
-    if (_useAndroidAudioHandler) {
-      await _androidAudioHandler!.play();
-      return;
-    }
     await player.play();
   }
 
   Future<void> pause() async {
-    if (_useAndroidAudioHandler) {
-      await _androidAudioHandler!.pause();
-      return;
-    }
     await player.pause();
   }
 
@@ -1272,10 +1038,6 @@ class _AppController {
   }
 
   Future<void> seek(Duration position) async {
-    if (_useAndroidAudioHandler) {
-      await _androidAudioHandler!.seek(position);
-      return;
-    }
     await player.seek(position);
   }
 
