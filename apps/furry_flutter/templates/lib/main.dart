@@ -226,6 +226,9 @@ class _AppController {
       ValueNotifier<List<File>>(<File>[]);
   final ValueNotifier<String> log = ValueNotifier<String>('');
 
+  List<File>? _queue;
+  int _queueIndex = -1;
+
   // Keep this bounded to avoid unbounded RAM growth (cover bytes can be large).
   final Map<String, Future<_MetaPreview>> _metaPreviewCache =
       <String, Future<_MetaPreview>>{};
@@ -513,6 +516,21 @@ class _AppController {
     String? displayName,
   }) async {
     final name = displayName ?? p.basename(file.path);
+
+    // If this file belongs to the current queue, keep queue navigation working.
+    final queue = _queue;
+    if (queue != null) {
+      final idx = queue.indexWhere((f) => f.path == file.path);
+      if (idx >= 0) {
+        _queueIndex = idx;
+      } else {
+        _queue = null;
+        _queueIndex = -1;
+      }
+    } else {
+      _queueIndex = -1;
+    }
+
     nowPlaying.value = _NowPlaying(
       title: name,
       subtitle: '正在加载…',
@@ -660,6 +678,39 @@ class _AppController {
     } catch (e, st) {
       appendLog('Play failed: $e\n$st');
     }
+  }
+
+  Future<void> playFromQueue({
+    required List<File> queue,
+    required int index,
+    String? displayName,
+  }) async {
+    if (queue.isEmpty) return;
+    if (index < 0 || index >= queue.length) return;
+    _queue = List<File>.from(queue);
+    _queueIndex = index;
+    await playFile(
+      file: queue[index],
+      displayName: displayName ?? p.basename(queue[index].path),
+    );
+  }
+
+  bool get canPlayPreviousTrack => _queue != null && _queueIndex > 0;
+  bool get canPlayNextTrack =>
+      _queue != null && _queueIndex >= 0 && _queueIndex < (_queue!.length - 1);
+
+  Future<void> playPreviousTrack() async {
+    final queue = _queue;
+    if (queue == null) return;
+    if (_queueIndex <= 0) return;
+    await playFromQueue(queue: queue, index: _queueIndex - 1);
+  }
+
+  Future<void> playNextTrack() async {
+    final queue = _queue;
+    if (queue == null) return;
+    if (_queueIndex < 0 || _queueIndex >= queue.length - 1) return;
+    await playFromQueue(queue: queue, index: _queueIndex + 1);
   }
 
   Future<void> stop() async {
@@ -838,10 +889,11 @@ class _LibraryPageState extends State<LibraryPage> {
 
               return Column(
                 children: [
-                  for (final f in filtered)
+                  for (var i = 0; i < filtered.length; i++)
                     FutureBuilder<_MetaPreview>(
-                      future: controller.getMetaPreviewForFurry(f),
+                      future: controller.getMetaPreviewForFurry(filtered[i]),
                       builder: (context, snap) {
+                        final f = filtered[i];
                         final meta = snap.data;
                         return ListTile(
                           leading: _CoverThumb(artUri: meta?.artUri),
@@ -855,8 +907,11 @@ class _LibraryPageState extends State<LibraryPage> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           trailing: const Icon(Icons.chevron_right),
-                          onTap: () => controller.playFile(
-                              file: f, displayName: p.basename(f.path)),
+                          onTap: () => controller.playFromQueue(
+                            queue: filtered,
+                            index: i,
+                            displayName: p.basename(f.path),
+                          ),
                         );
                       },
                     ),
@@ -1111,11 +1166,11 @@ class MiniPlayerBar extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    tooltip: '后退 10 秒',
-                    onPressed: () => controller.seekBy(
-                      const Duration(seconds: -10),
-                    ),
-                    icon: const Icon(Icons.replay_10),
+                    tooltip: '上一首',
+                    onPressed: controller.canPlayPreviousTrack
+                        ? controller.playPreviousTrack
+                        : null,
+                    icon: const Icon(Icons.skip_previous),
                   ),
                   StreamBuilder<PlayerState>(
                     stream: controller.player.playerStateStream,
@@ -1146,11 +1201,11 @@ class MiniPlayerBar extends StatelessWidget {
                     },
                   ),
                   IconButton(
-                    tooltip: '前进 10 秒',
-                    onPressed: () => controller.seekBy(
-                      const Duration(seconds: 10),
-                    ),
-                    icon: const Icon(Icons.forward_10),
+                    tooltip: '下一首',
+                    onPressed: controller.canPlayNextTrack
+                        ? controller.playNextTrack
+                        : null,
+                    icon: const Icon(Icons.skip_next),
                   ),
                 ],
               ),
@@ -1294,11 +1349,11 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    tooltip: '后退 10 秒',
-                    onPressed: () => widget.controller.seekBy(
-                      const Duration(seconds: -10),
-                    ),
-                    icon: const Icon(Icons.replay_10),
+                    tooltip: '上一首',
+                    onPressed: widget.controller.canPlayPreviousTrack
+                        ? widget.controller.playPreviousTrack
+                        : null,
+                    icon: const Icon(Icons.skip_previous),
                   ),
                   const SizedBox(width: 12),
                   StreamBuilder<PlayerState>(
@@ -1332,11 +1387,11 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
                   ),
                   const SizedBox(width: 12),
                   IconButton(
-                    tooltip: '前进 10 秒',
-                    onPressed: () => widget.controller.seekBy(
-                      const Duration(seconds: 10),
-                    ),
-                    icon: const Icon(Icons.forward_10),
+                    tooltip: '下一首',
+                    onPressed: widget.controller.canPlayNextTrack
+                        ? widget.controller.playNextTrack
+                        : null,
+                    icon: const Icon(Icons.skip_next),
                   ),
                 ],
               ),
