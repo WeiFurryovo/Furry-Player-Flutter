@@ -1355,12 +1355,16 @@ class _AppController {
   Future<void> seekBy(Duration delta) async {
     try {
       final duration = _useAndroidAudioHandler
-          ? (_androidAudioHandler!.mediaItem.hasValue
-              ? _androidAudioHandler!.mediaItem.value.duration
-              : null)
+          ? await durationStream.first.timeout(
+              const Duration(milliseconds: 250),
+              onTimeout: () => null,
+            )
           : player.duration;
       final position = _useAndroidAudioHandler
-          ? _androidAudioHandler!.playbackState.value.updatePosition
+          ? await positionStream.first.timeout(
+              const Duration(milliseconds: 250),
+              onTimeout: () => Duration.zero,
+            )
           : player.position;
       final target = position + delta;
       var clamped = target;
@@ -2216,45 +2220,45 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
                         icon: const Icon(Icons.skip_previous_rounded),
                       ),
                       const SizedBox(width: 12),
-                      StreamBuilder<PlayerState>(
-                        stream: widget.controller.playerStateStream,
-                        builder: (context, snap) {
-                          final playing = snap.data?.playing ?? false;
-                          final processing = snap.data?.processingState ??
-                              ProcessingState.idle;
-                          final busy = processing == ProcessingState.loading ||
-                              processing == ProcessingState.buffering;
-                              return FilledButton.icon(
-                                onPressed: busy
-                                    ? null
-                                    : () async {
-                                        if (playing) {
-                                          await widget.controller.pause();
-                                        } else {
-                                          await widget.controller.play();
-                                        }
-                                      },
-                                icon: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 180),
-                                  child: busy
-                                  ? const SizedBox(
-                                      key: ValueKey('busy'),
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2),
-                                    )
-                                  : Icon(
-                                      playing
-                                          ? Icons.pause_rounded
-                                          : Icons.play_arrow_rounded,
-                                      key: ValueKey(playing),
-                                    ),
-                            ),
-                            label: Text(playing ? '暂停' : '播放'),
-                          );
-                        },
-                      ),
+	                      StreamBuilder<PlayerState>(
+	                        stream: widget.controller.playerStateStream,
+	                        builder: (context, snap) {
+	                          final playing = snap.data?.playing ?? false;
+	                          final processing = snap.data?.processingState ??
+	                              ProcessingState.idle;
+	                          final busy = processing == ProcessingState.loading ||
+	                              processing == ProcessingState.buffering;
+	                          return FilledButton.icon(
+	                            onPressed: busy
+	                                ? null
+	                                : () async {
+	                                    if (playing) {
+	                                      await widget.controller.pause();
+	                                    } else {
+	                                      await widget.controller.play();
+	                                    }
+	                                  },
+	                            icon: AnimatedSwitcher(
+	                              duration: const Duration(milliseconds: 180),
+	                              child: busy
+	                                  ? const SizedBox(
+	                                      key: ValueKey('busy'),
+	                                      width: 18,
+	                                      height: 18,
+	                                      child: CircularProgressIndicator(
+	                                          strokeWidth: 2),
+	                                    )
+	                                  : Icon(
+	                                      playing
+	                                          ? Icons.pause_rounded
+	                                          : Icons.play_arrow_rounded,
+	                                      key: ValueKey(playing),
+	                                    ),
+	                            ),
+	                            label: Text(playing ? '暂停' : '播放'),
+	                          );
+	                        },
+	                      ),
                       const SizedBox(width: 12),
                       IconButton.filledTonal(
                         tooltip: '下一首',
