@@ -163,7 +163,18 @@ else
 fi
 
 echo "[INFO] 添加依赖（pub add）"
-(cd "$OUT_DIR" && flutter pub add file_picker path_provider just_audio just_audio_platform_interface path ffi just_audio_background audio_service smtc_windows dbus)
+# Pin versions to avoid breaking API changes (e.g. file_picker v10 removed FilePicker.platform).
+(cd "$OUT_DIR" && flutter pub add \
+  file_picker:^8.3.2 \
+  path_provider:^2.1.5 \
+  just_audio:^0.9.46 \
+  just_audio_platform_interface:^4.6.0 \
+  path:^1.9.0 \
+  ffi:^2.1.3 \
+  just_audio_background:^0.0.1-beta.15 \
+  audio_service:^0.18.17 \
+  smtc_windows:^1.0.0 \
+  dbus:^0.7.11)
 
 echo "[INFO] 覆盖模板代码"
 cp -a "$TEMPLATES_DIR/lib/." "$OUT_DIR/lib/"
