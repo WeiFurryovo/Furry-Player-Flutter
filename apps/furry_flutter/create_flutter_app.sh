@@ -8,6 +8,60 @@ TEMPLATES_DIR="$ROOT/apps/furry_flutter/templates"
 BUILD_ANDROID=1
 BUILD_FFI=1
 
+patch_android_manifest_for_audio_service() {
+  local manifest_file="$OUT_DIR/android/app/src/main/AndroidManifest.xml"
+  if [ ! -f "$manifest_file" ]; then
+    echo "[WARN] 未找到 AndroidManifest.xml，跳过 audio_service 配置：$manifest_file" >&2
+    return 0
+  fi
+
+  python3 - "$manifest_file" <<'PY'
+import re
+import sys
+
+path = sys.argv[1]
+text = open(path, "r", encoding="utf-8").read()
+original = text
+
+m_app = re.search(r"\n([ \t]*)<application\b", text)
+if not m_app:
+  raise SystemExit("AndroidManifest.xml missing <application>")
+app_indent = m_app.group(1)
+insert_permissions_at = m_app.start() + 1  # after newline, before indentation
+
+m_app_end = re.search(r"\n([ \t]*)</application>", text)
+if not m_app_end:
+  raise SystemExit("AndroidManifest.xml missing </application>")
+insert_service_at = m_app_end.start() + 1  # after newline, before indentation
+
+service_indent = m_app_end.group(1) + (" " * 4)
+service_snippet = (
+  f"{service_indent}<service\n"
+  f"{service_indent}    android:name=\"com.ryanheise.audioservice.AudioService\"\n"
+  f"{service_indent}    android:exported=\"false\"\n"
+  f"{service_indent}    android:foregroundServiceType=\"mediaPlayback\" />\n"
+  "\n"
+)
+
+permissions = [
+  f"{app_indent}<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />\n",
+  f"{app_indent}<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK\" />\n",
+]
+
+if "com.ryanheise.audioservice.AudioService" not in text:
+  text = text[:insert_service_at] + service_snippet + text[insert_service_at:]
+  # If we inserted service before the application close tag, permission insertion index stays valid.
+
+for p in permissions:
+  if p.strip() not in text:
+    text = text[:insert_permissions_at] + p + text[insert_permissions_at:]
+    insert_permissions_at += len(p)
+
+if text != original:
+  open(path, "w", encoding="utf-8").write(text)
+PY
+}
+
 usage() {
   cat <<EOF
 Usage: $0 [--no-android] [--no-ffi]
@@ -53,6 +107,9 @@ fi
 if [ -f "$TEMPLATES_DIR/analysis_options.yaml" ]; then
   cp -f "$TEMPLATES_DIR/analysis_options.yaml" "$OUT_DIR/analysis_options.yaml"
 fi
+
+echo "[INFO] 配置 Android AudioService（用于 just_audio_background / audio_service）"
+patch_android_manifest_for_audio_service
 
 if [ "$BUILD_ANDROID" -eq 1 ]; then
   echo "[INFO] 构建 Rust Android 动态库（需要 ANDROID_NDK_HOME）"
