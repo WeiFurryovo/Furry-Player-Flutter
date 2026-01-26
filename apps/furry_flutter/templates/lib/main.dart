@@ -1020,7 +1020,7 @@ class _AppController {
           await _androidAudioHandler!.customAction(
             'setAudioSource',
             <String, dynamic>{
-              'uri': unpacked!.uri.toString(),
+              'uri': unpacked.uri.toString(),
               'id': mediaItem.id,
               'title': mediaItem.title,
               'artist': mediaItem.artist,
