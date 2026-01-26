@@ -90,20 +90,27 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   late final _controller = _AppController();
   int _tabIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller.init();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _controller.appendLog('Lifecycle: $state');
   }
 
   @override
@@ -151,6 +158,7 @@ class _AppController {
 
   StreamSubscription<dynamic>? _playbackErrorsSub;
   StreamSubscription<dynamic>? _playerStateSub;
+  Timer? _rssTimer;
 
   final ValueNotifier<_NowPlaying?> nowPlaying = ValueNotifier<_NowPlaying?>(null);
   final ValueNotifier<List<File>> furryOutputs = ValueNotifier<List<File>>(<File>[]);
@@ -234,6 +242,7 @@ class _AppController {
   void dispose() {
     _playbackErrorsSub?.cancel();
     _playerStateSub?.cancel();
+    _rssTimer?.cancel();
     player.dispose();
     systemMedia.dispose();
     nowPlaying.dispose();
@@ -251,8 +260,21 @@ class _AppController {
       },
     );
     _playerStateSub = player.playerStateStream.listen((state) {
+      final shouldLogMem = !kIsWeb && (Platform.isAndroid || Platform.isIOS);
       if (state.processingState == ProcessingState.completed) {
         appendLog('Playback completed');
+      }
+      if (!shouldLogMem) return;
+      if (state.playing) {
+        _rssTimer ??= Timer.periodic(const Duration(seconds: 5), (_) {
+          try {
+            final rss = ProcessInfo.currentRss;
+            appendLog('Mem: rss=${(rss / (1024 * 1024)).toStringAsFixed(1)}MiB');
+          } catch (_) {}
+        });
+      } else {
+        _rssTimer?.cancel();
+        _rssTimer = null;
       }
     });
   }
