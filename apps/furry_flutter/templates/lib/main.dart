@@ -248,6 +248,14 @@ class _AppController {
     try {
       await api.init();
       await systemMedia.init();
+      systemMedia.bindQueueControls(
+        onNext: playNextTrack,
+        onPrevious: playPreviousTrack,
+      );
+      unawaited(systemMedia.setQueueAvailability(
+        canGoNext: canPlayNextTrack,
+        canGoPrevious: canPlayPreviousTrack,
+      ));
       _wirePlayerDiagnostics();
       for (final line in _takeStartupDiagnostics()) {
         appendLog(line);
@@ -530,6 +538,10 @@ class _AppController {
     } else {
       _queueIndex = -1;
     }
+    unawaited(systemMedia.setQueueAvailability(
+      canGoNext: canPlayNextTrack,
+      canGoPrevious: canPlayPreviousTrack,
+    ));
 
     nowPlaying.value = _NowPlaying(
       title: name,
@@ -689,6 +701,10 @@ class _AppController {
     if (index < 0 || index >= queue.length) return;
     _queue = List<File>.from(queue);
     _queueIndex = index;
+    unawaited(systemMedia.setQueueAvailability(
+      canGoNext: canPlayNextTrack,
+      canGoPrevious: canPlayPreviousTrack,
+    ));
     await playFile(
       file: queue[index],
       displayName: displayName ?? p.basename(queue[index].path),

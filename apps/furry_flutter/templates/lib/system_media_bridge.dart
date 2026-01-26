@@ -27,7 +27,8 @@ class SystemMediaBridge {
 
   final AudioPlayer _player;
 
-  final List<StreamSubscription<dynamic>> _subs = <StreamSubscription<dynamic>>[];
+  final List<StreamSubscription<dynamic>> _subs =
+      <StreamSubscription<dynamic>>[];
   _WindowsSmtc? _windows;
   _LinuxMpris? _linux;
 
@@ -48,6 +49,28 @@ class SystemMediaBridge {
     await _linux?.setMetadata(meta);
   }
 
+  void bindQueueControls({
+    Future<void> Function()? onNext,
+    Future<void> Function()? onPrevious,
+  }) {
+    _windows?.bindQueueControls(onNext: onNext, onPrevious: onPrevious);
+    _linux?.bindQueueControls(onNext: onNext, onPrevious: onPrevious);
+  }
+
+  Future<void> setQueueAvailability({
+    required bool canGoNext,
+    required bool canGoPrevious,
+  }) async {
+    await _windows?.setQueueAvailability(
+      canGoNext: canGoNext,
+      canGoPrevious: canGoPrevious,
+    );
+    await _linux?.setQueueAvailability(
+      canGoNext: canGoNext,
+      canGoPrevious: canGoPrevious,
+    );
+  }
+
   Future<void> dispose() async {
     for (final s in _subs) {
       await s.cancel();
@@ -63,7 +86,10 @@ class _WindowsSmtc {
 
   final AudioPlayer _player;
   final SMTCWindows _smtc;
-  final List<StreamSubscription<dynamic>> _subs = <StreamSubscription<dynamic>>[];
+  final List<StreamSubscription<dynamic>> _subs =
+      <StreamSubscription<dynamic>>[];
+  Future<void> Function()? _onNext;
+  Future<void> Function()? _onPrevious;
 
   static Future<_WindowsSmtc> create(AudioPlayer player) async {
     await SMTCWindows.initialize();
@@ -119,7 +145,13 @@ class _WindowsSmtc {
           await _player.stop();
           break;
         case PressedButton.next:
+          final fn = _onNext;
+          if (fn != null) await fn();
+          break;
         case PressedButton.previous:
+          final fn = _onPrevious;
+          if (fn != null) await fn();
+          break;
         case PressedButton.fastForward:
         case PressedButton.rewind:
         case PressedButton.record:
@@ -128,6 +160,22 @@ class _WindowsSmtc {
           break;
       }
     }));
+  }
+
+  void bindQueueControls({
+    Future<void> Function()? onNext,
+    Future<void> Function()? onPrevious,
+  }) {
+    _onNext = onNext;
+    _onPrevious = onPrevious;
+  }
+
+  Future<void> setQueueAvailability({
+    required bool canGoNext,
+    required bool canGoPrevious,
+  }) async {
+    await _smtc.setIsNextEnabled(canGoNext);
+    await _smtc.setIsPrevEnabled(canGoPrevious);
   }
 
   Future<void> setMetadata(SystemMediaMetadata meta) async {
@@ -168,7 +216,8 @@ class _LinuxMpris {
   final AudioPlayer _player;
   final DBusClient _client;
   final _MprisObject _obj;
-  final List<StreamSubscription<dynamic>> _subs = <StreamSubscription<dynamic>>[];
+  final List<StreamSubscription<dynamic>> _subs =
+      <StreamSubscription<dynamic>>[];
 
   static const _busName = 'org.mpris.MediaPlayer2.furry_flutter_app';
   static final _objectPath = DBusObjectPath('/org/mpris/MediaPlayer2');
@@ -199,6 +248,22 @@ class _LinuxMpris {
 
   Future<void> setMetadata(SystemMediaMetadata meta) => _obj.setMetadata(meta);
 
+  void bindQueueControls({
+    Future<void> Function()? onNext,
+    Future<void> Function()? onPrevious,
+  }) {
+    _obj.bindQueueControls(onNext: onNext, onPrevious: onPrevious);
+  }
+
+  Future<void> setQueueAvailability({
+    required bool canGoNext,
+    required bool canGoPrevious,
+  }) =>
+      _obj.setQueueAvailability(
+        canGoNext: canGoNext,
+        canGoPrevious: canGoPrevious,
+      );
+
   Future<void> dispose() async {
     for (final s in _subs) {
       await s.cancel();
@@ -217,24 +282,56 @@ class _MprisObject extends DBusObject {
 
   String _playbackStatus = 'Stopped';
   bool _canControl = true;
+  bool _canGoNext = false;
+  bool _canGoPrevious = false;
   Duration? _duration;
   Duration _position = Duration.zero;
   Map<String, DBusValue> _metadata = <String, DBusValue>{};
+
+  Future<void> Function()? _onNext;
+  Future<void> Function()? _onPrevious;
 
   Future<void> setMetadata(SystemMediaMetadata meta) async {
     _duration = meta.duration;
     _metadata = <String, DBusValue>{
       'mpris:trackid': DBusObjectPath('/org/mpris/MediaPlayer2/track/0'),
       'xesam:title': DBusString(meta.title),
-      'xesam:artist': DBusArray(DBusSignature('s'), <DBusValue>[DBusString(meta.artist)]),
+      'xesam:artist':
+          DBusArray(DBusSignature('s'), <DBusValue>[DBusString(meta.artist)]),
       'xesam:album': DBusString(meta.album),
-      if (_duration != null) 'mpris:length': DBusInt64(_duration!.inMicroseconds),
-      if (meta.artUri != null) 'mpris:artUrl': DBusString(meta.artUri.toString()),
+      if (_duration != null)
+        'mpris:length': DBusInt64(_duration!.inMicroseconds),
+      if (meta.artUri != null)
+        'mpris:artUrl': DBusString(meta.artUri.toString()),
     };
     await emitPropertiesChanged(
       'org.mpris.MediaPlayer2.Player',
       changedProperties: <String, DBusValue>{
         'Metadata': DBusDict.stringVariant(_metadata),
+      },
+    );
+  }
+
+  void bindQueueControls({
+    Future<void> Function()? onNext,
+    Future<void> Function()? onPrevious,
+  }) {
+    _onNext = onNext;
+    _onPrevious = onPrevious;
+  }
+
+  Future<void> setQueueAvailability({
+    required bool canGoNext,
+    required bool canGoPrevious,
+  }) async {
+    if (_canGoNext == canGoNext && _canGoPrevious == canGoPrevious) return;
+    _canGoNext = canGoNext;
+    _canGoPrevious = canGoPrevious;
+    await emitPropertiesChanged(
+      'org.mpris.MediaPlayer2.Player',
+      changedProperties: <String, DBusValue>{
+        'CanGoNext': DBusBoolean(_canGoNext),
+        'CanGoPrevious': DBusBoolean(_canGoPrevious),
       },
     );
   }
@@ -275,10 +372,12 @@ class _MprisObject extends DBusObject {
 
   @override
   List<DBusIntrospectInterface> introspect() {
-    DBusIntrospectMethod m(String name, {List<DBusIntrospectArgument> args = const []}) =>
+    DBusIntrospectMethod m(String name,
+            {List<DBusIntrospectArgument> args = const []}) =>
         DBusIntrospectMethod(name, args: args);
 
-    DBusIntrospectProperty p(String name, String sig, DBusPropertyAccess access) =>
+    DBusIntrospectProperty p(
+            String name, String sig, DBusPropertyAccess access) =>
         DBusIntrospectProperty(name, DBusSignature(sig), access: access);
 
     return <DBusIntrospectInterface>[
@@ -307,20 +406,28 @@ class _MprisObject extends DBusObject {
           m(
             'Seek',
             args: <DBusIntrospectArgument>[
-              DBusIntrospectArgument(DBusSignature('x'), DBusArgumentDirection.in_, name: 'Offset'),
+              DBusIntrospectArgument(
+                  DBusSignature('x'), DBusArgumentDirection.in_,
+                  name: 'Offset'),
             ],
           ),
           m(
             'SetPosition',
             args: <DBusIntrospectArgument>[
-              DBusIntrospectArgument(DBusSignature('o'), DBusArgumentDirection.in_, name: 'TrackId'),
-              DBusIntrospectArgument(DBusSignature('x'), DBusArgumentDirection.in_, name: 'Position'),
+              DBusIntrospectArgument(
+                  DBusSignature('o'), DBusArgumentDirection.in_,
+                  name: 'TrackId'),
+              DBusIntrospectArgument(
+                  DBusSignature('x'), DBusArgumentDirection.in_,
+                  name: 'Position'),
             ],
           ),
           m(
             'OpenUri',
             args: <DBusIntrospectArgument>[
-              DBusIntrospectArgument(DBusSignature('s'), DBusArgumentDirection.in_, name: 'Uri'),
+              DBusIntrospectArgument(
+                  DBusSignature('s'), DBusArgumentDirection.in_,
+                  name: 'Uri'),
             ],
           ),
         ],
@@ -328,7 +435,9 @@ class _MprisObject extends DBusObject {
           DBusIntrospectSignal(
             'Seeked',
             args: <DBusIntrospectArgument>[
-              DBusIntrospectArgument(DBusSignature('x'), DBusArgumentDirection.out, name: 'Position'),
+              DBusIntrospectArgument(
+                  DBusSignature('x'), DBusArgumentDirection.out,
+                  name: 'Position'),
             ],
           ),
         ],
@@ -389,15 +498,23 @@ class _MprisObject extends DBusObject {
           final offsetUs = (methodCall.values.first as DBusInt64).value;
           final target = _position + Duration(microseconds: offsetUs);
           await _player.seek(target < Duration.zero ? Duration.zero : target);
-          await emitSignal('org.mpris.MediaPlayer2.Player', 'Seeked', [DBusInt64(_player.position.inMicroseconds)]);
+          await emitSignal('org.mpris.MediaPlayer2.Player', 'Seeked',
+              [DBusInt64(_player.position.inMicroseconds)]);
           return DBusMethodSuccessResponse();
         case 'SetPosition':
           final posUs = (methodCall.values[1] as DBusInt64).value;
           await _player.seek(Duration(microseconds: posUs));
-          await emitSignal('org.mpris.MediaPlayer2.Player', 'Seeked', [DBusInt64(_player.position.inMicroseconds)]);
+          await emitSignal('org.mpris.MediaPlayer2.Player', 'Seeked',
+              [DBusInt64(_player.position.inMicroseconds)]);
           return DBusMethodSuccessResponse();
         case 'Next':
+          final fn = _onNext;
+          if (fn != null) await fn();
+          return DBusMethodSuccessResponse();
         case 'Previous':
+          final fn = _onPrevious;
+          if (fn != null) await fn();
+          return DBusMethodSuccessResponse();
         case 'OpenUri':
           return DBusMethodSuccessResponse();
       }
@@ -421,9 +538,11 @@ class _MprisObject extends DBusObject {
         case 'DesktopEntry':
           return DBusGetPropertyResponse(DBusString('furry_flutter_app'));
         case 'SupportedUriSchemes':
-          return DBusGetPropertyResponse(DBusArray(DBusSignature('s'), <DBusValue>[DBusString('file')]));
+          return DBusGetPropertyResponse(
+              DBusArray(DBusSignature('s'), <DBusValue>[DBusString('file')]));
         case 'SupportedMimeTypes':
-          return DBusGetPropertyResponse(DBusArray(DBusSignature('s'), <DBusValue>[]));
+          return DBusGetPropertyResponse(
+              DBusArray(DBusSignature('s'), <DBusValue>[]));
       }
     }
 
@@ -448,9 +567,9 @@ class _MprisObject extends DBusObject {
         case 'MaximumRate':
           return DBusGetPropertyResponse(DBusDouble(1.0));
         case 'CanGoNext':
-          return DBusGetPropertyResponse(DBusBoolean(false));
+          return DBusGetPropertyResponse(DBusBoolean(_canGoNext));
         case 'CanGoPrevious':
-          return DBusGetPropertyResponse(DBusBoolean(false));
+          return DBusGetPropertyResponse(DBusBoolean(_canGoPrevious));
         case 'CanPlay':
           return DBusGetPropertyResponse(DBusBoolean(true));
         case 'CanPause':
@@ -474,7 +593,8 @@ class _MprisObject extends DBusObject {
         'HasTrackList': DBusBoolean(false),
         'Identity': DBusString('Furry Player'),
         'DesktopEntry': DBusString('furry_flutter_app'),
-        'SupportedUriSchemes': DBusArray(DBusSignature('s'), <DBusValue>[DBusString('file')]),
+        'SupportedUriSchemes':
+            DBusArray(DBusSignature('s'), <DBusValue>[DBusString('file')]),
         'SupportedMimeTypes': DBusArray(DBusSignature('s'), <DBusValue>[]),
       });
     }
@@ -489,8 +609,8 @@ class _MprisObject extends DBusObject {
         'Position': DBusInt64(_position.inMicroseconds),
         'MinimumRate': DBusDouble(1.0),
         'MaximumRate': DBusDouble(1.0),
-        'CanGoNext': DBusBoolean(false),
-        'CanGoPrevious': DBusBoolean(false),
+        'CanGoNext': DBusBoolean(_canGoNext),
+        'CanGoPrevious': DBusBoolean(_canGoPrevious),
         'CanPlay': DBusBoolean(true),
         'CanPause': DBusBoolean(true),
         'CanSeek': DBusBoolean(true),
