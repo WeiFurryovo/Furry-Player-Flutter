@@ -18,6 +18,9 @@ import 'system_media_bridge.dart';
 final List<String> _startupDiagnostics = <String>[];
 _AndroidAudioHandler? _androidAudioHandler;
 
+Color _withOpacityCompat(Color color, double opacity) =>
+    color.withAlpha((opacity * 255).round().clamp(0, 255));
+
 void _startupLog(String msg) {
   _startupDiagnostics.add(msg);
   debugPrint(msg);
@@ -276,7 +279,6 @@ class _ExpressiveTheme {
       labelLarge: tt.labelLarge?.copyWith(fontWeight: FontWeight.w700),
     );
 
-    const r28 = BorderRadius.all(Radius.circular(28));
     const r24 = BorderRadius.all(Radius.circular(24));
     const r18 = BorderRadius.all(Radius.circular(18));
 
@@ -290,12 +292,6 @@ class _ExpressiveTheme {
         scrolledUnderElevation: 0,
         backgroundColor: scheme.surface,
         foregroundColor: scheme.onSurface,
-      ),
-      cardTheme: CardTheme(
-        elevation: 0,
-        color: scheme.surfaceContainerHighest,
-        shape: const RoundedRectangleBorder(borderRadius: r28),
-        margin: EdgeInsets.zero,
       ),
       listTileTheme: ListTileThemeData(
         shape: const RoundedRectangleBorder(borderRadius: r18),
@@ -1321,6 +1317,12 @@ class _LibraryPageState extends State<LibraryPage> {
                 if (filtered.isEmpty) {
                   return SliverToBoxAdapter(
                     child: Card(
+                      margin: EdgeInsets.zero,
+                      elevation: 0,
+                      color: cs.surfaceContainerHighest,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: Row(
@@ -1340,7 +1342,8 @@ class _LibraryPageState extends State<LibraryPage> {
 
                 return SliverList.separated(
                   itemCount: filtered.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  separatorBuilder: (_, i) =>
+                      SizedBox(height: i.isEven ? 10 : 10),
                   itemBuilder: (context, i) {
                     final f = filtered[i];
                     return FutureBuilder<_MetaPreview>(
@@ -1348,6 +1351,12 @@ class _LibraryPageState extends State<LibraryPage> {
                       builder: (context, snap) {
                         final meta = snap.data;
                         return Card(
+                          margin: EdgeInsets.zero,
+                          elevation: 0,
+                          color: cs.surfaceContainerHighest,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(28),
+                          ),
                           child: ListTile(
                             leading: _CoverThumb(artUri: meta?.artUri),
                             title: Text(meta?.title ?? p.basename(f.path),
@@ -1446,6 +1455,12 @@ class _ConverterPageState extends State<ConverterPage> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             sliver: SliverToBoxAdapter(
               child: Card(
+                margin: EdgeInsets.zero,
+                elevation: 0,
+                color: cs.surfaceContainerHighest,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(28),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -1545,6 +1560,12 @@ class _ConverterPageState extends State<ConverterPage> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
             sliver: SliverToBoxAdapter(
               child: Card(
+                margin: EdgeInsets.zero,
+                elevation: 0,
+                color: cs.surfaceContainerHighest,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(28),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -1612,6 +1633,12 @@ class SettingsPage extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             sliver: SliverToBoxAdapter(
               child: Card(
+                margin: EdgeInsets.zero,
+                elevation: 0,
+                color: cs.surfaceContainerHighest,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(28),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -1681,6 +1708,12 @@ class MiniPlayerBar extends StatelessWidget {
         return Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
           child: Card(
+            margin: EdgeInsets.zero,
+            elevation: 0,
+            color: cs.surfaceContainerHighest,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+            ),
             child: InkWell(
               onTap: () => _showNowPlaying(context, controller),
               borderRadius: BorderRadius.circular(28),
@@ -1781,8 +1814,8 @@ class MiniPlayerBar extends StatelessWidget {
                               child: LinearProgressIndicator(
                                 value: value,
                                 minHeight: 3,
-                                backgroundColor:
-                                    cs.onSurfaceVariant.withOpacity(0.15),
+                                backgroundColor: _withOpacityCompat(
+                                    cs.onSurfaceVariant, 0.15),
                               ),
                             );
                           },
@@ -1842,7 +1875,7 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    cs.primaryContainer.withOpacity(0.35),
+                    _withOpacityCompat(cs.primaryContainer, 0.35),
                     cs.surface,
                   ],
                 ),
@@ -1862,7 +1895,7 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
                             color: cs.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(28),
                             border: Border.all(
-                              color: cs.outlineVariant.withOpacity(0.5),
+                              color: _withOpacityCompat(cs.outlineVariant, 0.5),
                             ),
                           ),
                           clipBehavior: Clip.antiAlias,
@@ -2014,6 +2047,11 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
                   const SizedBox(height: 16),
                   Card(
                     color: cs.surfaceContainer,
+                    margin: EdgeInsets.zero,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
                     child: Padding(
                       padding: const EdgeInsets.all(12),
                       child: Row(
