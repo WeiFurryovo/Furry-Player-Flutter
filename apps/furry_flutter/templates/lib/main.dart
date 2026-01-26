@@ -674,6 +674,19 @@ class _AppController {
     return '$m:$s';
   }
 
+  Future<void> seekBy(Duration delta) async {
+    try {
+      final duration = player.duration;
+      final target = player.position + delta;
+      var clamped = target;
+      if (clamped.isNegative) clamped = Duration.zero;
+      if (duration != null && clamped > duration) clamped = duration;
+      await player.seek(clamped);
+    } catch (e, st) {
+      appendLog('Seek failed: $e\n$st');
+    }
+  }
+
   Future<_MetaPreview> getMetaPreviewForFurry(File furryFile) {
     final key = furryFile.path;
     final existing = _metaPreviewCache[key];
@@ -1097,6 +1110,13 @@ class MiniPlayerBar extends StatelessWidget {
                       ],
                     ),
                   ),
+                  IconButton(
+                    tooltip: '后退 10 秒',
+                    onPressed: () => controller.seekBy(
+                      const Duration(seconds: -10),
+                    ),
+                    icon: const Icon(Icons.replay_10),
+                  ),
                   StreamBuilder<PlayerState>(
                     stream: controller.player.playerStateStream,
                     builder: (context, snap) {
@@ -1124,6 +1144,13 @@ class MiniPlayerBar extends StatelessWidget {
                             : Icon(playing ? Icons.pause : Icons.play_arrow),
                       );
                     },
+                  ),
+                  IconButton(
+                    tooltip: '前进 10 秒',
+                    onPressed: () => controller.seekBy(
+                      const Duration(seconds: 10),
+                    ),
+                    icon: const Icon(Icons.forward_10),
                   ),
                 ],
               ),
@@ -1265,6 +1292,14 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
                     onPressed: widget.controller.stop,
                     icon: const Icon(Icons.stop),
                   ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: '后退 10 秒',
+                    onPressed: () => widget.controller.seekBy(
+                      const Duration(seconds: -10),
+                    ),
+                    icon: const Icon(Icons.replay_10),
+                  ),
                   const SizedBox(width: 12),
                   StreamBuilder<PlayerState>(
                     stream: widget.controller.player.playerStateStream,
@@ -1294,6 +1329,14 @@ class _NowPlayingSheetState extends State<NowPlayingSheet> {
                         label: Text(playing ? '暂停' : '播放'),
                       );
                     },
+                  ),
+                  const SizedBox(width: 12),
+                  IconButton(
+                    tooltip: '前进 10 秒',
+                    onPressed: () => widget.controller.seekBy(
+                      const Duration(seconds: 10),
+                    ),
+                    icon: const Icon(Icons.forward_10),
                   ),
                 ],
               ),
