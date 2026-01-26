@@ -46,6 +46,7 @@ service_snippet = (
 permissions = [
   f"{app_indent}<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />\n",
   f"{app_indent}<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK\" />\n",
+  f"{app_indent}<uses-permission android:name=\"android.permission.WAKE_LOCK\" />\n",
 ]
 
 if "com.ryanheise.audioservice.AudioService" not in text:
