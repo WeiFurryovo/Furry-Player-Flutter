@@ -27,3 +27,4 @@ Thumbs.db
 # Local Flutter SDK downloads (keep out of git)
 flutter*.tar.*
 flutter*.zip
+flutter/
