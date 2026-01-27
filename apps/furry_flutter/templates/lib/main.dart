@@ -1873,6 +1873,7 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
   final DraggableScrollableController _sheetController =
       DraggableScrollableController();
   double _extent = 0;
+  double? _dragStartExtent;
 
   // Tuned by eye: close to the old mini bar height.
   static const double _miniHeightPx = 96;
@@ -1923,6 +1924,35 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
             final fullOpacity =
                 Curves.easeInOutCubicEmphasized.transform(reveal);
 
+            void onHeaderDragStart(DragStartDetails details) {
+              _dragStartExtent = effectiveExtent;
+            }
+
+            void onHeaderDragUpdate(DragUpdateDetails details) {
+              final h = availableH <= 1 ? 1.0 : availableH;
+              final start = _dragStartExtent ?? effectiveExtent;
+              final next = (start + (-details.delta.dy / h)).clamp(
+                minSize,
+                maxSize,
+              );
+              _sheetController.jumpTo(next);
+              if (mounted) setState(() => _extent = next);
+            }
+
+            void onHeaderDragEnd(DragEndDetails details) {
+              _dragStartExtent = null;
+              final v = details.primaryVelocity ?? 0.0;
+              final mid = (minSize + maxSize) / 2;
+              final snapTo = (v.abs() > 600)
+                  ? (v < 0 ? maxSize : minSize)
+                  : ((effectiveExtent >= mid) ? maxSize : minSize);
+              _sheetController.animateTo(
+                snapTo,
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+              );
+            }
+
             return NotificationListener<DraggableScrollableNotification>(
               onNotification: (n) {
                 if (mounted) {
@@ -1972,14 +2002,20 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                               ),
                             ),
                             const SizedBox(height: 10),
-                            _NowPlayingMorphHeader(
-                              controller: widget.controller,
-                              np: np,
-                              reveal: reveal,
-                              miniOpacity: miniOpacity,
-                              fullOpacity: fullOpacity,
-                              onExpand: () => _expand(maxSize),
-                              onCollapse: () => _collapse(minSize),
+                            GestureDetector(
+                              behavior: HitTestBehavior.translucent,
+                              onVerticalDragStart: onHeaderDragStart,
+                              onVerticalDragUpdate: onHeaderDragUpdate,
+                              onVerticalDragEnd: onHeaderDragEnd,
+                              child: _NowPlayingMorphHeader(
+                                controller: widget.controller,
+                                np: np,
+                                reveal: reveal,
+                                miniOpacity: miniOpacity,
+                                fullOpacity: fullOpacity,
+                                onExpand: () => _expand(maxSize),
+                                onCollapse: () => _collapse(minSize),
+                              ),
                             ),
                             const SizedBox(height: 6),
                             IgnorePointer(
@@ -2075,8 +2111,8 @@ class _NowPlayingMorphHeader extends StatelessWidget {
         const maxRadius = 28.0;
 
         final coverSize = lerpDouble(coverMin, coverMax, reveal)!;
-        final coverTop = lerpDouble(0, 46, reveal)!;
-        final coverLeft = lerpDouble(0, (w - coverSize) / 2, reveal)!;
+        final coverTop = lerpDouble(10, 46, reveal)!;
+        final coverLeft = lerpDouble(12, (w - coverSize) / 2, reveal)!;
         final radius = lerpDouble(minRadius, maxRadius, reveal)!;
 
         final headerH = lerpDouble(72, coverTop + coverSize + 92, reveal)!
@@ -2088,38 +2124,6 @@ class _NowPlayingMorphHeader extends StatelessWidget {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              Positioned(
-                left: coverLeft,
-                top: coverTop,
-                width: coverSize,
-                height: coverSize,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(radius),
-                    border: Border.all(
-                      color: _withOpacityCompat(cs.outlineVariant, 0.5),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _withOpacityCompat(cs.shadow, 0.18 * fullOpacity),
-                        blurRadius: 24 * fullOpacity,
-                        offset: Offset(0, 10 * fullOpacity),
-                      ),
-                    ],
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: np.artUri == null
-                      ? Icon(Icons.album_rounded,
-                          size: coverSize * 0.33, color: cs.primary)
-                      : Image.file(
-                          File.fromUri(np.artUri!),
-                          fit: BoxFit.cover,
-                          cacheWidth: (coverSize * 2).round().clamp(96, 1024),
-                          cacheHeight: (coverSize * 2).round().clamp(96, 1024),
-                        ),
-                ),
-              ),
               Positioned.fill(
                 child: Align(
                   alignment: Alignment.topLeft,
@@ -2227,6 +2231,42 @@ class _NowPlayingMorphHeader extends StatelessWidget {
                         ),
                       ),
                     ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: coverLeft,
+                top: coverTop,
+                width: coverSize,
+                height: coverSize,
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(radius),
+                      border: Border.all(
+                        color: _withOpacityCompat(cs.outlineVariant, 0.5),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color:
+                              _withOpacityCompat(cs.shadow, 0.18 * fullOpacity),
+                          blurRadius: 24 * fullOpacity,
+                          offset: Offset(0, 10 * fullOpacity),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: np.artUri == null
+                        ? Icon(Icons.album_rounded,
+                            size: coverSize * 0.33, color: cs.primary)
+                        : Image.file(
+                            File.fromUri(np.artUri!),
+                            fit: BoxFit.cover,
+                            cacheWidth: (coverSize * 2).round().clamp(96, 1024),
+                            cacheHeight:
+                                (coverSize * 2).round().clamp(96, 1024),
+                          ),
                   ),
                 ),
               ),
