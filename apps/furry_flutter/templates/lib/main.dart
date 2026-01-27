@@ -54,6 +54,7 @@ class _FurryAudioHandler extends BaseAudioHandler with SeekHandler, QueueHandler
   StreamSubscription<Duration?>? _durationSub;
 
   List<MediaItem> _queueItems = const <MediaItem>[];
+  final Map<int, Duration> _knownDurations = <int, Duration>{};
   DateTime? _lastPreviousPressedAt;
   static const Duration _previousDoublePressWindow = Duration(seconds: 2);
 
@@ -87,7 +88,14 @@ class _FurryAudioHandler extends BaseAudioHandler with SeekHandler, QueueHandler
 
   void _setMediaItemByIndex(int idx) {
     if (idx < 0 || idx >= _queueItems.length) return;
-    mediaItem.add(_queueItems[idx]);
+    final known = _knownDurations[idx];
+    final currentDuration =
+        idx == _player.currentIndex ? _player.duration : null;
+    final duration = known ?? currentDuration;
+    final item = duration == null
+        ? _queueItems[idx]
+        : _queueItems[idx].copyWith(duration: duration);
+    mediaItem.add(item);
   }
 
   void _onDurationChanged(Duration? duration) {
@@ -95,6 +103,10 @@ class _FurryAudioHandler extends BaseAudioHandler with SeekHandler, QueueHandler
     if (current == null) return;
     if (duration == null) return;
     if (current.duration == duration) return;
+    final idx = _player.currentIndex;
+    if (idx != null) {
+      _knownDurations[idx] = duration;
+    }
     mediaItem.add(current.copyWith(duration: duration));
   }
 
