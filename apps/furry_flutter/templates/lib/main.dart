@@ -109,9 +109,12 @@ Future<void> main() async {
         androidNotificationChannelId:
             'com.furry.furry_flutter_app.channel.audio',
         androidNotificationChannelName: 'Furry Player',
-        // `audio_service` asserts that if `androidNotificationOngoing` is true,
-        // `androidStopForegroundOnPause` must also be true.
-        androidNotificationOngoing: false,
+        // Keep the notification ongoing so Android doesn't add a stop/dismiss
+        // action button (square). This matches the in-app controls (no stop).
+        //
+        // Note: `audio_service` asserts that if `androidNotificationOngoing` is
+        // true, `androidStopForegroundOnPause` must also be true.
+        androidNotificationOngoing: true,
         androidStopForegroundOnPause: true,
       );
       _startupLog('JustAudioBackground init ok');
