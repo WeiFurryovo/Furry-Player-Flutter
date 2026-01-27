@@ -469,37 +469,50 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           label: '设置'),
     ];
 
+    const navBarHeight = 72.0;
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+
     return Scaffold(
-      body: SafeArea(
-        top: false,
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
-          child: IndexedStack(
-            key: ValueKey<int>(_tabIndex),
-            index: _tabIndex,
-            children: [
-              LibraryPage(controller: _controller),
-              ConverterPage(controller: _controller),
-              SettingsPage(controller: _controller),
-            ],
-          ),
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            MiniPlayerBar(controller: _controller),
-            NavigationBar(
-              selectedIndex: _tabIndex,
-              destinations: destinations,
-              onDestinationSelected: (i) => setState(() => _tabIndex = i),
+      body: Stack(
+        children: [
+          SafeArea(
+            top: false,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              child: IndexedStack(
+                key: ValueKey<int>(_tabIndex),
+                index: _tabIndex,
+                children: [
+                  LibraryPage(controller: _controller),
+                  ConverterPage(controller: _controller),
+                  SettingsPage(controller: _controller),
+                ],
+              ),
             ),
-          ],
-        ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SafeArea(
+              top: false,
+              child: NavigationBar(
+                selectedIndex: _tabIndex,
+                destinations: destinations,
+                onDestinationSelected: (i) => setState(() => _tabIndex = i),
+              ),
+            ),
+          ),
+          // Spotify-like persistent player panel above the nav bar.
+          Positioned.fill(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: navBarHeight + bottomInset),
+              child: NowPlayingPanel(controller: _controller),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1847,26 +1860,42 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-class MiniPlayerBar extends StatefulWidget {
+class NowPlayingPanel extends StatefulWidget {
   final _AppController controller;
-  const MiniPlayerBar({super.key, required this.controller});
+  const NowPlayingPanel({super.key, required this.controller});
 
   @override
-  State<MiniPlayerBar> createState() => _MiniPlayerBarState();
+  State<NowPlayingPanel> createState() => _NowPlayingPanelState();
 }
 
-class _MiniPlayerBarState extends State<MiniPlayerBar> {
-  double _dragDy = 0;
-  bool _openedFromDrag = false;
-  static const double _openThresholdPx = 24;
+class _NowPlayingPanelState extends State<NowPlayingPanel> {
+  final DraggableScrollableController _sheetController =
+      DraggableScrollableController();
+  double _extent = 0;
 
-  void _showNowPlaying() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (context) => NowPlayingSheet(controller: widget.controller),
+  // Tuned by eye: close to the old mini bar height.
+  static const double _miniHeightPx = 96;
+
+  void _expand(double maxSize) {
+    _sheetController.animateTo(
+      maxSize,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
     );
+  }
+
+  void _collapse(double minSize) {
+    _sheetController.animateTo(
+      minSize,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
+  void dispose() {
+    _sheetController.dispose();
+    super.dispose();
   }
 
   @override
@@ -1877,150 +1906,433 @@ class _MiniPlayerBarState extends State<MiniPlayerBar> {
       builder: (context, np, _) {
         if (np == null) return const SizedBox.shrink();
 
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-          child: Card(
-            margin: EdgeInsets.zero,
-            elevation: 0,
-            color: cs.surfaceContainerHighest,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(28),
-            ),
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onVerticalDragStart: (_) {
-                _dragDy = 0;
-                _openedFromDrag = false;
-              },
-              onVerticalDragUpdate: (d) {
-                _dragDy += d.delta.dy;
-                if (_openedFromDrag) return;
-                if (_dragDy < -_openThresholdPx) {
-                  _openedFromDrag = true;
-                  _showNowPlaying();
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final availableH = constraints.biggest.height;
+            final minSize = (availableH <= 0)
+                ? 0.18
+                : (_miniHeightPx / availableH).clamp(0.12, 0.28);
+            const maxSize = 0.98;
+            final showFull = _extent > (minSize + 0.08);
+
+            return NotificationListener<DraggableScrollableNotification>(
+              onNotification: (n) {
+                if (mounted) {
+                  setState(() => _extent = n.extent);
                 }
+                return false;
               },
-              onVerticalDragEnd: (_) {
-                _dragDy = 0;
-                _openedFromDrag = false;
-              },
-              child: InkWell(
-                onTap: _showNowPlaying,
-                borderRadius: BorderRadius.circular(28),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Hero(
-                            tag: 'cover_${np.sourcePath}',
-                            child: _CoverThumb(artUri: np.artUri),
+              child: DraggableScrollableSheet(
+                controller: _sheetController,
+                initialChildSize: minSize,
+                minChildSize: minSize,
+                maxChildSize: maxSize,
+                snap: true,
+                snapSizes: <double>[minSize, maxSize],
+                expand: false,
+                builder: (context, scrollController) {
+                  return Material(
+                    color: Colors.transparent,
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(28),
+                      ),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              _withOpacityCompat(cs.primaryContainer, 0.35),
+                              cs.surface,
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(np.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis),
-                                Text(
-                                  np.subtitle,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(color: cs.onSurfaceVariant),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                        ),
+                        child: ListView(
+                          controller: scrollController,
+                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+                          children: [
+                            Center(
+                              child: Container(
+                                width: 46,
+                                height: 5,
+                                decoration: BoxDecoration(
+                                  color: _withOpacityCompat(
+                                      cs.onSurfaceVariant, 0.35),
+                                  borderRadius: BorderRadius.circular(999),
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                          IconButton(
-                            tooltip: '上一首',
-                            onPressed: widget.controller.canPlayPreviousTrack
-                                ? widget.controller.playPreviousTrack
-                                : null,
-                            icon: const Icon(Icons.skip_previous_rounded),
-                          ),
-                          StreamBuilder<PlayerState>(
-                            stream: widget.controller.playerStateStream,
-                            builder: (context, snap) {
-                              final playing = snap.data?.playing ?? false;
-                              final processing = snap.data?.processingState ??
-                                  ProcessingState.idle;
-                              final busy =
-                                  processing == ProcessingState.loading ||
-                                      processing == ProcessingState.buffering;
-                              return IconButton.filledTonal(
-                                onPressed: busy
-                                    ? null
-                                    : () async {
-                                        if (playing) {
-                                          await widget.controller.pause();
-                                        } else {
-                                          await widget.controller.play();
-                                        }
-                                      },
-                                icon: busy
-                                    ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2),
-                                      )
-                                    : Icon(playing
-                                        ? Icons.pause_rounded
-                                        : Icons.play_arrow_rounded),
-                              );
-                            },
-                          ),
-                          IconButton(
-                            tooltip: '下一首',
-                            onPressed: widget.controller.canPlayNextTrack
-                                ? widget.controller.playNextTrack
-                                : null,
-                            icon: const Icon(Icons.skip_next_rounded),
-                          ),
-                        ],
+                            const SizedBox(height: 10),
+                            if (!showFull)
+                              _MiniNowPlayingCard(
+                                controller: widget.controller,
+                                np: np,
+                                onExpand: () => _expand(maxSize),
+                              )
+                            else
+                              _FullNowPlayingView(
+                                controller: widget.controller,
+                                np: np,
+                                onCollapse: () => _collapse(minSize),
+                              ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 6),
-                      StreamBuilder<Duration?>(
-                        stream: widget.controller.durationStream,
-                        builder: (context, durSnap) {
-                          final duration = durSnap.data ?? Duration.zero;
-                          return StreamBuilder<Duration>(
-                            stream: widget.controller.positionStream,
-                            builder: (context, posSnap) {
-                              final pos = posSnap.data ?? Duration.zero;
-                              final maxMs = duration.inMilliseconds <= 0
-                                  ? 1
-                                  : duration.inMilliseconds;
-                              final value =
-                                  (pos.inMilliseconds / maxMs).clamp(0.0, 1.0);
-                              return ClipRRect(
-                                borderRadius: BorderRadius.circular(999),
-                                child: LinearProgressIndicator(
-                                  value: value,
-                                  minHeight: 3,
-                                  backgroundColor: _withOpacityCompat(
-                                      cs.onSurfaceVariant, 0.15),
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ],
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _MiniNowPlayingCard extends StatelessWidget {
+  final _AppController controller;
+  final _NowPlaying np;
+  final VoidCallback onExpand;
+
+  const _MiniNowPlayingCard({
+    required this.controller,
+    required this.np,
+    required this.onExpand,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: cs.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: InkWell(
+        onTap: onExpand,
+        borderRadius: BorderRadius.circular(28),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Hero(
+                    tag: 'cover_${np.sourcePath}',
+                    child: _CoverThumb(artUri: np.artUri),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(np.title,
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text(
+                          np.subtitle,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: cs.onSurfaceVariant),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '上一首',
+                    onPressed: controller.canPlayPreviousTrack
+                        ? controller.playPreviousTrack
+                        : null,
+                    icon: const Icon(Icons.skip_previous_rounded),
+                  ),
+                  StreamBuilder<PlayerState>(
+                    stream: controller.playerStateStream,
+                    builder: (context, snap) {
+                      final playing = snap.data?.playing ?? false;
+                      final processing =
+                          snap.data?.processingState ?? ProcessingState.idle;
+                      final busy = processing == ProcessingState.loading ||
+                          processing == ProcessingState.buffering;
+                      return IconButton.filledTonal(
+                        onPressed: busy
+                            ? null
+                            : () async {
+                                if (playing) {
+                                  await controller.pause();
+                                } else {
+                                  await controller.play();
+                                }
+                              },
+                        icon: busy
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Icon(playing
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded),
+                      );
+                    },
+                  ),
+                  IconButton(
+                    tooltip: '下一首',
+                    onPressed:
+                        controller.canPlayNextTrack ? controller.playNextTrack : null,
+                    icon: const Icon(Icons.skip_next_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              StreamBuilder<Duration?>(
+                stream: controller.durationStream,
+                builder: (context, durSnap) {
+                  final duration = durSnap.data ?? Duration.zero;
+                  return StreamBuilder<Duration>(
+                    stream: controller.positionStream,
+                    builder: (context, posSnap) {
+                      final pos = posSnap.data ?? Duration.zero;
+                      final maxMs =
+                          duration.inMilliseconds <= 0 ? 1 : duration.inMilliseconds;
+                      final value = (pos.inMilliseconds / maxMs).clamp(0.0, 1.0);
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: LinearProgressIndicator(
+                          value: value,
+                          minHeight: 3,
+                          backgroundColor:
+                              _withOpacityCompat(cs.onSurfaceVariant, 0.15),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FullNowPlayingView extends StatelessWidget {
+  final _AppController controller;
+  final _NowPlaying np;
+  final VoidCallback onCollapse;
+
+  const _FullNowPlayingView({
+    required this.controller,
+    required this.np,
+    required this.onCollapse,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            IconButton(
+              tooltip: '收起',
+              onPressed: onCollapse,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded),
+            ),
+            const Spacer(),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Center(
+          child: Hero(
+            tag: 'cover_${np.sourcePath}',
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(
+                    color: _withOpacityCompat(cs.outlineVariant, 0.5),
                   ),
                 ),
+                clipBehavior: Clip.antiAlias,
+                child: np.artUri == null
+                    ? Icon(Icons.album_rounded, size: 96, color: cs.primary)
+                    : Image.file(
+                        File.fromUri(np.artUri!),
+                        fit: BoxFit.cover,
+                        cacheWidth: 1024,
+                        cacheHeight: 1024,
+                      ),
               ),
             ),
           ),
+        ),
+        const SizedBox(height: 18),
+        Text(np.title, style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 6),
+        Text(np.subtitle,
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: cs.onSurfaceVariant)),
+        const SizedBox(height: 14),
+        _NowPlayingSeekBar(controller: controller),
+        const SizedBox(height: 16),
+        _NowPlayingControls(controller: controller),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: _withOpacityCompat(cs.surfaceContainerHighest, 0.65),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline_rounded, color: cs.onSurfaceVariant),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  np.sourcePath,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NowPlayingSeekBar extends StatefulWidget {
+  final _AppController controller;
+  const _NowPlayingSeekBar({required this.controller});
+
+  @override
+  State<_NowPlayingSeekBar> createState() => _NowPlayingSeekBarState();
+}
+
+class _NowPlayingSeekBarState extends State<_NowPlayingSeekBar> {
+  double? _dragMs;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = widget.controller;
+    return StreamBuilder<Duration?>(
+      stream: controller.durationStream,
+      builder: (context, durSnap) {
+        final duration = durSnap.data ?? Duration.zero;
+        final maxMs = duration.inMilliseconds <= 0 ? 1.0 : duration.inMilliseconds.toDouble();
+        return StreamBuilder<Duration>(
+          stream: controller.positionStream,
+          builder: (context, posSnap) {
+            final pos = posSnap.data ?? Duration.zero;
+            final posMs = pos.inMilliseconds.toDouble().clamp(0.0, maxMs);
+            final value = _dragMs ?? posMs;
+            return Column(
+              children: [
+                Slider(
+                  value: value.clamp(0.0, maxMs),
+                  min: 0,
+                  max: maxMs,
+                  onChangeStart: (_) => setState(() => _dragMs = value),
+                  onChanged: (v) => setState(() => _dragMs = v),
+                  onChangeEnd: (v) async {
+                    setState(() => _dragMs = null);
+                    await controller.seek(Duration(milliseconds: v.round()));
+                  },
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(controller._fmt(Duration(milliseconds: posMs.round())),
+                        style: Theme.of(context).textTheme.bodySmall),
+                    Text(controller._fmt(duration),
+                        style: Theme.of(context).textTheme.bodySmall),
+                  ],
+                ),
+              ],
+            );
+          },
         );
       },
+    );
+  }
+}
+
+class _NowPlayingControls extends StatelessWidget {
+  final _AppController controller;
+  const _NowPlayingControls({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: StreamBuilder<PlayerState>(
+        stream: controller.playerStateStream,
+        builder: (context, snap) {
+          final playing = snap.data?.playing ?? false;
+          final processing =
+              snap.data?.processingState ?? ProcessingState.idle;
+          final busy =
+              processing == ProcessingState.loading ||
+                  processing == ProcessingState.buffering;
+
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton.filledTonal(
+                tooltip: '上一首',
+                onPressed: controller.canPlayPreviousTrack
+                    ? controller.playPreviousTrack
+                    : null,
+                icon: const Icon(Icons.skip_previous_rounded),
+              ),
+              const SizedBox(width: 14),
+              FilledButton(
+                onPressed: busy
+                    ? null
+                    : () async {
+                        if (playing) {
+                          await controller.pause();
+                        } else {
+                          await controller.play();
+                        }
+                      },
+                child: busy
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(playing ? '暂停' : '播放'),
+              ),
+              const SizedBox(width: 14),
+              IconButton.filledTonal(
+                tooltip: '下一首',
+                onPressed:
+                    controller.canPlayNextTrack ? controller.playNextTrack : null,
+                icon: const Icon(Icons.skip_next_rounded),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
