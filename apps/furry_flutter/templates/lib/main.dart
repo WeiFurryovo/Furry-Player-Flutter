@@ -2123,96 +2123,106 @@ class _NowPlayingMorphHeader extends StatelessWidget {
               Positioned.fill(
                 child: Align(
                   alignment: Alignment.topLeft,
-                  child: Opacity(
-                    opacity: miniOpacity,
-                    child: Card(
-                      margin: EdgeInsets.zero,
-                      elevation: 0,
-                      color: cs.surfaceContainerHighest,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                      child: InkWell(
-                        onTap: onExpand,
-                        borderRadius: BorderRadius.circular(28),
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                          child: Row(
-                            children: [
-                              const SizedBox(width: coverMin, height: coverMin),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      np.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    Text(
-                                      np.subtitle,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                              color: cs.onSurfaceVariant),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
+                  child: IgnorePointer(
+                    // Important: avoid an invisible mini bar blocking sheet dragging
+                    // when expanded.
+                    ignoring: reveal > 0.08,
+                    child: Opacity(
+                      opacity: miniOpacity,
+                      child: Card(
+                        margin: EdgeInsets.zero,
+                        elevation: 0,
+                        color: cs.surfaceContainerHighest,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                        child: InkWell(
+                          onTap: onExpand,
+                          borderRadius: BorderRadius.circular(28),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                            child: Row(
+                              children: [
+                                const SizedBox(
+                                    width: coverMin, height: coverMin),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        np.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        np.subtitle,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                                color: cs.onSurfaceVariant),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              IconButton(
-                                tooltip: '上一首',
-                                onPressed: controller.canPlayPreviousTrack
-                                    ? controller.playPreviousTrack
-                                    : null,
-                                icon: const Icon(Icons.skip_previous_rounded),
-                              ),
-                              StreamBuilder<PlayerState>(
-                                stream: controller.playerStateStream,
-                                builder: (context, snap) {
-                                  final playing = snap.data?.playing ?? false;
-                                  final processing =
-                                      snap.data?.processingState ??
-                                          ProcessingState.idle;
-                                  final busy =
-                                      processing == ProcessingState.loading ||
-                                          processing ==
-                                              ProcessingState.buffering;
-                                  return IconButton.filledTonal(
-                                    onPressed: busy
-                                        ? null
-                                        : () async {
-                                            if (playing) {
-                                              await controller.pause();
-                                            } else {
-                                              await controller.play();
-                                            }
-                                          },
-                                    icon: busy
-                                        ? const SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                                strokeWidth: 2),
-                                          )
-                                        : Icon(playing
-                                            ? Icons.pause_rounded
-                                            : Icons.play_arrow_rounded),
-                                  );
-                                },
-                              ),
-                              IconButton(
-                                tooltip: '下一首',
-                                onPressed: controller.canPlayNextTrack
-                                    ? controller.playNextTrack
-                                    : null,
-                                icon: const Icon(Icons.skip_next_rounded),
-                              ),
-                            ],
+                                IconButton(
+                                  tooltip: '上一首',
+                                  onPressed: controller.canPlayPreviousTrack
+                                      ? controller.playPreviousTrack
+                                      : null,
+                                  icon:
+                                      const Icon(Icons.skip_previous_rounded),
+                                ),
+                                StreamBuilder<PlayerState>(
+                                  stream: controller.playerStateStream,
+                                  builder: (context, snap) {
+                                    final playing =
+                                        snap.data?.playing ?? false;
+                                    final processing =
+                                        snap.data?.processingState ??
+                                            ProcessingState.idle;
+                                    final busy = processing ==
+                                            ProcessingState.loading ||
+                                        processing ==
+                                            ProcessingState.buffering;
+                                    return IconButton.filledTonal(
+                                      onPressed: busy
+                                          ? null
+                                          : () async {
+                                              if (playing) {
+                                                await controller.pause();
+                                              } else {
+                                                await controller.play();
+                                              }
+                                            },
+                                      icon: busy
+                                          ? const SizedBox(
+                                              width: 18,
+                                              height: 18,
+                                              child:
+                                                  CircularProgressIndicator(
+                                                      strokeWidth: 2),
+                                            )
+                                          : Icon(playing
+                                              ? Icons.pause_rounded
+                                              : Icons.play_arrow_rounded),
+                                    );
+                                  },
+                                ),
+                                IconButton(
+                                  tooltip: '下一首',
+                                  onPressed: controller.canPlayNextTrack
+                                      ? controller.playNextTrack
+                                      : null,
+                                  icon: const Icon(Icons.skip_next_rounded),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -2224,17 +2234,20 @@ class _NowPlayingMorphHeader extends StatelessWidget {
                 left: 0,
                 right: 0,
                 top: 0,
-                child: Opacity(
-                  opacity: fullOpacity,
-                  child: Row(
-                    children: [
-                      IconButton(
-                        tooltip: '收起',
-                        onPressed: onCollapse,
-                        icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                      ),
-                      const Spacer(),
-                    ],
+                child: IgnorePointer(
+                  ignoring: fullOpacity < 0.1,
+                  child: Opacity(
+                    opacity: fullOpacity,
+                    child: Row(
+                      children: [
+                        IconButton(
+                          tooltip: '收起',
+                          onPressed: onCollapse,
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                        ),
+                        const Spacer(),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -2242,25 +2255,28 @@ class _NowPlayingMorphHeader extends StatelessWidget {
                 left: 0,
                 right: 0,
                 top: coverTop + coverSize + 18,
-                child: Opacity(
-                  opacity: fullOpacity,
-                  child: Transform.translate(
-                    offset: Offset(0, 8 * (1 - fullOpacity)),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(np.title,
-                            style:
-                                Theme.of(context).textTheme.headlineSmall),
-                        const SizedBox(height: 6),
-                        Text(
-                          np.subtitle,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(color: cs.onSurfaceVariant),
-                        ),
-                      ],
+                child: IgnorePointer(
+                  ignoring: fullOpacity < 0.1,
+                  child: Opacity(
+                    opacity: fullOpacity,
+                    child: Transform.translate(
+                      offset: Offset(0, 8 * (1 - fullOpacity)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(np.title,
+                              style:
+                                  Theme.of(context).textTheme.headlineSmall),
+                          const SizedBox(height: 6),
+                          Text(
+                            np.subtitle,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
