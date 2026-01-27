@@ -100,18 +100,20 @@ class _FurryAudioHandler extends BaseAudioHandler with SeekHandler, QueueHandler
 
   int _compactControlsCount() {
     var count = 1; // play/pause always present
-    if (_player.hasPrevious) count++;
-    if (_player.hasNext) count++;
+    if (_queueItems.length > 1) {
+      count += 2;
+    }
     return count.clamp(1, 3);
   }
 
   void _onPlaybackEvent(PlaybackEvent event) {
+    final hasQueueNav = _queueItems.length > 1;
     playbackState.add(
       playbackState.value.copyWith(
         controls: <MediaControl>[
-          if (_player.hasPrevious) MediaControl.skipToPrevious,
+          if (hasQueueNav) MediaControl.skipToPrevious,
           if (_player.playing) MediaControl.pause else MediaControl.play,
-          if (_player.hasNext) MediaControl.skipToNext,
+          if (hasQueueNav) MediaControl.skipToNext,
         ],
         systemActions: const <MediaAction>{
           MediaAction.seek,
@@ -147,8 +149,12 @@ class _FurryAudioHandler extends BaseAudioHandler with SeekHandler, QueueHandler
 
   @override
   Future<void> skipToNext() async {
-    if (!_player.hasNext) return;
-    await _player.seekToNext();
+    if (_queueItems.length <= 1) return;
+    if (_player.hasNext) {
+      await _player.seekToNext();
+    } else {
+      await _player.seek(Duration.zero, index: 0);
+    }
     await _player.play();
   }
 
@@ -161,8 +167,12 @@ class _FurryAudioHandler extends BaseAudioHandler with SeekHandler, QueueHandler
         now.difference(_lastPreviousPressedAt!) <= _previousDoublePressWindow;
     _lastPreviousPressedAt = now;
 
-    if (withinWindow && _player.hasPrevious) {
-      await _player.seekToPrevious();
+    if (withinWindow && _queueItems.length > 1) {
+      if (_player.hasPrevious) {
+        await _player.seekToPrevious();
+      } else {
+        await _player.seek(Duration.zero, index: _queueItems.length - 1);
+      }
       await _player.play();
       return;
     }
@@ -1146,9 +1156,8 @@ class _AppController {
     );
   }
 
-  bool get canPlayPreviousTrack => _queue != null && _queueIndex > 0;
-  bool get canPlayNextTrack =>
-      _queue != null && _queueIndex >= 0 && _queueIndex < (_queue!.length - 1);
+  bool get canPlayPreviousTrack => _queue != null && _queue!.length > 1;
+  bool get canPlayNextTrack => _queue != null && _queue!.length > 1;
 
   Future<void> playPreviousTrack() async {
     final queue = _queue;
@@ -1164,8 +1173,8 @@ class _AppController {
       return;
     }
 
-    if (_queueIndex <= 0) return;
-    final nextIdx = _queueIndex - 1;
+    if (queue.length <= 1) return;
+    final nextIdx = (_queueIndex - 1 + queue.length) % queue.length;
     if (_androidPlaylistActive && !kIsWeb && Platform.isAndroid) {
       _queueIndex = nextIdx;
       unawaited(systemMedia.setQueueAvailability(
@@ -1183,8 +1192,8 @@ class _AppController {
   Future<void> playNextTrack() async {
     final queue = _queue;
     if (queue == null) return;
-    if (_queueIndex < 0 || _queueIndex >= queue.length - 1) return;
-    final nextIdx = _queueIndex + 1;
+    if (queue.length <= 1) return;
+    final nextIdx = (_queueIndex + 1) % queue.length;
     if (_androidPlaylistActive && !kIsWeb && Platform.isAndroid) {
       _queueIndex = nextIdx;
       unawaited(systemMedia.setQueueAvailability(
