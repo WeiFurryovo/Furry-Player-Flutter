@@ -5,7 +5,6 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:just_audio/just_audio.dart';
@@ -32,16 +31,6 @@ List<String> _takeStartupDiagnostics() {
   final out = List<String>.from(_startupDiagnostics);
   _startupDiagnostics.clear();
   return out;
-}
-
-Future<void> _requestAndroidNotificationPermission() async {
-  if (kIsWeb || !Platform.isAndroid) return;
-  try {
-    const ch = MethodChannel('furry.notifications');
-    await ch.invokeMethod<bool>('request');
-  } catch (_) {
-    // Best-effort. If this fails, user can still enable notifications in system settings.
-  }
 }
 
 class _DiagnosticsLog {
@@ -258,9 +247,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _controller.init();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_requestAndroidNotificationPermission());
-    });
   }
 
   @override

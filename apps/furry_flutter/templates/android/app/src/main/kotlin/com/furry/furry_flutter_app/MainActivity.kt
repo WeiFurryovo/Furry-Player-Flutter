@@ -1,12 +1,9 @@
 package com.furry.furry_flutter_app
 
-import android.Manifest
 import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import android.os.Process
 import androidx.annotation.NonNull
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -19,10 +16,6 @@ import java.util.concurrent.Executors
 
 class MainActivity : AudioServiceActivity() {
   private val nativeChannelName = "furry/native"
-  private val notificationsChannelName = "furry.notifications"
-  private val notificationsRequestCode = 8731
-
-  private var notificationsPendingResult: MethodChannel.Result? = null
 
   private var inited = false
   private val executor = Executors.newFixedThreadPool(2)
@@ -93,14 +86,6 @@ class MainActivity : AudioServiceActivity() {
           result.error("native_error", t.toString(), null)
         }
       }
-
-    MethodChannel(flutterEngine.dartExecutor.binaryMessenger, notificationsChannelName)
-      .setMethodCallHandler { call, result ->
-        when (call.method) {
-          "request" -> requestNotificationPermission(result)
-          else -> result.notImplemented()
-        }
-      }
   }
 
   private fun ensureInit() {
@@ -166,43 +151,6 @@ class MainActivity : AudioServiceActivity() {
     }
   }
 
-  private fun requestNotificationPermission(result: MethodChannel.Result) {
-    if (Build.VERSION.SDK_INT < 33) {
-      result.success(true)
-      return
-    }
-    val granted = ContextCompat.checkSelfPermission(
-      this,
-      Manifest.permission.POST_NOTIFICATIONS
-    ) == PackageManager.PERMISSION_GRANTED
-    if (granted) {
-      result.success(true)
-      return
-    }
-    if (notificationsPendingResult != null) {
-      notificationsPendingResult?.success(false)
-      notificationsPendingResult = null
-    }
-    notificationsPendingResult = result
-    ActivityCompat.requestPermissions(
-      this,
-      arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-      notificationsRequestCode
-    )
-  }
-
-  override fun onRequestPermissionsResult(
-    requestCode: Int,
-    permissions: Array<out String>,
-    grantResults: IntArray
-  ) {
-    super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-    if (requestCode != notificationsRequestCode) return
-    val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
-    notificationsPendingResult?.success(granted)
-    notificationsPendingResult = null
-  }
-
   override fun onLowMemory() {
     super.onLowMemory()
     appendDiagnostics("Activity: onLowMemory")
@@ -219,4 +167,3 @@ class MainActivity : AudioServiceActivity() {
     executor.shutdown()
   }
 }
-
