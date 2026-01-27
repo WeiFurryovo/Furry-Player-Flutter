@@ -1913,7 +1913,12 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                 ? 0.18
                 : (_miniHeightPx / availableH).clamp(0.12, 0.28);
             const maxSize = 0.98;
-            final showFull = _extent > (minSize + 0.08);
+            final effectiveExtent = _extent == 0 ? minSize : _extent;
+            final tRaw = ((effectiveExtent - minSize) / (maxSize - minSize))
+                .clamp(0.0, 1.0);
+            final reveal = Curves.easeOutCubic.transform(tRaw);
+            final miniOpacity = (1.0 - Curves.easeOutCubic.transform(tRaw))
+                .clamp(0.0, 1.0);
 
             return NotificationListener<DraggableScrollableNotification>(
               onNotification: (n) {
@@ -1964,18 +1969,35 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                               ),
                             ),
                             const SizedBox(height: 10),
-                            if (!showFull)
-                              _MiniNowPlayingCard(
-                                controller: widget.controller,
-                                np: np,
-                                onExpand: () => _expand(maxSize),
-                              )
-                            else
-                              _FullNowPlayingView(
-                                controller: widget.controller,
-                                np: np,
-                                onCollapse: () => _collapse(minSize),
+                            // Mini -> Full animation linkage:
+                            // - Mini fades/moves up as the sheet expands.
+                            // - Full content reveals progressively (heightFactor) and fades in.
+                            Transform.translate(
+                              offset: Offset(0, -12 * reveal),
+                              child: Opacity(
+                                opacity: miniOpacity,
+                                child: _MiniNowPlayingCard(
+                                  controller: widget.controller,
+                                  np: np,
+                                  onExpand: () => _expand(maxSize),
+                                ),
                               ),
+                            ),
+                            const SizedBox(height: 8),
+                            ClipRect(
+                              child: Align(
+                                alignment: Alignment.topCenter,
+                                heightFactor: reveal,
+                                child: Opacity(
+                                  opacity: reveal,
+                                  child: _FullNowPlayingView(
+                                    controller: widget.controller,
+                                    np: np,
+                                    onCollapse: () => _collapse(minSize),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -2022,10 +2044,7 @@ class _MiniNowPlayingCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Hero(
-                    tag: 'cover_${np.sourcePath}',
-                    child: _CoverThumb(artUri: np.artUri),
-                  ),
+                  _CoverThumb(artUri: np.artUri),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -2153,28 +2172,25 @@ class _FullNowPlayingView extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Center(
-          child: Hero(
-            tag: 'cover_${np.sourcePath}',
-            child: AspectRatio(
-              aspectRatio: 1,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: _withOpacityCompat(cs.outlineVariant, 0.5),
-                  ),
+          child: AspectRatio(
+            aspectRatio: 1,
+            child: Container(
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: _withOpacityCompat(cs.outlineVariant, 0.5),
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: np.artUri == null
-                    ? Icon(Icons.album_rounded, size: 96, color: cs.primary)
-                    : Image.file(
-                        File.fromUri(np.artUri!),
-                        fit: BoxFit.cover,
-                        cacheWidth: 1024,
-                        cacheHeight: 1024,
-                      ),
               ),
+              clipBehavior: Clip.antiAlias,
+              child: np.artUri == null
+                  ? Icon(Icons.album_rounded, size: 96, color: cs.primary)
+                  : Image.file(
+                      File.fromUri(np.artUri!),
+                      fit: BoxFit.cover,
+                      cacheWidth: 1024,
+                      cacheHeight: 1024,
+                    ),
             ),
           ),
         ),
