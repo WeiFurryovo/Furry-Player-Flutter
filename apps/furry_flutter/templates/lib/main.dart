@@ -1990,18 +1990,6 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                           controller: scrollController,
                           padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
                           children: [
-                            Center(
-                              child: Container(
-                                width: 46,
-                                height: 5,
-                                decoration: BoxDecoration(
-                                  color: _withOpacityCompat(
-                                      cs.onSurfaceVariant, 0.35),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
                             GestureDetector(
                               behavior: HitTestBehavior.translucent,
                               onVerticalDragStart: onHeaderDragStart,
@@ -2110,10 +2098,16 @@ class _NowPlayingMorphHeader extends StatelessWidget {
         const minRadius = 14.0;
         const maxRadius = 28.0;
 
-        final coverSize = lerpDouble(coverMin, coverMax, reveal)!;
-        final coverTop = lerpDouble(10, 46, reveal)!;
-        final coverLeft = lerpDouble(12, (w - coverSize) / 2, reveal)!;
-        final radius = lerpDouble(minRadius, maxRadius, reveal)!;
+        // Prevent the cover from growing while the mini controls are still
+        // visible; otherwise it can overlap the mini bar buttons.
+        final coverT = Curves.easeOutCubic.transform(
+          ((reveal - 0.18) / 0.82).clamp(0.0, 1.0),
+        );
+
+        final coverSize = lerpDouble(coverMin, coverMax, coverT)!;
+        final coverTop = lerpDouble(10, 46, coverT)!;
+        final coverLeft = lerpDouble(12, (w - coverSize) / 2, coverT)!;
+        final radius = lerpDouble(minRadius, maxRadius, coverT)!;
 
         final headerH = lerpDouble(72, coverTop + coverSize + 92, reveal)!
             .clamp(72.0, 640.0)
@@ -2124,6 +2118,21 @@ class _NowPlayingMorphHeader extends StatelessWidget {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    width: 46,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: _withOpacityCompat(cs.onSurfaceVariant, 0.35),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+              ),
               Positioned.fill(
                 child: Align(
                   alignment: Alignment.topLeft,
