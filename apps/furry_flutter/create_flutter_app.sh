@@ -86,45 +86,109 @@ EOF
   fi
 
   python3 - "$gradle_file" <<'PY'
-import re
 import sys
 
 path = sys.argv[1]
 text = open(path, "r", encoding="utf-8").read()
 original = text
 
-def ensure_in_release_block(lines_to_ensure):
-  global text
-  m = re.search(r"buildTypes\\s*\\{", text)
-  if not m:
-    return
-  # Find release { ... } block (simple heuristic).
-  m_rel = re.search(r"release\\s*\\{", text)
-  if not m_rel:
-    return
-  # Insert after the opening brace line.
-  # Find end of that line.
-  line_end = text.find("\\n", m_rel.end())
-  if line_end == -1:
-    return
-  insert_at = line_end + 1
-  # Determine indentation from the next line or from "release {" line.
-  indent = re.search(r"(^[ \\t]*)release\\s*\\{", text[m_rel.start()-50:m_rel.start()+50], re.M)
-  base_indent = "        "
-  if indent:
-    base_indent = indent.group(1) + "    "
+def find_block_start(needle: str, start: int = 0) -> int:
+  idx = text.find(needle, start)
+  return idx
 
-  for l in lines_to_ensure:
-    if l.strip() in text:
-      continue
-    text = text[:insert_at] + f"{base_indent}{l}\\n" + text[insert_at:]
-    insert_at += len(base_indent) + len(l) + 1
+def find_matching_brace(open_brace_idx: int) -> int:
+  depth = 0
+  i = open_brace_idx
+  while i < len(text):
+    c = text[i]
+    if c == "{":
+      depth += 1
+    elif c == "}":
+      depth -= 1
+      if depth == 0:
+        return i
+    i += 1
+  return -1
 
-ensure_in_release_block([
+bt_idx = find_block_start("buildTypes")
+if bt_idx == -1:
+  sys.exit(0)
+
+bt_brace = text.find("{", bt_idx)
+if bt_brace == -1:
+  sys.exit(0)
+
+bt_end = find_matching_brace(bt_brace)
+if bt_end == -1:
+  sys.exit(0)
+
+rel_idx = text.find("release", bt_brace, bt_end)
+if rel_idx == -1:
+  sys.exit(0)
+
+rel_brace = text.find("{", rel_idx, bt_end)
+if rel_brace == -1:
+  sys.exit(0)
+
+rel_end = find_matching_brace(rel_brace)
+if rel_end == -1:
+  sys.exit(0)
+
+release_block = text[rel_brace:rel_end + 1]
+
+def has_line(substr: str) -> bool:
+  return substr in release_block
+
+lines_to_ensure = [
   "minifyEnabled true",
   "shrinkResources true",
   "proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'",
-])
+]
+
+missing = [l for l in lines_to_ensure if not has_line(l)]
+if not missing:
+  sys.exit(0)
+
+# Indent: take indentation of the release line and add 4 spaces.
+line_start = text.rfind("\n", 0, rel_idx) + 1
+line_prefix = text[line_start:rel_idx]
+base_indent = line_prefix + "    "
+
+insert_at = text.find("\n", rel_brace) + 1
+to_insert = "".join(f"{base_indent}{l}\n" for l in missing)
+text = text[:insert_at] + to_insert + text[insert_at:]
+
+if text != original:
+  open(path, "w", encoding="utf-8").write(text)
+PY
+}
+
+patch_android_gradle_properties_for_size() {
+  local props_file="$OUT_DIR/android/gradle.properties"
+  if [ ! -f "$props_file" ]; then
+    echo "[WARN] 未找到 android/gradle.properties，跳过 Gradle 体积优化：$props_file" >&2
+    return 0
+  fi
+
+  python3 - "$props_file" <<'PY'
+import sys
+
+path = sys.argv[1]
+text = open(path, "r", encoding="utf-8").read()
+original = text
+
+def ensure_line(line: str) -> None:
+  global text
+  if line in text:
+    return
+  if not text.endswith("\n"):
+    text += "\n"
+  text += line + "\n"
+
+# Full mode can yield better shrinking/obfuscation results for R8.
+ensure_line("android.enableR8.fullMode=true")
+# Compress native libs in app bundles for smaller download size.
+ensure_line("android.bundle.enableUncompressedNativeLibs=false")
 
 if text != original:
   open(path, "w", encoding="utf-8").write(text)
@@ -203,6 +267,7 @@ patch_android_manifest_for_audio_service
 
 echo "[INFO] 配置 Android release 体积优化（R8 + 资源压缩）"
 patch_android_gradle_for_release_shrink
+patch_android_gradle_properties_for_size
 
 if [ "$BUILD_ANDROID" -eq 1 ]; then
   echo "[INFO] 构建 Rust Android 动态库（需要 ANDROID_NDK_HOME）"

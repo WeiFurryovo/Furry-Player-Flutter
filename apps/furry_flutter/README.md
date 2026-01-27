@@ -37,7 +37,10 @@ Android 包体积通常会比 Windows/Linux 大（包含 Flutter 引擎 + 多 AB
 - 优先发布/安装 `AAB`：`flutter build appbundle --release`（Google Play 会按设备 ABI/密度拆分）
 - 需要 APK 侧载时，用按 ABI 拆分：`flutter build apk --release --split-per-abi`
   - 生成的 `app-arm64-v8a-release.apk` / `app-armeabi-v7a-release.apk` 会比通用 `app-release.apk` 小很多
-- 本仓库生成脚本会为 release 打开 `minifyEnabled` + `shrinkResources`（R8/资源压缩），并尝试 `llvm-strip` 去掉 Rust `.so` 符号表
+- 用 `--obfuscate` + `--split-debug-info` 去掉 AOT 符号表（更小，且保留符号到本地目录用于崩溃堆栈还原）：
+  - `flutter build appbundle --release --obfuscate --split-debug-info=build/symbols`
+  - `flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/symbols`
+- 本仓库生成脚本会为 release 打开 `minifyEnabled` + `shrinkResources`（R8/资源压缩）、开启 `android.enableR8.fullMode=true`，并尝试 `llvm-strip` 去掉 Rust `.so` 符号表
 
 ### 常见问题
 - `./build.sh android` 提示找不到 NDK：设置 `ANDROID_NDK_HOME`，例如 `export ANDROID_NDK_HOME=~/Android/Sdk/ndk/26.1.10909125`
