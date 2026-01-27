@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show lerpDouble;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -1919,6 +1920,8 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
             final reveal = Curves.easeOutCubic.transform(tRaw);
             final miniOpacity = (1.0 - Curves.easeOutCubic.transform(tRaw))
                 .clamp(0.0, 1.0);
+            final fullOpacity =
+                Curves.easeInOutCubicEmphasized.transform(reveal);
 
             return NotificationListener<DraggableScrollableNotification>(
               onNotification: (n) {
@@ -1969,32 +1972,59 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                               ),
                             ),
                             const SizedBox(height: 10),
-                            // Mini -> Full animation linkage:
-                            // - Mini fades/moves up as the sheet expands.
-                            // - Full content reveals progressively (heightFactor) and fades in.
-                            Transform.translate(
-                              offset: Offset(0, -12 * reveal),
-                              child: Opacity(
-                                opacity: miniOpacity,
-                                child: _MiniNowPlayingCard(
-                                  controller: widget.controller,
-                                  np: np,
-                                  onExpand: () => _expand(maxSize),
-                                ),
-                              ),
+                            _NowPlayingMorphHeader(
+                              controller: widget.controller,
+                              np: np,
+                              reveal: reveal,
+                              miniOpacity: miniOpacity,
+                              fullOpacity: fullOpacity,
+                              onExpand: () => _expand(maxSize),
+                              onCollapse: () => _collapse(minSize),
                             ),
-                            const SizedBox(height: 8),
-                            ClipRect(
-                              child: Align(
-                                alignment: Alignment.topCenter,
-                                heightFactor: reveal,
-                                child: Opacity(
-                                  opacity: reveal,
-                                  child: _FullNowPlayingView(
-                                    controller: widget.controller,
-                                    np: np,
-                                    onCollapse: () => _collapse(minSize),
-                                  ),
+                            const SizedBox(height: 6),
+                            IgnorePointer(
+                              ignoring: reveal < 0.35,
+                              child: Opacity(
+                                opacity: fullOpacity,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const SizedBox(height: 14),
+                                    _NowPlayingSeekBar(
+                                        controller: widget.controller),
+                                    const SizedBox(height: 16),
+                                    _NowPlayingControls(
+                                        controller: widget.controller),
+                                    const SizedBox(height: 16),
+                                    Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: _withOpacityCompat(
+                                            cs.surfaceContainerHighest, 0.65),
+                                        borderRadius: BorderRadius.circular(18),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.info_outline_rounded,
+                                              color: cs.onSurfaceVariant),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Text(
+                                              np.sourcePath,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                      color:
+                                                          cs.onSurfaceVariant),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -2013,225 +2043,232 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
   }
 }
 
-class _MiniNowPlayingCard extends StatelessWidget {
+class _NowPlayingMorphHeader extends StatelessWidget {
   final _AppController controller;
   final _NowPlaying np;
+  final double reveal;
+  final double miniOpacity;
+  final double fullOpacity;
   final VoidCallback onExpand;
-
-  const _MiniNowPlayingCard({
-    required this.controller,
-    required this.np,
-    required this.onExpand,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
-      color: cs.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(28),
-      ),
-      child: InkWell(
-        onTap: onExpand,
-        borderRadius: BorderRadius.circular(28),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  _CoverThumb(artUri: np.artUri),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(np.title,
-                            maxLines: 1, overflow: TextOverflow.ellipsis),
-                        Text(
-                          np.subtitle,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: cs.onSurfaceVariant),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: '上一首',
-                    onPressed: controller.canPlayPreviousTrack
-                        ? controller.playPreviousTrack
-                        : null,
-                    icon: const Icon(Icons.skip_previous_rounded),
-                  ),
-                  StreamBuilder<PlayerState>(
-                    stream: controller.playerStateStream,
-                    builder: (context, snap) {
-                      final playing = snap.data?.playing ?? false;
-                      final processing =
-                          snap.data?.processingState ?? ProcessingState.idle;
-                      final busy = processing == ProcessingState.loading ||
-                          processing == ProcessingState.buffering;
-                      return IconButton.filledTonal(
-                        onPressed: busy
-                            ? null
-                            : () async {
-                                if (playing) {
-                                  await controller.pause();
-                                } else {
-                                  await controller.play();
-                                }
-                              },
-                        icon: busy
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : Icon(playing
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded),
-                      );
-                    },
-                  ),
-                  IconButton(
-                    tooltip: '下一首',
-                    onPressed:
-                        controller.canPlayNextTrack ? controller.playNextTrack : null,
-                    icon: const Icon(Icons.skip_next_rounded),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              StreamBuilder<Duration?>(
-                stream: controller.durationStream,
-                builder: (context, durSnap) {
-                  final duration = durSnap.data ?? Duration.zero;
-                  return StreamBuilder<Duration>(
-                    stream: controller.positionStream,
-                    builder: (context, posSnap) {
-                      final pos = posSnap.data ?? Duration.zero;
-                      final maxMs =
-                          duration.inMilliseconds <= 0 ? 1 : duration.inMilliseconds;
-                      final value = (pos.inMilliseconds / maxMs).clamp(0.0, 1.0);
-                      return ClipRRect(
-                        borderRadius: BorderRadius.circular(999),
-                        child: LinearProgressIndicator(
-                          value: value,
-                          minHeight: 3,
-                          backgroundColor:
-                              _withOpacityCompat(cs.onSurfaceVariant, 0.15),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FullNowPlayingView extends StatelessWidget {
-  final _AppController controller;
-  final _NowPlaying np;
   final VoidCallback onCollapse;
 
-  const _FullNowPlayingView({
+  const _NowPlayingMorphHeader({
     required this.controller,
     required this.np,
+    required this.reveal,
+    required this.miniOpacity,
+    required this.fullOpacity,
+    required this.onExpand,
     required this.onCollapse,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            IconButton(
-              tooltip: '收起',
-              onPressed: onCollapse,
-              icon: const Icon(Icons.keyboard_arrow_down_rounded),
-            ),
-            const Spacer(),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Center(
-          child: AspectRatio(
-            aspectRatio: 1,
-            child: Container(
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(
-                  color: _withOpacityCompat(cs.outlineVariant, 0.5),
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final coverMax = w.clamp(0.0, 420.0).toDouble();
+        const coverMin = 44.0;
+        const minRadius = 14.0;
+        const maxRadius = 28.0;
+
+        final coverSize = lerpDouble(coverMin, coverMax, reveal)!;
+        final coverTop = lerpDouble(0, 46, reveal)!;
+        final coverLeft = lerpDouble(0, (w - coverSize) / 2, reveal)!;
+        final radius = lerpDouble(minRadius, maxRadius, reveal)!;
+
+        final headerH = lerpDouble(72, coverTop + coverSize + 92, reveal)!
+            .clamp(72.0, 640.0)
+            .toDouble();
+
+        return SizedBox(
+          height: headerH,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: coverLeft,
+                top: coverTop,
+                width: coverSize,
+                height: coverSize,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(radius),
+                    border: Border.all(
+                      color: _withOpacityCompat(cs.outlineVariant, 0.5),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _withOpacityCompat(cs.shadow, 0.18 * fullOpacity),
+                        blurRadius: 24 * fullOpacity,
+                        offset: Offset(0, 10 * fullOpacity),
+                      ),
+                    ],
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: np.artUri == null
+                      ? Icon(Icons.album_rounded,
+                          size: coverSize * 0.33, color: cs.primary)
+                      : Image.file(
+                          File.fromUri(np.artUri!),
+                          fit: BoxFit.cover,
+                          cacheWidth: (coverSize * 2).round().clamp(96, 1024),
+                          cacheHeight: (coverSize * 2).round().clamp(96, 1024),
+                        ),
                 ),
               ),
-              clipBehavior: Clip.antiAlias,
-              child: np.artUri == null
-                  ? Icon(Icons.album_rounded, size: 96, color: cs.primary)
-                  : Image.file(
-                      File.fromUri(np.artUri!),
-                      fit: BoxFit.cover,
-                      cacheWidth: 1024,
-                      cacheHeight: 1024,
+              Positioned.fill(
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: Opacity(
+                    opacity: miniOpacity,
+                    child: Card(
+                      margin: EdgeInsets.zero,
+                      elevation: 0,
+                      color: cs.surfaceContainerHighest,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                      child: InkWell(
+                        onTap: onExpand,
+                        borderRadius: BorderRadius.circular(28),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                          child: Row(
+                            children: [
+                              const SizedBox(width: coverMin, height: coverMin),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      np.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      np.subtitle,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                              color: cs.onSurfaceVariant),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: '上一首',
+                                onPressed: controller.canPlayPreviousTrack
+                                    ? controller.playPreviousTrack
+                                    : null,
+                                icon: const Icon(Icons.skip_previous_rounded),
+                              ),
+                              StreamBuilder<PlayerState>(
+                                stream: controller.playerStateStream,
+                                builder: (context, snap) {
+                                  final playing = snap.data?.playing ?? false;
+                                  final processing =
+                                      snap.data?.processingState ??
+                                          ProcessingState.idle;
+                                  final busy =
+                                      processing == ProcessingState.loading ||
+                                          processing ==
+                                              ProcessingState.buffering;
+                                  return IconButton.filledTonal(
+                                    onPressed: busy
+                                        ? null
+                                        : () async {
+                                            if (playing) {
+                                              await controller.pause();
+                                            } else {
+                                              await controller.play();
+                                            }
+                                          },
+                                    icon: busy
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2),
+                                          )
+                                        : Icon(playing
+                                            ? Icons.pause_rounded
+                                            : Icons.play_arrow_rounded),
+                                  );
+                                },
+                              ),
+                              IconButton(
+                                tooltip: '下一首',
+                                onPressed: controller.canPlayNextTrack
+                                    ? controller.playNextTrack
+                                    : null,
+                                icon: const Icon(Icons.skip_next_rounded),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 18),
-        Text(np.title, style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 6),
-        Text(np.subtitle,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(color: cs.onSurfaceVariant)),
-        const SizedBox(height: 14),
-        _NowPlayingSeekBar(controller: controller),
-        const SizedBox(height: 16),
-        _NowPlayingControls(controller: controller),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: _withOpacityCompat(cs.surfaceContainerHighest, 0.65),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.info_outline_rounded, color: cs.onSurfaceVariant),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  np.sourcePath,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                child: Opacity(
+                  opacity: fullOpacity,
+                  child: Row(
+                    children: [
+                      IconButton(
+                        tooltip: '收起',
+                        onPressed: onCollapse,
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                      ),
+                      const Spacer(),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                top: coverTop + coverSize + 18,
+                child: Opacity(
+                  opacity: fullOpacity,
+                  child: Transform.translate(
+                    offset: Offset(0, 8 * (1 - fullOpacity)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(np.title,
+                            style:
+                                Theme.of(context).textTheme.headlineSmall),
+                        const SizedBox(height: 6),
+                        Text(
+                          np.subtitle,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 }
