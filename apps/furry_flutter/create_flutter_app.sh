@@ -164,16 +164,23 @@ else
 fi
 
 echo "[INFO] 添加依赖（pub add）"
+# Remove deps that are no longer used by the template (keeps pubspec stable
+# across template upgrades).
+echo "[INFO] 移除已废弃依赖（pub remove）"
+(cd "$OUT_DIR" && flutter pub remove \
+  just_audio_background \
+  just_audio_platform_interface \
+  mpris \
+  > /dev/null 2>&1 || true)
+
 # Pin versions to avoid breaking API changes (e.g. file_picker v10 removed FilePicker.platform).
 (cd "$OUT_DIR" && flutter pub add \
   file_picker:^8.3.2 \
   path_provider:^2.1.5 \
   just_audio:^0.9.46 \
-  just_audio_platform_interface:^4.6.0 \
   audio_session:^0.1.25 \
-  path \
+  path:any \
   ffi:^2.1.3 \
-  just_audio_background:^0.0.1-beta.15 \
   audio_service:^0.18.17 \
   smtc_windows:^1.0.0 \
   dbus:^0.7.11)

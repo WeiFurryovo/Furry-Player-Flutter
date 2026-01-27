@@ -6,7 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:audio_session/audio_session.dart';
-import 'package:just_audio_background/just_audio_background.dart';
+import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -17,6 +17,7 @@ import 'in_memory_audio_source.dart';
 import 'system_media_bridge.dart';
 
 final List<String> _startupDiagnostics = <String>[];
+late final AudioPlayer _sharedPlayer;
 
 Color _withOpacityCompat(Color color, double opacity) =>
     color.withAlpha((opacity * 255).round().clamp(0, 255));
@@ -31,6 +32,149 @@ List<String> _takeStartupDiagnostics() {
   final out = List<String>.from(_startupDiagnostics);
   _startupDiagnostics.clear();
   return out;
+}
+
+class _FurryAudioHandler extends BaseAudioHandler with SeekHandler, QueueHandler {
+  _FurryAudioHandler(this._player) {
+    _sequenceStateSub = _player.sequenceStateStream.listen(_onSequenceState);
+    _indexSub = _player.currentIndexStream.listen(_onIndexChanged);
+    _eventSub = _player.playbackEventStream.listen(_onPlaybackEvent);
+    _durationSub = _player.durationStream.listen(_onDurationChanged);
+
+    _onSequenceState(_player.sequenceState);
+    _onIndexChanged(_player.currentIndex);
+    _onPlaybackEvent(_player.playbackEvent);
+  }
+
+  final AudioPlayer _player;
+
+  StreamSubscription<SequenceState?>? _sequenceStateSub;
+  StreamSubscription<int?>? _indexSub;
+  StreamSubscription<PlaybackEvent>? _eventSub;
+  StreamSubscription<Duration?>? _durationSub;
+
+  List<MediaItem> _queueItems = const <MediaItem>[];
+
+  void _onSequenceState(SequenceState? state) {
+    final sequence = state?.effectiveSequence ?? const <IndexedAudioSource>[];
+    final items = <MediaItem>[];
+    for (final source in sequence) {
+      final tag = source.tag;
+      if (tag is MediaItem) {
+        items.add(tag);
+      } else {
+        items.add(
+          MediaItem(
+            id: source.toString(),
+            title: 'Unknown',
+          ),
+        );
+      }
+    }
+    _queueItems = List<MediaItem>.unmodifiable(items);
+    queue.add(_queueItems);
+
+    final idx = state?.currentIndex;
+    if (idx != null) _setMediaItemByIndex(idx);
+  }
+
+  void _onIndexChanged(int? idx) {
+    if (idx == null) return;
+    _setMediaItemByIndex(idx);
+  }
+
+  void _setMediaItemByIndex(int idx) {
+    if (idx < 0 || idx >= _queueItems.length) return;
+    mediaItem.add(_queueItems[idx]);
+  }
+
+  void _onDurationChanged(Duration? duration) {
+    final current = mediaItem.value;
+    if (current == null) return;
+    if (duration == null) return;
+    if (current.duration == duration) return;
+    mediaItem.add(current.copyWith(duration: duration));
+  }
+
+  int _compactControlsCount() {
+    var count = 1; // play/pause always present
+    if (_player.hasPrevious) count++;
+    if (_player.hasNext) count++;
+    return count.clamp(1, 3);
+  }
+
+  void _onPlaybackEvent(PlaybackEvent event) {
+    playbackState.add(
+      playbackState.value.copyWith(
+        controls: <MediaControl>[
+          if (_player.hasPrevious) MediaControl.skipToPrevious,
+          if (_player.playing) MediaControl.pause else MediaControl.play,
+          if (_player.hasNext) MediaControl.skipToNext,
+        ],
+        systemActions: const <MediaAction>{
+          MediaAction.seek,
+          MediaAction.seekForward,
+          MediaAction.seekBackward,
+        },
+        androidCompactActionIndices:
+            List<int>.generate(_compactControlsCount(), (i) => i),
+        processingState: const <ProcessingState, AudioProcessingState>{
+          ProcessingState.idle: AudioProcessingState.idle,
+          ProcessingState.loading: AudioProcessingState.loading,
+          ProcessingState.buffering: AudioProcessingState.buffering,
+          ProcessingState.ready: AudioProcessingState.ready,
+          ProcessingState.completed: AudioProcessingState.completed,
+        }[event.processingState]!,
+        playing: _player.playing,
+        updatePosition: event.updatePosition,
+        bufferedPosition: event.bufferedPosition,
+        speed: _player.speed,
+        queueIndex: event.currentIndex,
+      ),
+    );
+  }
+
+  @override
+  Future<void> play() => _player.play();
+
+  @override
+  Future<void> pause() => _player.pause();
+
+  @override
+  Future<void> seek(Duration position) => _player.seek(position);
+
+  @override
+  Future<void> skipToNext() async {
+    if (!_player.hasNext) return;
+    await _player.seekToNext();
+    await _player.play();
+  }
+
+  @override
+  Future<void> skipToPrevious() async {
+    if (!_player.hasPrevious) return;
+    await _player.seekToPrevious();
+    await _player.play();
+  }
+
+  @override
+  Future<void> stop() async {
+    await _player.stop();
+    await super.stop();
+  }
+
+  @override
+  Future<void> onTaskRemoved() async {
+    await _player.pause();
+    return super.onTaskRemoved();
+  }
+
+  Future<void> dispose() async {
+    await _sequenceStateSub?.cancel();
+    await _indexSub?.cancel();
+    await _eventSub?.cancel();
+    await _durationSub?.cancel();
+  }
 }
 
 class _DiagnosticsLog {
@@ -92,23 +236,25 @@ Future<void> main() async {
     return true;
   };
 
+  _sharedPlayer = AudioPlayer();
+
   if (!kIsWeb && Platform.isAndroid) {
     try {
-      await JustAudioBackground.init(
-        androidNotificationChannelId:
-            'com.furry.furry_flutter_app.channel.audio',
-        androidNotificationChannelName: 'Furry Player',
-        // Keep the notification ongoing so Android doesn't add a stop/dismiss
-        // action button (square). This matches the in-app controls (no stop).
-        //
-        // Note: `audio_service` asserts that if `androidNotificationOngoing` is
-        // true, `androidStopForegroundOnPause` must also be true.
-        androidNotificationOngoing: true,
-        androidStopForegroundOnPause: true,
+      await AudioService.init(
+        builder: () => _FurryAudioHandler(_sharedPlayer),
+        config: const AudioServiceConfig(
+          androidNotificationChannelId: 'com.furry.furry_flutter_app.channel.audio',
+          androidNotificationChannelName: 'Furry Player',
+          // Don’t publish a STOP action; keep controls in sync with the app UI.
+          // Also keep the notification dismissible to avoid OEM “stop” affordances.
+          androidNotificationOngoing: false,
+          androidStopForegroundOnPause: true,
+          androidShowNotificationBadge: false,
+        ),
       );
-      _startupLog('JustAudioBackground init ok');
+      _startupLog('AudioService init ok');
     } catch (e, st) {
-      _startupLog('JustAudioBackground init failed: $e\n$st');
+      _startupLog('AudioService init failed: $e\n$st');
     }
   }
 
@@ -121,11 +267,13 @@ Future<void> main() async {
       _startupLog('AudioSession configure failed: $e\n$st');
     }
   }
-  runApp(const FurryApp());
+  runApp(FurryApp(player: _sharedPlayer));
 }
 
 class FurryApp extends StatelessWidget {
-  const FurryApp({super.key});
+  const FurryApp({super.key, required this.player});
+
+  final AudioPlayer player;
 
   @override
   Widget build(BuildContext context) {
@@ -135,7 +283,7 @@ class FurryApp extends StatelessWidget {
       themeMode: ThemeMode.system,
       theme: _ExpressiveTheme.build(Brightness.light),
       darkTheme: _ExpressiveTheme.build(Brightness.dark),
-      home: const AppShell(),
+      home: AppShell(player: player),
     );
   }
 }
@@ -232,20 +380,23 @@ class _ExpressiveTheme {
 }
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  const AppShell({super.key, required this.player});
+
+  final AudioPlayer player;
 
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
-  late final _controller = _AppController();
+  late final _AppController _controller;
   int _tabIndex = 0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _controller = _AppController(widget.player);
     _controller.init();
   }
 
@@ -315,7 +466,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 }
 
 class _AppController {
-  _AppController() : player = AudioPlayer();
+  _AppController(this.player);
 
   final AudioPlayer player;
   final FurryApi api = createFurryApi();
