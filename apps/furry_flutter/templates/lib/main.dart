@@ -1537,6 +1537,28 @@ class ConverterPage extends StatefulWidget {
 }
 
 class _ConverterPageState extends State<ConverterPage> {
+  late final ValueNotifier<double> _paddingDraftKb;
+
+  @override
+  void initState() {
+    super.initState();
+    _paddingDraftKb = ValueNotifier<double>(widget.controller.paddingKb.toDouble());
+  }
+
+  @override
+  void didUpdateWidget(covariant ConverterPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      _paddingDraftKb.value = widget.controller.paddingKb.toDouble();
+    }
+  }
+
+  @override
+  void dispose() {
+    _paddingDraftKb.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
@@ -1637,22 +1659,35 @@ class _ConverterPageState extends State<ConverterPage> {
                           const Text('Padding (KB)'),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Slider(
-                              value: controller.paddingKb
-                                  .toDouble()
-                                  .clamp(0, 1024),
-                              min: 0,
-                              max: 1024,
-                              divisions: 64,
-                              label: '${controller.paddingKb} KB',
-                              onChanged: (v) => setState(
-                                  () => controller.paddingKb = v.round()),
+                            child: ValueListenableBuilder<double>(
+                              valueListenable: _paddingDraftKb,
+                              builder: (context, draft, _) {
+                                final clamped =
+                                    draft.clamp(0.0, 1024.0).toDouble();
+                                final rounded = clamped.round();
+                                return Slider(
+                                  value: clamped,
+                                  min: 0,
+                                  max: 1024,
+                                  divisions: null,
+                                  label: '$rounded KB',
+                                  onChanged: (v) {
+                                    _paddingDraftKb.value = v;
+                                    controller.paddingKb = v.round();
+                                  },
+                                );
+                              },
                             ),
                           ),
                         ],
                       ),
-                      Text('当前 padding: ${controller.paddingKb} KB',
-                          style: Theme.of(context).textTheme.bodySmall),
+                      ValueListenableBuilder<double>(
+                        valueListenable: _paddingDraftKb,
+                        builder: (context, draft, _) => Text(
+                          '当前 padding: ${draft.clamp(0.0, 1024.0).round()} KB',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
                     ],
                   ),
                 ),
