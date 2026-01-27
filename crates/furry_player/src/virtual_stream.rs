@@ -134,7 +134,12 @@ impl Read for VirtualAudioStream {
 
         self.ensure_chunk_loaded().map_err(std::io::Error::other)?;
 
-        let cache = self.current_chunk.as_ref().unwrap();
+        let cache = self.current_chunk.as_ref().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "virtual stream chunk cache missing after ensure_chunk_loaded",
+            )
+        })?;
         let offset_in_chunk = (self.position - cache.virtual_start) as usize;
         let available = cache.data.len() - offset_in_chunk;
         let to_read = buf.len().min(available);

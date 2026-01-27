@@ -181,7 +181,7 @@ impl RingBuffer {
     }
 
     fn write(&self, data: &[f32]) {
-        let mut buf = self.buffer.lock().unwrap();
+        let mut buf = self.buffer.lock().unwrap_or_else(|e| e.into_inner());
         if data.len() >= self.capacity {
             buf.clear();
             buf.extend(data[data.len() - self.capacity..].iter().copied());
@@ -199,7 +199,7 @@ impl RingBuffer {
     }
 
     fn read(&self, output: &mut [f32]) -> usize {
-        let mut buf = self.buffer.lock().unwrap();
+        let mut buf = self.buffer.lock().unwrap_or_else(|e| e.into_inner());
         let to_read = output.len().min(buf.len());
 
         let (a, b) = buf.as_slices();

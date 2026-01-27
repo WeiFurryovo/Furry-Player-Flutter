@@ -961,8 +961,9 @@ class _AppController {
           }
         }
         await play();
+        final title = meta.title.isEmpty ? name : meta.title;
         nowPlaying.value = _NowPlaying(
-          title: meta.title.isEmpty ? name : meta.title,
+          title: title,
           subtitle:
               meta.subtitle.isEmpty ? '.furry → $originalExt' : meta.subtitle,
           sourcePath: file.path,
@@ -970,7 +971,7 @@ class _AppController {
         );
         await systemMedia.setMetadata(
           SystemMediaMetadata(
-            title: nowPlaying.value!.title,
+            title: title,
             artist: meta.subtitle,
             album: '',
             artUri: artUriSystem,
