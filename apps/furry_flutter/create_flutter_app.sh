@@ -170,7 +170,7 @@ echo "[INFO] 添加依赖（pub add）"
   path_provider:^2.1.5 \
   just_audio:^0.9.46 \
   just_audio_platform_interface:^4.6.0 \
-  audio_session:^0.1.24 \
+  audio_session:^0.1.25 \
   path \
   ffi:^2.1.3 \
   just_audio_background:^0.0.1-beta.15 \
