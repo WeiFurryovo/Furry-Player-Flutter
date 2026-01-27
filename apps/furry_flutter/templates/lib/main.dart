@@ -54,6 +54,8 @@ class _FurryAudioHandler extends BaseAudioHandler with SeekHandler, QueueHandler
   StreamSubscription<Duration?>? _durationSub;
 
   List<MediaItem> _queueItems = const <MediaItem>[];
+  DateTime? _lastPreviousPressedAt;
+  static const Duration _previousDoublePressWindow = Duration(seconds: 2);
 
   void _onSequenceState(SequenceState? state) {
     final sequence = state?.effectiveSequence ?? const <IndexedAudioSource>[];
@@ -152,8 +154,20 @@ class _FurryAudioHandler extends BaseAudioHandler with SeekHandler, QueueHandler
 
   @override
   Future<void> skipToPrevious() async {
-    if (!_player.hasPrevious) return;
-    await _player.seekToPrevious();
+    // 1st press => restart current track
+    // 2nd press within a short window => go to previous track
+    final now = DateTime.now();
+    final withinWindow = _lastPreviousPressedAt != null &&
+        now.difference(_lastPreviousPressedAt!) <= _previousDoublePressWindow;
+    _lastPreviousPressedAt = now;
+
+    if (withinWindow && _player.hasPrevious) {
+      await _player.seekToPrevious();
+      await _player.play();
+      return;
+    }
+
+    await _player.seek(Duration.zero);
     await _player.play();
   }
 
@@ -490,6 +504,8 @@ class _AppController {
   List<File>? _queue;
   int _queueIndex = -1;
   bool _androidPlaylistActive = false;
+  DateTime? _lastPreviousPressedAt;
+  static const Duration _previousDoublePressWindow = Duration(seconds: 2);
 
   // Keep this bounded to avoid unbounded RAM growth (cover bytes can be large).
   final Map<String, Future<_MetaPreview>> _metaPreviewCache =
@@ -629,6 +645,7 @@ class _AppController {
       if (idx == null) return;
       if (idx < 0 || idx >= queue.length) return;
       if (idx == _queueIndex) return;
+      _lastPreviousPressedAt = null;
       _queueIndex = idx;
       unawaited(_syncNowPlayingFromQueueIndex(idx));
       unawaited(systemMedia.setQueueAvailability(
@@ -1136,6 +1153,17 @@ class _AppController {
   Future<void> playPreviousTrack() async {
     final queue = _queue;
     if (queue == null) return;
+    final now = DateTime.now();
+    final withinWindow = _lastPreviousPressedAt != null &&
+        now.difference(_lastPreviousPressedAt!) <= _previousDoublePressWindow;
+    _lastPreviousPressedAt = now;
+
+    if (!withinWindow) {
+      await player.seek(Duration.zero);
+      await play();
+      return;
+    }
+
     if (_queueIndex <= 0) return;
     final nextIdx = _queueIndex - 1;
     if (_androidPlaylistActive && !kIsWeb && Platform.isAndroid) {
