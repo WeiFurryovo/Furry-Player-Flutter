@@ -1,0 +1,11 @@
+{
+  "dart.analysisExcludedFolders": [
+    "flutter/**"
+  ],
+  "search.exclude": {
+    "flutter/**": true
+  },
+  "files.watcherExclude": {
+    "flutter/**": true
+  }
+}
