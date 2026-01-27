@@ -130,7 +130,11 @@ class _FurryAudioHandler extends BaseAudioHandler with SeekHandler, QueueHandler
           ProcessingState.completed: AudioProcessingState.completed,
         }[event.processingState]!,
         playing: _player.playing,
-        updatePosition: event.updatePosition,
+        // Use the live position rather than `PlaybackEvent.updatePosition`.
+        // `updatePosition` in just_audio events may remain stale between events,
+        // and since `audio_service` refreshes `updateTime` on each state update,
+        // stale `updatePosition` can make the system seekbar jump back to 0.
+        updatePosition: _player.position,
         bufferedPosition: event.bufferedPosition,
         speed: _player.speed,
         queueIndex: event.currentIndex,
