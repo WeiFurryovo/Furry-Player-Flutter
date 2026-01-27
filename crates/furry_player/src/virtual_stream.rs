@@ -135,8 +135,7 @@ impl Read for VirtualAudioStream {
         self.ensure_chunk_loaded().map_err(std::io::Error::other)?;
 
         let cache = self.current_chunk.as_ref().ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::Other,
+            std::io::Error::other(
                 "virtual stream chunk cache missing after ensure_chunk_loaded",
             )
         })?;
