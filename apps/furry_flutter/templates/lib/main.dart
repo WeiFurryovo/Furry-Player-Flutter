@@ -121,6 +121,16 @@ class _FurryAudioHandler extends BaseAudioHandler with SeekHandler, QueueHandler
 
   void _onPlaybackEvent(PlaybackEvent event) {
     final hasQueueNav = _queueItems.length > 1;
+    final processingState = (event.processingState == ProcessingState.completed &&
+            !_player.hasNext)
+        ? AudioProcessingState.ready
+        : const <ProcessingState, AudioProcessingState>{
+            ProcessingState.idle: AudioProcessingState.idle,
+            ProcessingState.loading: AudioProcessingState.loading,
+            ProcessingState.buffering: AudioProcessingState.buffering,
+            ProcessingState.ready: AudioProcessingState.ready,
+            ProcessingState.completed: AudioProcessingState.completed,
+          }[event.processingState]!;
     playbackState.add(
       playbackState.value.copyWith(
         controls: <MediaControl>[
@@ -135,13 +145,7 @@ class _FurryAudioHandler extends BaseAudioHandler with SeekHandler, QueueHandler
         },
         androidCompactActionIndices:
             List<int>.generate(_compactControlsCount(), (i) => i),
-        processingState: const <ProcessingState, AudioProcessingState>{
-          ProcessingState.idle: AudioProcessingState.idle,
-          ProcessingState.loading: AudioProcessingState.loading,
-          ProcessingState.buffering: AudioProcessingState.buffering,
-          ProcessingState.ready: AudioProcessingState.ready,
-          ProcessingState.completed: AudioProcessingState.completed,
-        }[event.processingState]!,
+        processingState: processingState,
         playing: _player.playing,
         // Use the live position rather than `PlaybackEvent.updatePosition`.
         // `updatePosition` in just_audio events may remain stale between events,

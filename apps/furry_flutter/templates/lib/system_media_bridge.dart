@@ -113,7 +113,9 @@ class _WindowsSmtc {
   void _wire() {
     _subs.add(_player.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
-        _smtc.setPlaybackStatus(PlaybackStatus.stopped);
+        // Prefer "paused" at end of track (especially last track) to avoid
+        // the system UI switching to a stop state.
+        _smtc.setPlaybackStatus(PlaybackStatus.paused);
         return;
       }
       if (state.playing) {
@@ -355,8 +357,7 @@ class _MprisObject extends DBusObject {
 
   void updatePlayback(PlayerState state) {
     final next = state.playing ? 'Playing' : 'Paused';
-    if (state.processingState == ProcessingState.idle ||
-        state.processingState == ProcessingState.completed) {
+    if (state.processingState == ProcessingState.idle) {
       _playbackStatus = 'Stopped';
     } else {
       _playbackStatus = next;
