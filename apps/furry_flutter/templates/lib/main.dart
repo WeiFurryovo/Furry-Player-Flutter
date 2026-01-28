@@ -547,6 +547,7 @@ class _AppController {
   StreamSubscription<dynamic>? _playerStateSub;
   StreamSubscription<int?>? _currentIndexSub;
   Timer? _rssTimer;
+  bool _handlingCompletion = false;
 
   final ValueNotifier<_NowPlaying?> nowPlaying =
       ValueNotifier<_NowPlaying?>(null);
@@ -676,6 +677,22 @@ class _AppController {
       final shouldLogMem = !kIsWeb && (Platform.isAndroid || Platform.isIOS);
       if (state.processingState == ProcessingState.completed) {
         appendLog('Playback completed');
+        // At end of the last track, just_audio can remain in an "at end" state
+        // where a first Play press does not restart cleanly. Normalize by
+        // rewinding to 0 while staying paused so the next Play is a true replay.
+        if (!_handlingCompletion && !player.hasNext) {
+          _handlingCompletion = true;
+          unawaited(() async {
+            try {
+              await player.pause();
+              await player.seek(Duration.zero, index: player.currentIndex);
+            } catch (e, st) {
+              appendLog('Completion rewind failed: $e\n$st');
+            } finally {
+              _handlingCompletion = false;
+            }
+          }());
+        }
       }
       if (!shouldLogMem) return;
       if (state.playing) {
