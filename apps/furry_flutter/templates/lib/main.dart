@@ -2141,7 +2141,12 @@ class _NowPlayingMorphHeader extends StatelessWidget {
         final coverSize = lerpDouble(coverMin, coverMax, coverT)!;
         final coverTop = lerpDouble(10, 46, coverT)!;
         final coverLeft = lerpDouble(12, (w - coverSize) / 2, coverT)!;
-        final radius = lerpDouble(minRadius, maxRadius, coverT)!;
+        // Smooth radius separately (coverT is intentionally delayed and can
+        // make the radius feel like it "jumps").
+        final radiusT = Curves.easeInOutCubicEmphasized.transform(
+          ((reveal - 0.06) / 0.94).clamp(0.0, 1.0),
+        );
+        final radius = lerpDouble(minRadius, maxRadius, radiusT)!;
 
         final desiredHeaderH = lerpDouble(72, coverTop + coverSize + 92, reveal)!
             .clamp(72.0, 640.0)
