@@ -1094,6 +1094,9 @@ class _AppController {
         sourcePath: queue[index].path,
         artUri: null,
       );
+      // Don't wait for the whole playlist to be prepared before showing metadata
+      // for the selected track; otherwise users see "loading" until a second tap.
+      unawaited(_syncNowPlayingFromQueueIndex(index));
 
       await cleanupTempArtifacts();
       final tmp = await getTemporaryDirectory();
