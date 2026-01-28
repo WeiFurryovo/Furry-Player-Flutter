@@ -1923,6 +1923,10 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                 .clamp(0.0, 1.0);
             final fullOpacity =
                 Curves.easeInOutCubicEmphasized.transform(reveal);
+            final sheetPixels = _sheetController.isAttached
+                ? _sheetController.pixels
+                : (effectiveExtent * availableH);
+            final maxHeaderHeight = (sheetPixels - 12).clamp(0.0, sheetPixels);
 
             void onHeaderDragStart(DragStartDetails details) {
               _dragStartExtent = _sheetController.isAttached
@@ -2010,6 +2014,7 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                                   reveal: reveal,
                                   miniOpacity: miniOpacity,
                                   fullOpacity: fullOpacity,
+                                  maxHeight: maxHeaderHeight,
                                   onExpand: () => _expand(maxSize),
                                   onCollapse: () => _collapse(minSize),
                                 ),
@@ -2097,6 +2102,7 @@ class _NowPlayingMorphHeader extends StatelessWidget {
   final double reveal;
   final double miniOpacity;
   final double fullOpacity;
+  final double maxHeight;
   final VoidCallback onExpand;
   final VoidCallback onCollapse;
 
@@ -2106,6 +2112,7 @@ class _NowPlayingMorphHeader extends StatelessWidget {
     required this.reveal,
     required this.miniOpacity,
     required this.fullOpacity,
+    required this.maxHeight,
     required this.onExpand,
     required this.onCollapse,
   });
@@ -2133,9 +2140,10 @@ class _NowPlayingMorphHeader extends StatelessWidget {
         final coverLeft = lerpDouble(12, (w - coverSize) / 2, coverT)!;
         final radius = lerpDouble(minRadius, maxRadius, coverT)!;
 
-        final headerH = lerpDouble(72, coverTop + coverSize + 92, reveal)!
+        final desiredHeaderH = lerpDouble(72, coverTop + coverSize + 92, reveal)!
             .clamp(72.0, 640.0)
             .toDouble();
+        final headerH = desiredHeaderH.clamp(0.0, maxHeight).toDouble();
 
         return SizedBox(
           height: headerH,
