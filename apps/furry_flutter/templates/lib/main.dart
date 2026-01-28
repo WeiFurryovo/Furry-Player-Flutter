@@ -1925,12 +1925,15 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                 Curves.easeInOutCubicEmphasized.transform(reveal);
 
             void onHeaderDragStart(DragStartDetails details) {
-              _dragStartExtent = effectiveExtent;
+              _dragStartExtent = _sheetController.isAttached
+                  ? _sheetController.size
+                  : effectiveExtent;
             }
 
             void onHeaderDragUpdate(DragUpdateDetails details) {
               final h = availableH <= 1 ? 1.0 : availableH;
-              final start = _dragStartExtent ?? effectiveExtent;
+              final start = _dragStartExtent ??
+                  (_sheetController.isAttached ? _sheetController.size : effectiveExtent);
               final next = (start + (-details.delta.dy / h)).clamp(
                 minSize,
                 maxSize,
@@ -1942,10 +1945,12 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
             void onHeaderDragEnd(DragEndDetails details) {
               _dragStartExtent = null;
               final v = details.primaryVelocity ?? 0.0;
-              final mid = (minSize + maxSize) / 2;
+              final current =
+                  _sheetController.isAttached ? _sheetController.size : effectiveExtent;
+              final threshold = minSize + (maxSize - minSize) * 0.33;
               final snapTo = (v.abs() > 600)
                   ? (v < 0 ? maxSize : minSize)
-                  : ((effectiveExtent >= mid) ? maxSize : minSize);
+                  : ((current >= threshold) ? maxSize : minSize);
               _sheetController.animateTo(
                 snapTo,
                 duration: const Duration(milliseconds: 220),
