@@ -1939,6 +1939,7 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                 maxSize,
               );
               _sheetController.jumpTo(next);
+              _dragStartExtent = next;
               if (mounted) setState(() => _extent = next);
             }
 
