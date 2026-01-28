@@ -160,7 +160,12 @@ class _FurryAudioHandler extends BaseAudioHandler with SeekHandler, QueueHandler
   }
 
   @override
-  Future<void> play() => _player.play();
+  Future<void> play() async {
+    if (_player.processingState == ProcessingState.completed) {
+      await _player.seek(Duration.zero, index: _player.currentIndex);
+    }
+    await _player.play();
+  }
 
   @override
   Future<void> pause() => _player.pause();
@@ -1251,6 +1256,10 @@ class _AppController {
   }
 
   Future<void> play() async {
+    // If the current track has completed, pressing play should restart it.
+    if (player.processingState == ProcessingState.completed) {
+      await player.seek(Duration.zero, index: player.currentIndex);
+    }
     await player.play();
   }
 
