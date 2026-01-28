@@ -2284,36 +2284,56 @@ class _NowPlayingMorphHeader extends StatelessWidget {
                 width: coverSize,
                 height: coverSize,
                 child: IgnorePointer(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(radius),
-                      border: Border.all(
-                        color: _withOpacityCompat(cs.outlineVariant, 0.5),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color:
-                              _withOpacityCompat(cs.shadow, 0.18 * fullOpacity),
-                          blurRadius: 24 * fullOpacity,
-                          offset: Offset(0, 10 * fullOpacity),
-                        ),
-                      ],
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: np.artUri == null
-                        ? Icon(Icons.album_rounded,
-                            size: coverSize * 0.33, color: cs.primary)
-                        : Image.file(
-                            File.fromUri(np.artUri!),
-                            fit: BoxFit.cover,
-                            // Keep cache dimensions stable while dragging to avoid
-                            // re-decoding on every frame (which can cause flicker).
-                            cacheWidth: 1024,
-                            cacheHeight: 1024,
-                            gaplessPlayback: true,
-                            filterQuality: FilterQuality.medium,
+                  child: Builder(
+                    builder: (context) {
+                      final isThumb = coverSize <= 60;
+                      final image = np.artUri == null
+                          ? Icon(Icons.album_rounded,
+                              size: coverSize * 0.33, color: cs.primary)
+                          : Image.file(
+                              File.fromUri(np.artUri!),
+                              fit: BoxFit.cover,
+                              // Keep cache dimensions stable while dragging to avoid
+                              // re-decoding on every frame (which can cause flicker).
+                              cacheWidth: 1024,
+                              cacheHeight: 1024,
+                              gaplessPlayback: true,
+                              filterQuality: FilterQuality.medium,
+                            );
+
+                      // Match the "最近输出" thumbnail feel: no border/shadow when small.
+                      if (isThumb) {
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: ColoredBox(
+                            color: cs.surfaceContainerHighest,
+                            child: image,
                           ),
+                        );
+                      }
+
+                      return DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(radius),
+                          border: Border.all(
+                            color: _withOpacityCompat(cs.outlineVariant, 0.5),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _withOpacityCompat(
+                                  cs.shadow, 0.18 * fullOpacity),
+                              blurRadius: 24 * fullOpacity,
+                              offset: Offset(0, 10 * fullOpacity),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(radius),
+                          child: image,
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
