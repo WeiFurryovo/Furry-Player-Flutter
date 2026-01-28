@@ -2130,7 +2130,6 @@ class _NowPlayingMorphHeader extends StatelessWidget {
         final coverMax = w.clamp(0.0, 420.0).toDouble();
         const coverMin = 44.0;
         const minRadius = 14.0;
-        const maxRadius = 28.0;
 
         // Prevent the cover from growing while the mini controls are still
         // visible; otherwise it can overlap the mini bar buttons.
@@ -2141,12 +2140,8 @@ class _NowPlayingMorphHeader extends StatelessWidget {
         final coverSize = lerpDouble(coverMin, coverMax, coverT)!;
         final coverTop = lerpDouble(10, 46, coverT)!;
         final coverLeft = lerpDouble(12, (w - coverSize) / 2, coverT)!;
-        // Smooth radius separately (coverT is intentionally delayed and can
-        // make the radius feel like it "jumps").
-        final radiusT = Curves.easeInOutCubicEmphasized.transform(
-          ((reveal - 0.06) / 0.94).clamp(0.0, 1.0),
-        );
-        final radius = lerpDouble(minRadius, maxRadius, radiusT)!;
+        // Match "最近输出" thumbnails: fixed corner radius.
+        const radius = minRadius;
 
         final desiredHeaderH = lerpDouble(72, coverTop + coverSize + 92, reveal)!
             .clamp(72.0, 640.0)
