@@ -2304,9 +2304,12 @@ class _NowPlayingMorphHeader extends StatelessWidget {
                         : Image.file(
                             File.fromUri(np.artUri!),
                             fit: BoxFit.cover,
-                            cacheWidth: (coverSize * 2).round().clamp(96, 1024),
-                            cacheHeight:
-                                (coverSize * 2).round().clamp(96, 1024),
+                            // Keep cache dimensions stable while dragging to avoid
+                            // re-decoding on every frame (which can cause flicker).
+                            cacheWidth: 1024,
+                            cacheHeight: 1024,
+                            gaplessPlayback: true,
+                            filterQuality: FilterQuality.medium,
                           ),
                   ),
                 ),
