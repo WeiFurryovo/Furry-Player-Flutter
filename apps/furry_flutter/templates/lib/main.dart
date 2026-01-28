@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui' show lerpDouble;
+import 'dart:ui' show ImageFilter, lerpDouble;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -35,7 +35,8 @@ List<String> _takeStartupDiagnostics() {
   return out;
 }
 
-class _FurryAudioHandler extends BaseAudioHandler with SeekHandler, QueueHandler {
+class _FurryAudioHandler extends BaseAudioHandler
+    with SeekHandler, QueueHandler {
   _FurryAudioHandler(this._player) {
     _sequenceStateSub = _player.sequenceStateStream.listen(_onSequenceState);
     _indexSub = _player.currentIndexStream.listen(_onIndexChanged);
@@ -121,16 +122,16 @@ class _FurryAudioHandler extends BaseAudioHandler with SeekHandler, QueueHandler
 
   void _onPlaybackEvent(PlaybackEvent event) {
     final hasQueueNav = _queueItems.length > 1;
-    final processingState = (event.processingState == ProcessingState.completed &&
-            !_player.hasNext)
-        ? AudioProcessingState.ready
-        : const <ProcessingState, AudioProcessingState>{
-            ProcessingState.idle: AudioProcessingState.idle,
-            ProcessingState.loading: AudioProcessingState.loading,
-            ProcessingState.buffering: AudioProcessingState.buffering,
-            ProcessingState.ready: AudioProcessingState.ready,
-            ProcessingState.completed: AudioProcessingState.completed,
-          }[event.processingState]!;
+    final processingState =
+        (event.processingState == ProcessingState.completed && !_player.hasNext)
+            ? AudioProcessingState.ready
+            : const <ProcessingState, AudioProcessingState>{
+                ProcessingState.idle: AudioProcessingState.idle,
+                ProcessingState.loading: AudioProcessingState.loading,
+                ProcessingState.buffering: AudioProcessingState.buffering,
+                ProcessingState.ready: AudioProcessingState.ready,
+                ProcessingState.completed: AudioProcessingState.completed,
+              }[event.processingState]!;
     playbackState.add(
       playbackState.value.copyWith(
         controls: <MediaControl>[
@@ -297,7 +298,8 @@ Future<void> main() async {
       await AudioService.init(
         builder: () => _FurryAudioHandler(_sharedPlayer),
         config: const AudioServiceConfig(
-          androidNotificationChannelId: 'com.furry.furry_flutter_app.channel.audio',
+          androidNotificationChannelId:
+              'com.furry.furry_flutter_app.channel.audio',
           androidNotificationChannelName: 'Furry Player',
           // Don’t publish a STOP action; keep controls in sync with the app UI.
           // Also keep the notification dismissible to avoid OEM “stop” affordances.
@@ -1613,7 +1615,8 @@ class _ConverterPageState extends State<ConverterPage> {
   @override
   void initState() {
     super.initState();
-    _paddingDraftKb = ValueNotifier<double>(widget.controller.paddingKb.toDouble());
+    _paddingDraftKb =
+        ValueNotifier<double>(widget.controller.paddingKb.toDouble());
   }
 
   @override
@@ -1960,8 +1963,8 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
             final tRaw = ((effectiveExtent - minSize) / (maxSize - minSize))
                 .clamp(0.0, 1.0);
             final reveal = Curves.easeOutCubic.transform(tRaw);
-            final miniOpacity = (1.0 - Curves.easeOutCubic.transform(tRaw))
-                .clamp(0.0, 1.0);
+            final miniOpacity =
+                (1.0 - Curves.easeOutCubic.transform(tRaw)).clamp(0.0, 1.0);
             final fullOpacity =
                 Curves.easeInOutCubicEmphasized.transform(reveal);
             final sheetPixels = _sheetController.isAttached
@@ -1978,7 +1981,9 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
             void onHeaderDragUpdate(DragUpdateDetails details) {
               final h = availableH <= 1 ? 1.0 : availableH;
               final start = _dragStartExtent ??
-                  (_sheetController.isAttached ? _sheetController.size : effectiveExtent);
+                  (_sheetController.isAttached
+                      ? _sheetController.size
+                      : effectiveExtent);
               final next = (start + (-details.delta.dy / h)).clamp(
                 minSize,
                 maxSize,
@@ -1991,8 +1996,9 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
             void onHeaderDragEnd(DragEndDetails details) {
               _dragStartExtent = null;
               final v = details.primaryVelocity ?? 0.0;
-              final current =
-                  _sheetController.isAttached ? _sheetController.size : effectiveExtent;
+              final current = _sheetController.isAttached
+                  ? _sheetController.size
+                  : effectiveExtent;
               final threshold = minSize + (maxSize - minSize) * 0.33;
               final snapTo = (v.abs() > 600)
                   ? (v < 0 ? maxSize : minSize)
@@ -2026,17 +2032,9 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(28),
                       ),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              _withOpacityCompat(cs.primaryContainer, 0.35),
-                              cs.surface,
-                            ],
-                          ),
-                        ),
+                      child: _NowPlayingBackdrop(
+                        reveal: reveal,
+                        cs: cs,
                         child: Column(
                           children: [
                             Padding(
@@ -2093,10 +2091,8 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                                             ),
                                             child: Row(
                                               children: [
-                                                Icon(
-                                                    Icons.info_outline_rounded,
-                                                    color:
-                                                        cs.onSurfaceVariant),
+                                                Icon(Icons.info_outline_rounded,
+                                                    color: cs.onSurfaceVariant),
                                                 const SizedBox(width: 10),
                                                 Expanded(
                                                   child: Text(
@@ -2133,6 +2129,76 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
           },
         );
       },
+    );
+  }
+}
+
+class _NowPlayingBackdrop extends StatelessWidget {
+  final double reveal;
+  final ColorScheme cs;
+  final Widget child;
+
+  const _NowPlayingBackdrop({
+    required this.reveal,
+    required this.cs,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Material 3 Expressive prefers tonal surfaces. We keep the now-playing
+    // surface mostly opaque for readability, and optionally apply a subtle blur
+    // when expanded (mini state stays crisp).
+    const blurEnabled = !kIsWeb;
+    final blurT = Curves.easeOutCubic.transform(reveal.clamp(0.0, 1.0));
+    final blurSigma = blurEnabled ? (lerpDouble(0, 24, blurT) ?? 0) : 0.0;
+    final surfaceOpacity = lerpDouble(0.95, 0.82, blurT) ?? 0.9;
+    final tintOpacity = lerpDouble(0.10, 0.06, blurT) ?? 0.08;
+
+    return Stack(
+      children: [
+        if (blurSigma > 0.5)
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(
+                sigmaX: blurSigma,
+                sigmaY: blurSigma,
+              ),
+              child: const SizedBox.expand(),
+            ),
+          ),
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: _withOpacityCompat(
+                  cs.surfaceContainerHighest, surfaceOpacity),
+              border: Border(
+                top: BorderSide(
+                  color: _withOpacityCompat(cs.outlineVariant, 0.35),
+                  width: 1,
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    _withOpacityCompat(cs.primaryContainer, tintOpacity),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        child,
+      ],
     );
   }
 }
@@ -2181,9 +2247,10 @@ class _NowPlayingMorphHeader extends StatelessWidget {
         // Match "最近输出" thumbnails: fixed corner radius.
         const radius = minRadius;
 
-        final desiredHeaderH = lerpDouble(72, coverTop + coverSize + 92, reveal)!
-            .clamp(72.0, 640.0)
-            .toDouble();
+        final desiredHeaderH =
+            lerpDouble(72, coverTop + coverSize + 92, reveal)!
+                .clamp(72.0, 640.0)
+                .toDouble();
         final headerH = desiredHeaderH.clamp(0.0, maxHeight).toDouble();
 
         return SizedBox(
@@ -2261,21 +2328,18 @@ class _NowPlayingMorphHeader extends StatelessWidget {
                                   onPressed: controller.canPlayPreviousTrack
                                       ? controller.playPreviousTrack
                                       : null,
-                                  icon:
-                                      const Icon(Icons.skip_previous_rounded),
+                                  icon: const Icon(Icons.skip_previous_rounded),
                                 ),
                                 StreamBuilder<PlayerState>(
                                   stream: controller.playerStateStream,
                                   builder: (context, snap) {
-                                    final playing =
-                                        snap.data?.playing ?? false;
+                                    final playing = snap.data?.playing ?? false;
                                     final processing =
                                         snap.data?.processingState ??
                                             ProcessingState.idle;
                                     final busy = processing ==
                                             ProcessingState.loading ||
-                                        processing ==
-                                            ProcessingState.buffering;
+                                        processing == ProcessingState.buffering;
                                     return IconButton.filledTonal(
                                       onPressed: busy
                                           ? null
@@ -2290,9 +2354,8 @@ class _NowPlayingMorphHeader extends StatelessWidget {
                                           ? const SizedBox(
                                               width: 18,
                                               height: 18,
-                                              child:
-                                                  CircularProgressIndicator(
-                                                      strokeWidth: 2),
+                                              child: CircularProgressIndicator(
+                                                  strokeWidth: 2),
                                             )
                                           : Icon(playing
                                               ? Icons.pause_rounded
@@ -2410,8 +2473,7 @@ class _NowPlayingMorphHeader extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(np.title,
-                              style:
-                                  Theme.of(context).textTheme.headlineSmall),
+                              style: Theme.of(context).textTheme.headlineSmall),
                           const SizedBox(height: 6),
                           Text(
                             np.subtitle,
@@ -2452,7 +2514,9 @@ class _NowPlayingSeekBarState extends State<_NowPlayingSeekBar> {
       stream: controller.durationStream,
       builder: (context, durSnap) {
         final duration = durSnap.data ?? Duration.zero;
-        final maxMs = duration.inMilliseconds <= 0 ? 1.0 : duration.inMilliseconds.toDouble();
+        final maxMs = duration.inMilliseconds <= 0
+            ? 1.0
+            : duration.inMilliseconds.toDouble();
         return StreamBuilder<Duration>(
           stream: controller.positionStream,
           builder: (context, posSnap) {
@@ -2501,11 +2565,9 @@ class _NowPlayingControls extends StatelessWidget {
         stream: controller.playerStateStream,
         builder: (context, snap) {
           final playing = snap.data?.playing ?? false;
-          final processing =
-              snap.data?.processingState ?? ProcessingState.idle;
-          final busy =
-              processing == ProcessingState.loading ||
-                  processing == ProcessingState.buffering;
+          final processing = snap.data?.processingState ?? ProcessingState.idle;
+          final busy = processing == ProcessingState.loading ||
+              processing == ProcessingState.buffering;
 
           return Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -2539,8 +2601,9 @@ class _NowPlayingControls extends StatelessWidget {
               const SizedBox(width: 14),
               IconButton.filledTonal(
                 tooltip: '下一首',
-                onPressed:
-                    controller.canPlayNextTrack ? controller.playNextTrack : null,
+                onPressed: controller.canPlayNextTrack
+                    ? controller.playNextTrack
+                    : null,
                 icon: const Icon(Icons.skip_next_rounded),
               ),
             ],
