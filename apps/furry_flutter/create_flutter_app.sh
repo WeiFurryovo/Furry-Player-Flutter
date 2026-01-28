@@ -185,10 +185,16 @@ def ensure_line(line: str) -> None:
     text += "\n"
   text += line + "\n"
 
+# AGP 8.1+ removed this option (and will fail the build if present).
+lines = []
+for line in text.splitlines():
+  if line.strip().startswith("android.bundle.enableUncompressedNativeLibs="):
+    continue
+  lines.append(line)
+text = "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+
 # Full mode can yield better shrinking/obfuscation results for R8.
 ensure_line("android.enableR8.fullMode=true")
-# Compress native libs in app bundles for smaller download size.
-ensure_line("android.bundle.enableUncompressedNativeLibs=false")
 
 if text != original:
   open(path, "w", encoding="utf-8").write(text)

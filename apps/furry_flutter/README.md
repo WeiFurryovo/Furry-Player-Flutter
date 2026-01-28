@@ -40,7 +40,7 @@ Android 包体积通常会比 Windows/Linux 大（包含 Flutter 引擎 + 多 AB
 - 用 `--obfuscate` + `--split-debug-info` 去掉 AOT 符号表（更小，且保留符号到本地目录用于崩溃堆栈还原）：
   - `flutter build appbundle --release --obfuscate --split-debug-info=build/symbols`
   - `flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/symbols`
-- 本仓库生成脚本会为 release 打开 `minifyEnabled` + `shrinkResources`（R8/资源压缩）、开启 `android.enableR8.fullMode=true`，并尝试 `llvm-strip` 去掉 Rust `.so` 符号表
+- 本仓库生成脚本会为 release 打开 `minifyEnabled` + `shrinkResources`（R8/资源压缩）、开启 `android.enableR8.fullMode=true`，并尝试 `llvm-strip` 去掉 Rust `.so` 符号表（AGP 8.1+ 已移除 `android.bundle.enableUncompressedNativeLibs`，脚本会自动清理该配置避免构建失败）
 
 ### 常见问题
 - `./build.sh android` 提示找不到 NDK：设置 `ANDROID_NDK_HOME`，例如 `export ANDROID_NDK_HOME=~/Android/Sdk/ndk/26.1.10909125`
