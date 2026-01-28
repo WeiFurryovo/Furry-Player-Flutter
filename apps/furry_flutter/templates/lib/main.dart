@@ -1992,70 +1992,88 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                             ],
                           ),
                         ),
-                        child: ListView(
-                          controller: scrollController,
-                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+                        child: Column(
                           children: [
-                            GestureDetector(
-                              behavior: HitTestBehavior.translucent,
-                              onVerticalDragStart: onHeaderDragStart,
-                              onVerticalDragUpdate: onHeaderDragUpdate,
-                              onVerticalDragEnd: onHeaderDragEnd,
-                              child: _NowPlayingMorphHeader(
-                                controller: widget.controller,
-                                np: np,
-                                reveal: reveal,
-                                miniOpacity: miniOpacity,
-                                fullOpacity: fullOpacity,
-                                onExpand: () => _expand(maxSize),
-                                onCollapse: () => _collapse(minSize),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                              child: GestureDetector(
+                                // Keep the drag gesture out of the ListView to avoid
+                                // gesture arena conflicts (slow drags would be won by
+                                // the Scrollable and "bounce back").
+                                behavior: HitTestBehavior.translucent,
+                                onVerticalDragStart: onHeaderDragStart,
+                                onVerticalDragUpdate: onHeaderDragUpdate,
+                                onVerticalDragEnd: onHeaderDragEnd,
+                                child: _NowPlayingMorphHeader(
+                                  controller: widget.controller,
+                                  np: np,
+                                  reveal: reveal,
+                                  miniOpacity: miniOpacity,
+                                  fullOpacity: fullOpacity,
+                                  onExpand: () => _expand(maxSize),
+                                  onCollapse: () => _collapse(minSize),
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            IgnorePointer(
-                              ignoring: reveal < 0.35,
-                              child: Opacity(
-                                opacity: fullOpacity,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const SizedBox(height: 14),
-                                    _NowPlayingSeekBar(
-                                        controller: widget.controller),
-                                    const SizedBox(height: 16),
-                                    _NowPlayingControls(
-                                        controller: widget.controller),
-                                    const SizedBox(height: 16),
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: _withOpacityCompat(
-                                            cs.surfaceContainerHighest, 0.65),
-                                        borderRadius: BorderRadius.circular(18),
-                                      ),
-                                      child: Row(
+                            Expanded(
+                              child: ListView(
+                                controller: scrollController,
+                                padding:
+                                    const EdgeInsets.fromLTRB(12, 6, 12, 24),
+                                children: [
+                                  IgnorePointer(
+                                    ignoring: reveal < 0.35,
+                                    child: Opacity(
+                                      opacity: fullOpacity,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          Icon(Icons.info_outline_rounded,
-                                              color: cs.onSurfaceVariant),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Text(
-                                              np.sourcePath,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.copyWith(
-                                                      color:
-                                                          cs.onSurfaceVariant),
+                                          const SizedBox(height: 14),
+                                          _NowPlayingSeekBar(
+                                              controller: widget.controller),
+                                          const SizedBox(height: 16),
+                                          _NowPlayingControls(
+                                              controller: widget.controller),
+                                          const SizedBox(height: 16),
+                                          Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: _withOpacityCompat(
+                                                  cs.surfaceContainerHighest,
+                                                  0.65),
+                                              borderRadius:
+                                                  BorderRadius.circular(18),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                    Icons.info_outline_rounded,
+                                                    color:
+                                                        cs.onSurfaceVariant),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Text(
+                                                    np.sourcePath,
+                                                    maxLines: 2,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: Theme.of(context)
+                                                        .textTheme
+                                                        .bodySmall
+                                                        ?.copyWith(
+                                                            color: cs
+                                                                .onSurfaceVariant),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ],
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
