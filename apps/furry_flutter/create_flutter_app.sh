@@ -195,6 +195,38 @@ if text != original:
 PY
 }
 
+patch_android_local_properties_for_sdk() {
+  local props_file="$OUT_DIR/android/local.properties"
+  if [ ! -f "$props_file" ]; then
+    echo "[WARN] 未找到 android/local.properties，跳过 SDK 路径修复：$props_file" >&2
+    return 0
+  fi
+
+  python3 - "$props_file" <<'PY'
+import os
+import sys
+
+path = sys.argv[1]
+text = open(path, "r", encoding="utf-8").read()
+original = text
+
+def has_key(key: str) -> bool:
+  for line in text.splitlines():
+    if line.strip().startswith(f"{key}="):
+      return True
+  return False
+
+android_home = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")
+if not has_key("sdk.dir") and android_home:
+  if not text.endswith("\n") and text != "":
+    text += "\n"
+  text += f"sdk.dir={android_home}\n"
+
+if text != original:
+  open(path, "w", encoding="utf-8").write(text)
+PY
+}
+
 usage() {
   cat <<EOF
 Usage: $0 [--no-android] [--no-ffi]
@@ -251,7 +283,18 @@ echo "[INFO] 移除已废弃依赖（pub remove）"
 
 echo "[INFO] 覆盖模板代码"
 cp -a "$TEMPLATES_DIR/lib/." "$OUT_DIR/lib/"
-cp -a "$TEMPLATES_DIR/android/." "$OUT_DIR/android/"
+# Do NOT overwrite android/local.properties. It contains per-machine paths
+# (Android SDK / Flutter SDK) required for building (especially debug apk).
+LOCAL_PROPS_BAK=""
+if [ -f "$OUT_DIR/android/local.properties" ]; then
+  LOCAL_PROPS_BAK="$(mktemp)"
+  cp -f "$OUT_DIR/android/local.properties" "$LOCAL_PROPS_BAK"
+fi
+cp -a "$TEMPLATES_DIR/android/." "$OUT_DIR/android/" 2>/dev/null || true
+if [ -n "${LOCAL_PROPS_BAK:-}" ] && [ -f "$LOCAL_PROPS_BAK" ]; then
+  cp -f "$LOCAL_PROPS_BAK" "$OUT_DIR/android/local.properties"
+  rm -f "$LOCAL_PROPS_BAK"
+fi
 # Ensure Flutter generates plugin registrant for the current dependency set.
 rm -f "$OUT_DIR/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java" || true
 if [ -d "$TEMPLATES_DIR/test" ]; then
@@ -268,6 +311,7 @@ patch_android_manifest_for_audio_service
 echo "[INFO] 配置 Android release 体积优化（R8 + 资源压缩）"
 patch_android_gradle_for_release_shrink
 patch_android_gradle_properties_for_size
+patch_android_local_properties_for_sdk
 
 if [ "$BUILD_ANDROID" -eq 1 ]; then
   echo "[INFO] 构建 Rust Android 动态库（需要 ANDROID_NDK_HOME）"
