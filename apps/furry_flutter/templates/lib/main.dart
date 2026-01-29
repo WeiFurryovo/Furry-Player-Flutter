@@ -645,25 +645,50 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           );
         }
 
-        return Scaffold(
-          body: Stack(
-            children: [
-              contentStack(bottomPadding: navBarHeight + bottomInset),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: SafeArea(
-                  top: false,
-                  child: NavigationBar(
-                    selectedIndex: _tabIndex,
-                    destinations: destinations,
-                    onDestinationSelected: (i) => setState(() => _tabIndex = i),
+        return ValueListenableBuilder<double>(
+          valueListenable: _controller.nowPlayingReveal,
+          builder: (context, reveal, _) {
+            final t = Curves.easeOutCubic.transform(reveal.clamp(0.0, 1.0));
+            final navOpacity = (1.0 - t).clamp(0.0, 1.0);
+            final bottomPadding =
+                (lerpDouble(navBarHeight + bottomInset, bottomInset, t) ??
+                        (navBarHeight + bottomInset))
+                    .clamp(bottomInset, navBarHeight + bottomInset);
+            return Scaffold(
+              body: Stack(
+                children: [
+                  contentStack(bottomPadding: bottomPadding),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: IgnorePointer(
+                      ignoring: navOpacity < 0.15,
+                      child: AnimatedSlide(
+                        offset: Offset(0, 0.25 * (1 - navOpacity)),
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOutCubic,
+                        child: AnimatedOpacity(
+                          opacity: navOpacity,
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeOutCubic,
+                          child: SafeArea(
+                            top: false,
+                            child: NavigationBar(
+                              selectedIndex: _tabIndex,
+                              destinations: destinations,
+                              onDestinationSelected: (i) =>
+                                  setState(() => _tabIndex = i),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -692,6 +717,7 @@ class _AppController {
   final ValueNotifier<List<File>> furryOutputs =
       ValueNotifier<List<File>>(<File>[]);
   final ValueNotifier<String> log = ValueNotifier<String>('');
+  final ValueNotifier<double> nowPlayingReveal = ValueNotifier<double>(0);
 
   List<File>? _queue;
   int _queueIndex = -1;
@@ -799,6 +825,7 @@ class _AppController {
     nowPlaying.dispose();
     furryOutputs.dispose();
     log.dispose();
+    nowPlayingReveal.dispose();
   }
 
   void _wirePlayerDiagnostics() {
@@ -2165,6 +2192,10 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                 (1.0 - Curves.easeOutCubic.transform(tRaw)).clamp(0.0, 1.0);
             final fullOpacity =
                 Curves.easeInOutCubicEmphasized.transform(reveal);
+            final prevReveal = widget.controller.nowPlayingReveal.value;
+            if ((prevReveal - reveal).abs() > 0.002) {
+              widget.controller.nowPlayingReveal.value = reveal;
+            }
             final sheetPixels = _sheetController.isAttached
                 ? _sheetController.pixels
                 : (effectiveExtent * availableH);
