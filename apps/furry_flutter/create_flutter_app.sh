@@ -253,8 +253,13 @@ while [ "${1:-}" != "" ]; do
 done
 
 if ! command -v flutter >/dev/null 2>&1; then
-  echo "[ERROR] 未找到 flutter 命令。请先安装 Flutter SDK，并确保 flutter 在 PATH 中。" >&2
-  exit 1
+  # Prefer the vendored Flutter SDK if present at repo root.
+  if [ -x "$ROOT/flutter/bin/flutter" ]; then
+    export PATH="$ROOT/flutter/bin:$PATH"
+  else
+    echo "[ERROR] 未找到 flutter 命令。请先安装 Flutter SDK，并确保 flutter 在 PATH 中。" >&2
+    exit 1
+  fi
 fi
 
 if [ ! -d "$OUT_DIR" ]; then
@@ -286,7 +291,8 @@ echo "[INFO] 移除已废弃依赖（pub remove）"
   audio_service:^0.18.17 \
   smtc_windows:^1.0.0 \
   dbus:^0.7.11 \
-  google_fonts:^6.3.0)
+  google_fonts:^6.3.0 \
+  dynamic_color:^1.7.0)
 
 echo "[INFO] 覆盖模板代码"
 cp -a "$TEMPLATES_DIR/lib/." "$OUT_DIR/lib/"

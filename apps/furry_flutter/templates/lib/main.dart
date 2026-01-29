@@ -6,8 +6,10 @@ import 'dart:ui' show ImageFilter, lerpDouble;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:audio_service/audio_service.dart';
+import 'package:dynamic_color/dynamic_color.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path/path.dart' as p;
@@ -277,6 +279,17 @@ class _DiagnosticsLog {
       await _writeChain;
     } catch (_) {}
   }
+
+  static Future<void> clear() async {
+    try {
+      await init();
+      _writeChain = _writeChain.then((_) async {
+        final f = _file!;
+        await f.writeAsString('', flush: true);
+      });
+      await _writeChain;
+    } catch (_) {}
+  }
 }
 
 Future<void> main() async {
@@ -334,13 +347,23 @@ class FurryApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Furry Player (Flutter)',
-      debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.system,
-      theme: _ExpressiveTheme.build(Brightness.light),
-      darkTheme: _ExpressiveTheme.build(Brightness.dark),
-      home: AppShell(player: player),
+    return DynamicColorBuilder(
+      builder: (lightDynamic, darkDynamic) {
+        return MaterialApp(
+          title: 'Furry Player (Flutter)',
+          debugShowCheckedModeBanner: false,
+          themeMode: ThemeMode.system,
+          theme: _ExpressiveTheme.build(
+            Brightness.light,
+            schemeOverride: lightDynamic,
+          ),
+          darkTheme: _ExpressiveTheme.build(
+            Brightness.dark,
+            schemeOverride: darkDynamic,
+          ),
+          home: AppShell(player: player),
+        );
+      },
     );
   }
 }
@@ -375,9 +398,12 @@ class _ExpressiveTheme {
     );
   }
 
-  static ThemeData build(Brightness brightness) {
+  static ThemeData build(
+    Brightness brightness, {
+    ColorScheme? schemeOverride,
+  }) {
     const seed = Color(0xFF8E7CFF);
-    final scheme =
+    final scheme = schemeOverride ??
         ColorScheme.fromSeed(seedColor: seed, brightness: brightness);
 
     final base = ThemeData(
@@ -835,6 +861,11 @@ class _AppController {
       log.value = log.value.substring(0, maxChars);
     }
     unawaited(_DiagnosticsLog.appendLine(msg));
+  }
+
+  Future<void> clearLog() async {
+    log.value = '';
+    await _DiagnosticsLog.clear();
   }
 
   Future<Directory> outputsDir() async {
@@ -1903,6 +1934,33 @@ class SettingsPage extends StatelessWidget {
                           Icon(Icons.bug_report_rounded, color: cs.primary),
                           const SizedBox(width: 10),
                           const Expanded(child: Text('诊断日志')),
+                          IconButton(
+                            tooltip: '复制',
+                            onPressed: () async {
+                              final text = controller.log.value;
+                              if (text.trim().isEmpty) return;
+                              await Clipboard.setData(
+                                  ClipboardData(text: text));
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('已复制诊断日志')),
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.copy_rounded),
+                          ),
+                          IconButton(
+                            tooltip: '清空',
+                            onPressed: () async {
+                              await controller.clearLog();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('已清空诊断日志')),
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.delete_outline_rounded),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -2192,8 +2250,12 @@ class _NowPlayingBackdrop extends StatelessWidget {
     // surface mostly opaque for readability, and optionally apply a subtle blur
     // when expanded (mini state stays crisp).
     const blurEnabled = !kIsWeb;
+    final reduceEffects =
+        (MediaQuery.maybeOf(context)?.disableAnimations ?? false) ||
+            (MediaQuery.maybeOf(context)?.accessibleNavigation ?? false);
     final blurT = Curves.easeOutCubic.transform(reveal.clamp(0.0, 1.0));
-    final blurSigma = blurEnabled ? (lerpDouble(0, 24, blurT) ?? 0) : 0.0;
+    final blurSigma =
+        (blurEnabled && !reduceEffects) ? (lerpDouble(0, 24, blurT) ?? 0) : 0.0;
     final surfaceOpacity = lerpDouble(0.95, 0.82, blurT) ?? 0.9;
     final tintOpacity = lerpDouble(0.10, 0.06, blurT) ?? 0.08;
 
@@ -2201,12 +2263,14 @@ class _NowPlayingBackdrop extends StatelessWidget {
       children: [
         if (blurSigma > 0.5)
           Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(
-                sigmaX: blurSigma,
-                sigmaY: blurSigma,
+            child: ClipRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(
+                  sigmaX: blurSigma,
+                  sigmaY: blurSigma,
+                ),
+                child: const SizedBox.expand(),
               ),
-              child: const SizedBox.expand(),
             ),
           ),
         Positioned.fill(
