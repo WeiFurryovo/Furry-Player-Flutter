@@ -577,7 +577,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           label: '设置'),
     ];
 
-    const navBarHeight = 64.0;
+    final navBarHeight = NavigationBarTheme.of(context).height ?? 80.0;
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return LayoutBuilder(
@@ -648,12 +648,15 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         return ValueListenableBuilder<double>(
           valueListenable: _controller.nowPlayingReveal,
           builder: (context, reveal, _) {
+            final cs = Theme.of(context).colorScheme;
             final t = Curves.easeOutCubic.transform(reveal.clamp(0.0, 1.0));
             final navOpacity = (1.0 - t).clamp(0.0, 1.0);
             final bottomPadding =
                 (lerpDouble(navBarHeight + bottomInset, bottomInset, t) ??
                         (navBarHeight + bottomInset))
                     .clamp(bottomInset, navBarHeight + bottomInset);
+            final navBg = Theme.of(context).navigationBarTheme.backgroundColor ??
+                cs.surfaceContainer;
             return Scaffold(
               body: Stack(
                 children: [
@@ -672,13 +675,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                           opacity: navOpacity,
                           duration: const Duration(milliseconds: 180),
                           curve: Curves.easeOutCubic,
-                          child: SafeArea(
-                            top: false,
-                            child: NavigationBar(
-                              selectedIndex: _tabIndex,
-                              destinations: destinations,
-                              onDestinationSelected: (i) =>
-                                  setState(() => _tabIndex = i),
+                          child: ColoredBox(
+                            color: navBg,
+                            child: SafeArea(
+                              top: false,
+                              child: NavigationBar(
+                                selectedIndex: _tabIndex,
+                                destinations: destinations,
+                                onDestinationSelected: (i) =>
+                                    setState(() => _tabIndex = i),
+                              ),
                             ),
                           ),
                         ),
