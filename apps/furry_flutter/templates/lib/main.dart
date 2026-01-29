@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:audio_service/audio_service.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -345,6 +346,35 @@ class FurryApp extends StatelessWidget {
 }
 
 class _ExpressiveTheme {
+  static TextTheme _fontFamilyWithFallback(
+    TextTheme theme, {
+    required String fontFamily,
+    required List<String> fallback,
+  }) {
+    TextStyle? patch(TextStyle? style) => style?.copyWith(
+          fontFamily: fontFamily,
+          fontFamilyFallback: fallback,
+        );
+
+    return theme.copyWith(
+      displayLarge: patch(theme.displayLarge),
+      displayMedium: patch(theme.displayMedium),
+      displaySmall: patch(theme.displaySmall),
+      headlineLarge: patch(theme.headlineLarge),
+      headlineMedium: patch(theme.headlineMedium),
+      headlineSmall: patch(theme.headlineSmall),
+      titleLarge: patch(theme.titleLarge),
+      titleMedium: patch(theme.titleMedium),
+      titleSmall: patch(theme.titleSmall),
+      bodyLarge: patch(theme.bodyLarge),
+      bodyMedium: patch(theme.bodyMedium),
+      bodySmall: patch(theme.bodySmall),
+      labelLarge: patch(theme.labelLarge),
+      labelMedium: patch(theme.labelMedium),
+      labelSmall: patch(theme.labelSmall),
+    );
+  }
+
   static ThemeData build(Brightness brightness) {
     const seed = Color(0xFF8E7CFF);
     final scheme =
@@ -353,12 +383,16 @@ class _ExpressiveTheme {
     final base = ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      // Uses system-installed Google Sans when available (e.g. some Android ROMs).
-      // Falls back to the platform default if missing.
+      // Prefer system Google Sans when available; otherwise fall back to
+      // a bundled Google Fonts alternative for consistent rendering.
       fontFamily: 'Google Sans',
     );
 
-    final tt = base.textTheme;
+    final tt = _fontFamilyWithFallback(
+      GoogleFonts.interTextTheme(base.textTheme),
+      fontFamily: 'Google Sans',
+      fallback: const <String>['Inter', 'Roboto'],
+    );
     final textTheme = tt.copyWith(
       displaySmall: tt.displaySmall?.copyWith(
         fontWeight: FontWeight.w800,
@@ -383,6 +417,11 @@ class _ExpressiveTheme {
 
     return base.copyWith(
       textTheme: textTheme,
+      primaryTextTheme: _fontFamilyWithFallback(
+        GoogleFonts.interTextTheme(base.primaryTextTheme),
+        fontFamily: 'Google Sans',
+        fallback: const <String>['Inter', 'Roboto'],
+      ),
       visualDensity: VisualDensity.standard,
       splashFactory: InkSparkle.splashFactory,
       scaffoldBackgroundColor: scheme.surface,

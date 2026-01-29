@@ -285,7 +285,8 @@ echo "[INFO] 移除已废弃依赖（pub remove）"
   ffi:^2.1.3 \
   audio_service:^0.18.17 \
   smtc_windows:^1.0.0 \
-  dbus:^0.7.11)
+  dbus:^0.7.11 \
+  google_fonts:^6.3.0)
 
 echo "[INFO] 覆盖模板代码"
 cp -a "$TEMPLATES_DIR/lib/." "$OUT_DIR/lib/"
