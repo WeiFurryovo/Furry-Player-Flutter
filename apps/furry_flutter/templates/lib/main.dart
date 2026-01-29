@@ -2411,7 +2411,10 @@ class _NowPlayingMorphHeader extends StatelessWidget {
         );
 
         final coverSize = lerpDouble(coverMin, coverMax, coverT)!;
-        final coverTop = lerpDouble(10, 46, coverT)!;
+        // The sheet already applies a SafeArea-like top padding when expanded,
+        // so keep the cover a bit closer to the top to avoid excessive vertical
+        // push-down on devices with tall status bars/notches.
+        final coverTop = lerpDouble(10, 34, coverT)!;
         final coverLeft = lerpDouble(12, (w - coverSize) / 2, coverT)!;
         // Match "最近输出" thumbnails: fixed corner radius.
         const radius = minRadius;
