@@ -479,7 +479,7 @@ class _ExpressiveTheme {
         textColor: scheme.onSurface,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        height: 72,
+        height: 64,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         backgroundColor: scheme.surfaceContainer,
         indicatorColor: scheme.secondaryContainer,
@@ -577,7 +577,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           label: '设置'),
     ];
 
-    const navBarHeight = 72.0;
+    const navBarHeight = 64.0;
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return LayoutBuilder(
