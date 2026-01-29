@@ -2214,61 +2214,71 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                               ),
                             ),
                             Expanded(
-                              child: ListView(
-                                controller: scrollController,
-                                padding:
-                                    const EdgeInsets.fromLTRB(12, 6, 12, 24),
-                                children: [
-                                  IgnorePointer(
-                                    ignoring: reveal < 0.35,
-                                    child: Opacity(
-                                      opacity: fullOpacity,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          const SizedBox(height: 14),
-                                          _NowPlayingSeekBar(
-                                              controller: widget.controller),
-                                          const SizedBox(height: 16),
-                                          _NowPlayingControls(
-                                              controller: widget.controller),
-                                          const SizedBox(height: 16),
-                                          Container(
-                                            padding: const EdgeInsets.all(12),
-                                            decoration: BoxDecoration(
-                                              color: cs.surfaceContainerHigh,
-                                              borderRadius:
-                                                  BorderRadius.circular(18),
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.info_outline_rounded,
-                                                    color: cs.onSurfaceVariant),
-                                                const SizedBox(width: 10),
-                                                Expanded(
-                                                  child: Text(
-                                                    np.sourcePath,
-                                                    maxLines: 2,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: Theme.of(context)
-                                                        .textTheme
-                                                        .bodySmall
-                                                        ?.copyWith(
-                                                          color: cs
-                                                              .onSurfaceVariant,
-                                                        ),
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onVerticalDragStart: onHeaderDragStart,
+                                onVerticalDragUpdate: onHeaderDragUpdate,
+                                onVerticalDragEnd: onHeaderDragEnd,
+                                child: ListView(
+                                  controller: scrollController,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  padding:
+                                      const EdgeInsets.fromLTRB(12, 6, 12, 24),
+                                  children: [
+                                    IgnorePointer(
+                                      ignoring: reveal < 0.35,
+                                      child: Opacity(
+                                        opacity: fullOpacity,
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const SizedBox(height: 14),
+                                            _NowPlayingSeekBar(
+                                                controller: widget.controller),
+                                            const SizedBox(height: 16),
+                                            _NowPlayingControls(
+                                                controller: widget.controller),
+                                            const SizedBox(height: 16),
+                                            Container(
+                                              padding: const EdgeInsets.all(12),
+                                              decoration: BoxDecoration(
+                                                color: cs.surfaceContainerHigh,
+                                                borderRadius:
+                                                    BorderRadius.circular(18),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                      Icons
+                                                          .info_outline_rounded,
+                                                      color:
+                                                          cs.onSurfaceVariant),
+                                                  const SizedBox(width: 10),
+                                                  Expanded(
+                                                    child: Text(
+                                                      np.sourcePath,
+                                                      maxLines: 2,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: Theme.of(context)
+                                                          .textTheme
+                                                          .bodySmall
+                                                          ?.copyWith(
+                                                            color: cs
+                                                                .onSurfaceVariant,
+                                                          ),
+                                                    ),
                                                   ),
-                                                ),
-                                              ],
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ],
