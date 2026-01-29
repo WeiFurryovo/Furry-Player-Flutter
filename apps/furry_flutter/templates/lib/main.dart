@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui' show ImageFilter, lerpDouble;
+import 'dart:ui' show lerpDouble;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -440,6 +440,7 @@ class _ExpressiveTheme {
 
     const r24 = BorderRadius.all(Radius.circular(24));
     const r18 = BorderRadius.all(Radius.circular(18));
+    const r28 = BorderRadius.all(Radius.circular(28));
 
     return base.copyWith(
       textTheme: textTheme,
@@ -457,6 +458,11 @@ class _ExpressiveTheme {
         backgroundColor: scheme.surface,
         foregroundColor: scheme.onSurface,
       ),
+      cardTheme: const CardTheme(
+        elevation: 0,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(borderRadius: r28),
+      ).copyWith(color: scheme.surfaceContainerHighest),
       listTileTheme: ListTileThemeData(
         shape: const RoundedRectangleBorder(borderRadius: r18),
         iconColor: scheme.onSurfaceVariant,
@@ -465,7 +471,7 @@ class _ExpressiveTheme {
       navigationBarTheme: NavigationBarThemeData(
         height: 72,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        backgroundColor: scheme.surface,
+        backgroundColor: scheme.surfaceContainer,
         indicatorColor: scheme.secondaryContainer,
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -498,6 +504,14 @@ class _ExpressiveTheme {
         modalBackgroundColor: scheme.surface,
         shape: const RoundedRectangleBorder(borderRadius: r24),
         clipBehavior: Clip.antiAlias,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: scheme.inverseSurface,
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: scheme.onInverseSurface,
+        ),
+        shape: const RoundedRectangleBorder(borderRadius: r18),
       ),
     );
   }
@@ -2128,98 +2142,91 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                 builder: (context, scrollController) {
                   return Material(
                     color: Colors.transparent,
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(28),
-                      ),
-                      child: _NowPlayingBackdrop(
-                        reveal: reveal,
-                        cs: cs,
-                        child: Column(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                              child: GestureDetector(
-                                // Keep the drag gesture out of the ListView to avoid
-                                // gesture arena conflicts (slow drags would be won by
-                                // the Scrollable and "bounce back").
-                                behavior: HitTestBehavior.translucent,
-                                onVerticalDragStart: onHeaderDragStart,
-                                onVerticalDragUpdate: onHeaderDragUpdate,
-                                onVerticalDragEnd: onHeaderDragEnd,
-                                child: _NowPlayingMorphHeader(
-                                  controller: widget.controller,
-                                  np: np,
-                                  reveal: reveal,
-                                  miniOpacity: miniOpacity,
-                                  fullOpacity: fullOpacity,
-                                  maxHeight: maxHeaderHeight,
-                                  onExpand: () => _expand(maxSize),
-                                  onCollapse: () => _collapse(minSize),
-                                ),
+                    child: _NowPlayingBackdrop(
+                      reveal: reveal,
+                      cs: cs,
+                      child: Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                            child: GestureDetector(
+                              // Keep the drag gesture out of the ListView to avoid
+                              // gesture arena conflicts (slow drags would be won by
+                              // the Scrollable and "bounce back").
+                              behavior: HitTestBehavior.translucent,
+                              onVerticalDragStart: onHeaderDragStart,
+                              onVerticalDragUpdate: onHeaderDragUpdate,
+                              onVerticalDragEnd: onHeaderDragEnd,
+                              child: _NowPlayingMorphHeader(
+                                controller: widget.controller,
+                                np: np,
+                                reveal: reveal,
+                                miniOpacity: miniOpacity,
+                                fullOpacity: fullOpacity,
+                                maxHeight: maxHeaderHeight,
+                                onExpand: () => _expand(maxSize),
+                                onCollapse: () => _collapse(minSize),
                               ),
                             ),
-                            Expanded(
-                              child: ListView(
-                                controller: scrollController,
-                                padding:
-                                    const EdgeInsets.fromLTRB(12, 6, 12, 24),
-                                children: [
-                                  IgnorePointer(
-                                    ignoring: reveal < 0.35,
-                                    child: Opacity(
-                                      opacity: fullOpacity,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          const SizedBox(height: 14),
-                                          _NowPlayingSeekBar(
-                                              controller: widget.controller),
-                                          const SizedBox(height: 16),
-                                          _NowPlayingControls(
-                                              controller: widget.controller),
-                                          const SizedBox(height: 16),
-                                          Container(
-                                            padding: const EdgeInsets.all(12),
-                                            decoration: BoxDecoration(
-                                              color: _withOpacityCompat(
-                                                  cs.surfaceContainerHighest,
-                                                  0.65),
-                                              borderRadius:
-                                                  BorderRadius.circular(18),
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.info_outline_rounded,
-                                                    color: cs.onSurfaceVariant),
-                                                const SizedBox(width: 10),
-                                                Expanded(
-                                                  child: Text(
-                                                    np.sourcePath,
-                                                    maxLines: 2,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: Theme.of(context)
-                                                        .textTheme
-                                                        .bodySmall
-                                                        ?.copyWith(
-                                                            color: cs
-                                                                .onSurfaceVariant),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
+                          ),
+                          Expanded(
+                            child: ListView(
+                              controller: scrollController,
+                              padding: const EdgeInsets.fromLTRB(12, 6, 12, 24),
+                              children: [
+                                IgnorePointer(
+                                  ignoring: reveal < 0.35,
+                                  child: Opacity(
+                                    opacity: fullOpacity,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const SizedBox(height: 14),
+                                        _NowPlayingSeekBar(
+                                            controller: widget.controller),
+                                        const SizedBox(height: 16),
+                                        _NowPlayingControls(
+                                            controller: widget.controller),
+                                        const SizedBox(height: 16),
+                                        Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: cs.surfaceContainerHigh,
+                                            borderRadius:
+                                                BorderRadius.circular(18),
                                           ),
-                                        ],
-                                      ),
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.info_outline_rounded,
+                                                  color: cs.onSurfaceVariant),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Text(
+                                                  np.sourcePath,
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .bodySmall
+                                                      ?.copyWith(
+                                                        color:
+                                                            cs.onSurfaceVariant,
+                                                      ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   );
@@ -2246,65 +2253,21 @@ class _NowPlayingBackdrop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Material 3 Expressive prefers tonal surfaces. We keep the now-playing
-    // surface mostly opaque for readability, and optionally apply a subtle blur
-    // when expanded (mini state stays crisp).
-    const blurEnabled = !kIsWeb;
-    final reduceEffects =
-        (MediaQuery.maybeOf(context)?.disableAnimations ?? false) ||
-            (MediaQuery.maybeOf(context)?.accessibleNavigation ?? false);
-    final blurT = Curves.easeOutCubic.transform(reveal.clamp(0.0, 1.0));
-    final blurSigma =
-        (blurEnabled && !reduceEffects) ? (lerpDouble(0, 24, blurT) ?? 0) : 0.0;
-    final surfaceOpacity = lerpDouble(0.95, 0.82, blurT) ?? 0.9;
-    final tintOpacity = lerpDouble(0.10, 0.06, blurT) ?? 0.08;
+    // Material 3 surfaces: prefer tonal, mostly-opaque surfaces with elevation.
+    // Avoid blur/glass as the baseline "strict" M3 look for better contrast and
+    // performance across devices.
+    final t = Curves.easeOutCubic.transform(reveal.clamp(0.0, 1.0));
+    final elevation = (lerpDouble(1.0, 8.0, t) ?? 4.0).clamp(0.0, 12.0);
 
-    return Stack(
-      children: [
-        if (blurSigma > 0.5)
-          Positioned.fill(
-            child: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(
-                  sigmaX: blurSigma,
-                  sigmaY: blurSigma,
-                ),
-                child: const SizedBox.expand(),
-              ),
-            ),
-          ),
-        Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: _withOpacityCompat(
-                  cs.surfaceContainerHighest, surfaceOpacity),
-              border: Border(
-                top: BorderSide(
-                  color: _withOpacityCompat(cs.outlineVariant, 0.35),
-                  width: 1,
-                ),
-              ),
-            ),
-          ),
-        ),
-        Positioned.fill(
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    _withOpacityCompat(cs.primaryContainer, tintOpacity),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        child,
-      ],
+    return Material(
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      elevation: elevation,
+      color: cs.surfaceContainerHighest,
+      surfaceTintColor: cs.surfaceTint,
+      child: child,
     );
   }
 }
