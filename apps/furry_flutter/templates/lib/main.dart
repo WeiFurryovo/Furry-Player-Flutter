@@ -353,6 +353,9 @@ class _ExpressiveTheme {
     final base = ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
+      // Uses system-installed Google Sans when available (e.g. some Android ROMs).
+      // Falls back to the platform default if missing.
+      fontFamily: 'Google Sans',
     );
 
     final tt = base.textTheme;
