@@ -36,32 +36,26 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android NDK (sdkmanager)
+      - name: Create Flutter app (Android)
         run: |
           set -euxo pipefail
-          mkdir -p ~/.android
-          touch ~/.android/repositories.cfg
-          export ANDROID_SDK_ROOT="${ANDROID_HOME}"
-          sdkmanager --version
-          # Ensure cmdline-tools present on runner
-          sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --install "cmdline-tools;latest"
-          # `yes | sdkmanager --licenses` may end with `yes: Broken pipe` under pipefail; only enforce sdkmanager's exit code.
-          set +o pipefail
-          yes | sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --licenses >/dev/null
-          status="${PIPESTATUS[1]}"
-          set -o pipefail
-          test "$status" -eq 0
-          sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --install "ndk;26.1.10909125"
-          sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --list | sed -n '1,120p'
+          ./apps/furry_flutter/create_flutter_app.sh --no-ffi
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('apps/furry_flutter/furry_flutter_app/android/gradle/wrapper/gradle-wrapper.properties', 'apps/furry_flutter/furry_flutter_app/android/**/*.gradle*', 'apps/furry_flutter/furry_flutter_app/android/**/gradle.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
       - name: Build debug APK (no signing secrets needed)
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
         run: |
           set -euxo pipefail
           mkdir -p dist/android/flutter
           (
-            ./apps/furry_flutter/create_flutter_app.sh --no-ffi
             cd apps/furry_flutter/furry_flutter_app
             flutter analyze
             flutter build apk --debug --verbose
