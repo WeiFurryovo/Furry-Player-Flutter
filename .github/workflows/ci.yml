@@ -187,18 +187,10 @@ jobs:
 
           Push-Location $outDir
           # Pin versions to avoid breaking API changes in dependencies (e.g. file_picker v10 removed FilePicker.platform).
-          flutter pub add `
-            file_picker:^8.3.2 `
-            path_provider:^2.1.5 `
-            just_audio:^0.9.46 `
-            audio_session:^0.1.25 `
-            path `
-            ffi:^2.1.3 `
-            audio_service:^0.18.17 `
-            smtc_windows:^1.0.0 `
-            dbus:^0.7.11 `
-            google_fonts:^6.3.0 `
-            dynamic_color:^1.7.0
+          $depsFile = Join-Path $root "apps\\furry_flutter\\deps_pins.txt"
+          if (!(Test-Path $depsFile)) { throw "Missing deps file: $depsFile" }
+          $deps = Get-Content $depsFile | Where-Object { $_ -and (-not $_.StartsWith("#")) }
+          flutter pub add @deps
           Pop-Location
 
           Copy-Item -Recurse -Force (Join-Path $templates "lib\*") (Join-Path $outDir "lib")

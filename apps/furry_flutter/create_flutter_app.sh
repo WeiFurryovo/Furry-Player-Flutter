@@ -281,18 +281,21 @@ echo "[INFO] 移除已废弃依赖（pub remove）"
   > /dev/null 2>&1 || true)
 
 # Pin versions to avoid breaking API changes (e.g. file_picker v10 removed FilePicker.platform).
-(cd "$OUT_DIR" && flutter pub add \
-  file_picker:^8.3.2 \
-  path_provider:^2.1.5 \
-  just_audio:^0.9.46 \
-  audio_session:^0.1.25 \
-  path:any \
-  ffi:^2.1.3 \
-  audio_service:^0.18.17 \
-  smtc_windows:^1.0.0 \
-  dbus:^0.7.11 \
-  google_fonts:^6.3.0 \
-  dynamic_color:^1.7.0)
+DEPS_FILE="$ROOT/apps/furry_flutter/deps_pins.txt"
+if [ ! -f "$DEPS_FILE" ]; then
+  echo "[ERROR] 缺少依赖列表文件：$DEPS_FILE" >&2
+  exit 1
+fi
+deps=()
+while IFS= read -r line; do
+  line="${line%%$'\r'}"
+  [ -z "$line" ] && continue
+  case "$line" in
+    \#*) continue ;;
+  esac
+  deps+=("$line")
+done <"$DEPS_FILE"
+(cd "$OUT_DIR" && flutter pub add "${deps[@]}")
 
 echo "[INFO] 覆盖模板代码"
 cp -a "$TEMPLATES_DIR/lib/." "$OUT_DIR/lib/"

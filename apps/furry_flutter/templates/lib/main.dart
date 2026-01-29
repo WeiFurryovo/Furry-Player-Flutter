@@ -290,6 +290,22 @@ class _DiagnosticsLog {
       await _writeChain;
     } catch (_) {}
   }
+
+  static Future<String?> exportToDocuments() async {
+    try {
+      await init();
+      final src = _file!;
+      if (!await src.exists()) return null;
+      final docs = await getApplicationDocumentsDirectory();
+      await docs.create(recursive: true);
+      final ts = DateTime.now().toIso8601String().replaceAll(':', '-');
+      final out = File(p.join(docs.path, 'furry_diagnostics_$ts.log'));
+      await src.copy(out.path);
+      return out.path;
+    } catch (_) {
+      return null;
+    }
+  }
 }
 
 Future<void> main() async {
@@ -874,6 +890,14 @@ class _AppController {
   Future<void> clearLog() async {
     log.value = '';
     await _DiagnosticsLog.clear();
+  }
+
+  Future<String?> exportLog() async {
+    final path = await _DiagnosticsLog.exportToDocuments();
+    if (path != null) {
+      appendLog('Log exported: $path');
+    }
+    return path;
   }
 
   Future<Directory> outputsDir() async {
@@ -1969,6 +1993,28 @@ class SettingsPage extends StatelessWidget {
                             },
                             icon: const Icon(Icons.delete_outline_rounded),
                           ),
+                          IconButton(
+                            tooltip: '导出',
+                            onPressed: () async {
+                              final path = await controller.exportLog();
+                              if (!context.mounted) return;
+                              if (path == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('导出失败')),
+                                );
+                                return;
+                              }
+                              await Clipboard.setData(
+                                  ClipboardData(text: path));
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text('已导出（路径已复制到剪贴板）')),
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.file_upload_outlined),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -2594,16 +2640,26 @@ class _NowPlayingSeekBarState extends State<_NowPlayingSeekBar> {
             final value = _dragMs ?? posMs;
             return Column(
               children: [
-                Slider(
-                  value: value.clamp(0.0, maxMs),
-                  min: 0,
-                  max: maxMs,
-                  onChangeStart: (_) => setState(() => _dragMs = value),
-                  onChanged: (v) => setState(() => _dragMs = v),
-                  onChangeEnd: (v) async {
-                    setState(() => _dragMs = null);
-                    await controller.seek(Duration(milliseconds: v.round()));
-                  },
+                Semantics(
+                  label: '播放进度',
+                  value:
+                      '${controller._fmt(Duration(milliseconds: posMs.round()))} / ${controller._fmt(duration)}',
+                  child: Slider(
+                    value: value.clamp(0.0, maxMs),
+                    min: 0,
+                    max: maxMs,
+                    semanticFormatterCallback: (v) => controller._fmt(
+                      Duration(
+                        milliseconds: v.round().clamp(0, maxMs.toInt()),
+                      ),
+                    ),
+                    onChangeStart: (_) => setState(() => _dragMs = value),
+                    onChanged: (v) => setState(() => _dragMs = v),
+                    onChangeEnd: (v) async {
+                      setState(() => _dragMs = null);
+                      await controller.seek(Duration(milliseconds: v.round()));
+                    },
+                  ),
                 ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2649,23 +2705,30 @@ class _NowPlayingControls extends StatelessWidget {
                 icon: const Icon(Icons.skip_previous_rounded),
               ),
               const SizedBox(width: 14),
-              FilledButton(
-                onPressed: busy
-                    ? null
-                    : () async {
-                        if (playing) {
-                          await controller.pause();
-                        } else {
-                          await controller.play();
-                        }
-                      },
-                child: busy
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(playing ? '暂停' : '播放'),
+              Semantics(
+                button: true,
+                label: playing ? '暂停' : '播放',
+                child: Tooltip(
+                  message: playing ? '暂停' : '播放',
+                  child: FilledButton(
+                    onPressed: busy
+                        ? null
+                        : () async {
+                            if (playing) {
+                              await controller.pause();
+                            } else {
+                              await controller.play();
+                            }
+                          },
+                    child: busy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(playing ? '暂停' : '播放'),
+                  ),
+                ),
               ),
               const SizedBox(width: 14),
               IconButton.filledTonal(
