@@ -580,48 +580,92 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     const navBarHeight = 72.0;
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
-    return Scaffold(
-      body: Stack(
-        children: [
-          SafeArea(
-            top: false,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              child: IndexedStack(
-                key: ValueKey<int>(_tabIndex),
-                index: _tabIndex,
-                children: [
-                  LibraryPage(controller: _controller),
-                  ConverterPage(controller: _controller),
-                  SettingsPage(controller: _controller),
-                ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useRail = constraints.maxWidth >= 700;
+        final pages = <Widget>[
+          LibraryPage(controller: _controller),
+          ConverterPage(controller: _controller),
+          SettingsPage(controller: _controller),
+        ];
+
+        Widget contentStack({required double bottomPadding}) {
+          return Stack(
+            children: [
+              SafeArea(
+                top: false,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  child: IndexedStack(
+                    key: ValueKey<int>(_tabIndex),
+                    index: _tabIndex,
+                    children: pages,
+                  ),
+                ),
               ),
-            ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: NavigationBar(
-                selectedIndex: _tabIndex,
-                destinations: destinations,
-                onDestinationSelected: (i) => setState(() => _tabIndex = i),
+              Positioned.fill(
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: bottomPadding),
+                  child: NowPlayingPanel(controller: _controller),
+                ),
               ),
+            ],
+          );
+        }
+
+        if (useRail) {
+          final railDestinations = destinations
+              .map(
+                (d) => NavigationRailDestination(
+                  icon: d.icon,
+                  selectedIcon: d.selectedIcon ?? d.icon,
+                  label: Text(d.label),
+                ),
+              )
+              .toList(growable: false);
+
+          return Scaffold(
+            body: Row(
+              children: [
+                SafeArea(
+                  child: NavigationRail(
+                    selectedIndex: _tabIndex,
+                    onDestinationSelected: (i) => setState(() => _tabIndex = i),
+                    labelType: NavigationRailLabelType.all,
+                    destinations: railDestinations,
+                  ),
+                ),
+                Expanded(
+                  child: contentStack(bottomPadding: bottomInset),
+                ),
+              ],
             ),
+          );
+        }
+
+        return Scaffold(
+          body: Stack(
+            children: [
+              contentStack(bottomPadding: navBarHeight + bottomInset),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: SafeArea(
+                  top: false,
+                  child: NavigationBar(
+                    selectedIndex: _tabIndex,
+                    destinations: destinations,
+                    onDestinationSelected: (i) => setState(() => _tabIndex = i),
+                  ),
+                ),
+              ),
+            ],
           ),
-          // Spotify-like persistent player panel above the nav bar.
-          Positioned.fill(
-            child: Padding(
-              padding: EdgeInsets.only(bottom: navBarHeight + bottomInset),
-              child: NowPlayingPanel(controller: _controller),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
