@@ -1,0 +1,2166 @@
+{
+  "base_url": "https://docs.flutter.dev/ui/widgets/material",
+  "source_html": "docs/web_audit/flutter_material_widgets.html",
+  "total_links": 429,
+  "by_type_counts": {
+    "css": 1,
+    "image": 41,
+    "js": 2,
+    "other": 385
+  },
+  "links": {
+    "other": [
+      {
+        "url": "https://api.flutter.dev",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/AlertDialog-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/AppBar-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/Badge-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/BottomAppBar-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/BottomSheet-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/ButtonStyle-class.html#material-3-button-types",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/Card-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/Checkbox-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/Chip-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/Divider-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/FloatingActionButton-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/FloatingActionButton/FloatingActionButton.extended.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/IconButton-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/LinearProgressIndicator-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/ListTile-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/MenuAnchor-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/NavigationBar-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/NavigationDrawer-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/NavigationRail-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/Radio-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/SegmentedButton-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/Slider-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/SnackBar-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/Switch-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/TabBar-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/TextField-class.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/showDatePicker.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://api.flutter.dev/flutter/material/showTimePicker.html",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://blog.flutter.dev",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://bsky.app/profile/flutter.dev",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://codelabs.developers.google.com/codelabs/admob-ads-in-flutter",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://codelabs.developers.google.com/codelabs/admob-inline-ads-in-flutter",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://codelabs.developers.google.com/codelabs/flutter-flame-brick-breaker",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://codelabs.developers.google.com/codelabs/flutter-in-app-purchases",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://codelabs.developers.google.com/codelabs/google-maps-in-flutter",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://creativecommons.org/licenses/by/4.0/",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://dart.dev",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://dartpad.dev",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developers.google.com/admob/flutter/mediation",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developers.google.com/maps/flutter-package",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/add-to-app",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/add-to-app/android/add-flutter-fragment",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/add-to-app/android/add-flutter-screen",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/add-to-app/android/add-flutter-view",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/add-to-app/android/plugin-setup",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/add-to-app/android/project-setup",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/add-to-app/debugging",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/add-to-app/ios/add-flutter-screen",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/add-to-app/ios/project-setup",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/add-to-app/multiple-flutters",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/add-to-app/performance",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/ai-rules",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/ai-toolkit",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/ai-toolkit/chat-client-sample",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/ai-toolkit/custom-llm-providers",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/ai-toolkit/feature-integration",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/ai-toolkit/user-experience",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/best-practices",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/best-practices/developer-experience",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/best-practices/mode-of-interaction",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/best-practices/prompting",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/best-practices/structure-output",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/best-practices/tool-calls",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/create-with-ai",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/gemini-cli-extension",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/genui",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/genui/components",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/genui/get-started",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/genui/input-events",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ai/mcp-server",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/app-architecture",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/app-architecture/case-study",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/app-architecture/case-study/data-layer",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/app-architecture/case-study/dependency-injection",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/app-architecture/case-study/testing",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/app-architecture/case-study/ui-layer",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/app-architecture/concepts",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/app-architecture/design-patterns",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/app-architecture/guide",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/app-architecture/recommendations",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/brand",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/contribute",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/animation/animated-container",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/animation/opacity-animation",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/animation/page-route-animation",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/animation/physics-simulation",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/design/drawer",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/design/fonts",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/design/package-fonts",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/design/snackbars",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/design/tabs",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/design/themes",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/effects/drag-a-widget",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/effects/parallax-scrolling",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/effects/staggered-menu-animation",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/forms/focus",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/forms/retrieve-input",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/forms/text-field-changes",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/forms/text-input",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/forms/validation",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/games/achievements-leaderboard",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/games/firestore-multiplayer",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/gestures/dismissible",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/gestures/handling-taps",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/gestures/ripples",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/images/fading-in-images",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/images/network-image",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/lists/basic-list",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/lists/floating-app-bar",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/lists/grid-lists",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/lists/horizontal-list",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/lists/long-lists",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/lists/mixed-list",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/lists/spaced-items",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/maintenance/error-reporting",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/navigation/navigation-basics",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/navigation/passing-data",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/navigation/returning-data",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/navigation/set-up-app-links",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/navigation/set-up-universal-links",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/networking/authenticated-requests",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/networking/background-parsing",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/networking/delete-data",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/networking/fetch-data",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/networking/send-data",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/networking/update-data",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/networking/web-sockets",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/persistence/key-value",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/persistence/reading-writing-files",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/persistence/sqlite",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/plugins/google-mobile-ads",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/plugins/play-video",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/testing/integration/introduction",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/testing/integration/profiling",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/testing/unit/introduction",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/testing/unit/mocking",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/testing/widget/finders",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/testing/widget/introduction",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/testing/widget/scrolling",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/cookbook/testing/widget/tap-drag",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/dash",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/data-and-backend/firebase",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/data-and-backend/google-apis",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/data-and-backend/networking",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/data-and-backend/serialization/json",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/data-and-backend/state-mgmt/declarative",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/data-and-backend/state-mgmt/ephemeral-vs-app",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/data-and-backend/state-mgmt/intro",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/data-and-backend/state-mgmt/options",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/data-and-backend/state-mgmt/simple",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/deployment/android",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/deployment/cd",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/deployment/flavors",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/deployment/flavors-ios",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/deployment/ios",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/deployment/linux",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/deployment/macos",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/deployment/obfuscate",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/deployment/web",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/deployment/windows",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/flutter-for/android-devs",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/flutter-for/compose-devs",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/flutter-for/dart-swift-concurrency",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/flutter-for/declarative",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/flutter-for/react-native-devs",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/flutter-for/swiftui-devs",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/flutter-for/uikit-devs",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/flutter-for/web-devs",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/flutter-for/xamarin-forms-devs",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/get-started/quick",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/install",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/install/add-to-path",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/install/archive",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/install/custom",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/install/quick",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/install/troubleshoot",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/install/uninstall",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/install/upgrade",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/learn",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/packages-and-plugins/developing-packages",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/packages-and-plugins/favorites",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/packages-and-plugins/swift-package-manager/for-app-developers",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/packages-and-plugins/swift-package-manager/for-plugin-authors",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/packages-and-plugins/using-packages",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/perf",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/perf/app-size",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/perf/appendix",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/perf/best-practices",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/perf/deferred-components",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/perf/faq",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/perf/impeller",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/perf/isolates",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/perf/metrics",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/perf/rendering-performance",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/perf/ui-performance",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/perf/web-performance",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/android/call-jetpack-apis",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/android/chromeos",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/android/compose-activity",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/android/platform-views",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/android/predictive-back",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/android/restore-state-android",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/android/sensitive-content",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/android/setup",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/android/splash-screen",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/bind-native-code",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/desktop",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/ios/app-extensions",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/ios/apple-frameworks",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/ios/ios-app-clip",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/ios/ios-debugging",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/ios/ios-latest",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/ios/launch-screen",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/ios/platform-views",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/ios/restore-state-ios",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/ios/setup",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/linux/building",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/linux/setup",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/macos/building",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/macos/platform-views",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/macos/setup",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/platform-channels",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/web",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/web/building",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/web/embedding-flutter-web",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/web/faq",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/web/initialization",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/web/renderers",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/web/setup",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/web/wasm",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/web/web-content-in-flutter",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/web/web-dev-config-file",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/web/web-images",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/windows/building",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/platform-integration/windows/setup",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/reference/create-new-app",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/reference/flutter-cli",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/reference/supported-platforms",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/reference/widgets",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/release/breaking-changes",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/release/breaking-changes/material-3-migration",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/release/compatibility-policy",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/release/release-notes",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/release/whats-new",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/resources/ads-overview",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/resources/architectural-overview",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/resources/bug-reports",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/resources/courses",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/resources/design-docs",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/resources/faq",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/resources/games-toolkit",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/resources/glossary",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/resources/inside-flutter",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/resources/payments-overview",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/resources/support",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/resources/videos",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/search",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/security",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/testing/build-modes",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/testing/code-debugging",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/testing/common-errors",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/testing/debugging",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/testing/errors",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/testing/integration-tests",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/testing/native-debugging",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/testing/overview",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/testing/plugins-in-tests",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/testing/testing-plugins",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/android-studio",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/devtools",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/devtools/android-studio",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/devtools/app-size",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/devtools/cli",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/devtools/console",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/devtools/cpu-profiler",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/devtools/debugger",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/devtools/deep-links",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/devtools/extensions",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/devtools/inspector",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/devtools/legacy-inspector",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/devtools/logging",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/devtools/memory",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/devtools/network",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/devtools/performance",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/devtools/release-notes",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/devtools/vscode",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/flutter-fix",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/formatting",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/hot-reload",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/property-editor",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/pubspec",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/sdk",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/vs-code",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tools/widget-previewer",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/tos",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/accessibility",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/accessibility/accessibility-testing",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/accessibility/assistive-technologies",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/accessibility/ui-design-and-styling",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/accessibility/web-accessibility",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/adaptive-responsive",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/adaptive-responsive/best-practices",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/adaptive-responsive/capabilities",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/adaptive-responsive/general",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/adaptive-responsive/input",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/adaptive-responsive/large-screens",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/adaptive-responsive/more-info",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/adaptive-responsive/platform-adaptations",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/adaptive-responsive/safearea-mediaquery",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/animations",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/animations/hero-animations",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/animations/implicit-animations",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/animations/overview",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/animations/staggered-animations",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/animations/tutorial",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/assets/asset-transformation",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/assets/assets-and-images",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/design/graphics/fragment-shaders",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/design/material",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/design/text/typography",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/interactivity",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/interactivity/actions-and-shortcuts",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/interactivity/focus",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/interactivity/gestures",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/interactivity/gestures/drag-outside",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/internationalization",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/layout",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/layout/constraints",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/layout/scrolling",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/layout/scrolling/slivers",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/layout/tutorial",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/navigation",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/navigation/deep-linking",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/navigation/url-strategies",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/widgets",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/widgets/accessibility",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/widgets/animation",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/widgets/assets",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/widgets/async",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/widgets/basics",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/widgets/cupertino",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/widgets/input",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/widgets/interaction",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/widgets/layout",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/widgets/material",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/widgets/material2",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/widgets/painting",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/widgets/scrolling",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/widgets/styling",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/ui/widgets/text",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://firebase.google.com/codelabs/build-leaderboards-with-firestore#0",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://firebase.google.com/codelabs/firebase-auth-in-flutter-apps",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://firebase.google.com/codelabs/firebase-get-to-know-web",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://firebase.google.com/docs/ai-logic/get-started?platform=flutter",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://firebase.google.com/docs/crashlytics/get-started?platform=flutter",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://firebase.google.com/docs/flutter",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://firebase.google.com/docs/flutter/setup",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://flutter.dev",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://fonts.googleapis.com",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://fonts.googleapis.com/css2?family=Google+Sans+Mono:wght@400;500;700&amp;display=swap",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://fonts.googleapis.com/css2?family=Google+Sans+Text:wght@400;500;700&amp;display=swap",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&amp;display=swap",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0..1,0",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://fonts.gstatic.com",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://github.com/flutter",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://github.com/flutter/samples/tree/main/material_3_demo/",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://github.com/flutter/website/issues/new?template=1_page_issue.yml&amp;page-url=https://docs.flutter.dev/ui/widgets/material",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://jaspr.site",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://m3.material.io/get-started",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://opensource.org/licenses/BSD-3-Clause",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://policies.google.com/privacy",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://policies.google.com/technologies/cookies",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://pub.dev",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://pub.dev/flutter",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://pub.dev/packages/google_fonts",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://pub.dev/packages/interactive_media_ads",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://pub.dev/packages/pay",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://twitter.com/FlutterDev",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://www.googletagmanager.com/ns.html?id=GTM-ND4LWWZ",
+        "tag": "iframe",
+        "attr": "src"
+      },
+      {
+        "url": "https://www.youtube.com/watch?v=U8x5n6RwZOo",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://www.youtube.com/watch?v=wUSkeTaBonA",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://youtube.com/@flutterdev",
+        "tag": "a",
+        "attr": "href"
+      }
+    ],
+    "js": [
+      {
+        "url": "https://cdn.jsdelivr.net/npm/@justinribeiro/lite-youtube@1.8.2/lite-youtube.js",
+        "tag": "script",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/main.client.dart.js",
+        "tag": "script",
+        "attr": "src"
+      }
+    ],
+    "css": [
+      {
+        "url": "https://docs.flutter.dev/assets/css/main.css?hash=JabuNWGMwhb6",
+        "tag": "link",
+        "attr": "href"
+      }
+    ],
+    "image": [
+      {
+        "url": "https://docs.flutter.dev/assets/images/branding/dart/logo.svg",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/branding/flutter/icon/64.png",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/branding/flutter/logo+text/horizontal/white.svg",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/branding/flutter/logo/default.svg",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/branding/flutter/logo/flutter-logomark-320px.png",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-badge.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-bottom-app-bar.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-bottom-sheet.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-bubbles.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-buttons.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-card.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-checkbox.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-chip.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-coral.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-date-picker.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-dialog.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-divider.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-extended-fab.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-floating-action-button.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-icon-button.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-leaves.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-list.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-menu.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-navigation-bar.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-navigation-drawer.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-navigation-rail.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-progress-indicator.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-radio-button.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-segmented-button.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-slider.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-snackbar.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-switch.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-tab-bar.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-text-field.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-time-picker.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/docs/widget-catalog/material-3-top-app-bar.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/social/bluesky.svg#bluesky",
+        "tag": "use",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/social/github.svg#github",
+        "tag": "use",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/social/medium.svg#medium",
+        "tag": "use",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/social/x.svg#x",
+        "tag": "use",
+        "attr": "href"
+      },
+      {
+        "url": "https://docs.flutter.dev/assets/images/social/youtube.svg#youtube",
+        "tag": "use",
+        "attr": "href"
+      }
+    ]
+  }
+}

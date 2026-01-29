@@ -1,0 +1,1084 @@
+{
+  "base_url": "https://developer.android.com/design/ui/mobile",
+  "source_html": "docs/web_audit/android_design_ui_mobile.html",
+  "total_links": 212,
+  "by_type_counts": {
+    "css": 3,
+    "image": 23,
+    "json": 1,
+    "other": 184,
+    "xml": 1
+  },
+  "links": {
+    "other": [
+      {
+        "url": "https://android-developers.googleblog.com/",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://apis.google.com",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://cloud.google.com",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/about/versions/10",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/about/versions/11",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/about/versions/12",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/about/versions/13",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/about/versions/14",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/about/versions/15",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/about/versions/pie",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/adaptive-apps",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/ai",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/build/gradle-build-overview",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/cars",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/chrome-os",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/community",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/courses",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design-for-safety/privacy-sandbox",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/ai-glasses",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/cars",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/large-screens",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile/guides/components/material-overview",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile/guides/foundations/accessibility",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile/guides/foundations/glossary",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile/guides/foundations/system-bars",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile/guides/home-screen/notifications",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile/guides/layout-and-content/layout-basics",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile/guides/patterns/predictive-back",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile/guides/styles/themes",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile/samples",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=ar",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=bn",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=de",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=es-419",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=fa",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=fr",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=he",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=hi",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=id",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=it",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=ja",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=ko",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=pl",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=pt-br",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=ru",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=th",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=tr",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=vi",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=zh-cn",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/mobile?hl=zh-tw",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/tv",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/tv#explore-our-kits",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/wear",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/wear#explore-our-kits",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/widget",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/design/ui/xr",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/develop",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/develop#core-areas",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/develop#devices",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/develop/background-work",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/develop/connectivity",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/develop/ui",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/develop/ui/compose/adopt",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/develop/ui/compose/layouts/adaptive/window-size-classes",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/develop/xr",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/developer-verification",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/distribute",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/distribute/marketing-tools",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/distribute/marketing-tools/brand-guidelines",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/distribute/play-billing",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/distribute/play-policies",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/docs/quality-guidelines/core-app-quality",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/games",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/games/pgs/overview",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/games/playgames/overview",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/gemini-in-android",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/get-started",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/get-started/codelabs",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/get-started/overview",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/google/play/installreferrer",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/google/play/integrity",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/guide",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/guide/app-bundle",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/guide/navigation/navigation-principles",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/guide/playcore/asset-delivery",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/guide/playcore/feature-delivery",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/guide/playcore/in-app-review",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/guide/playcore/in-app-updates",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/guide/topics/data",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/guide/topics/large-screens/get-started-with-large-screens",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/guide/topics/ui/accessibility",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/health-and-fitness",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/health-and-fitness/guides",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/identity",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/jetpack/androidx/explorer",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/jetpack/androidx/releases/compose",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/jetpack/androidx/versions",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/kotlin",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/kotlin/multiplatform",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/large-screens",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/large-screens/gallery",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/latest-updates",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/latest-updates/experimental",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/license",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/media",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/ml",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/ndk",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/news",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/podcasts",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/privacy",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/privacy#app-permissions",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/productivity",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/quality",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/quality/core-value",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/quality/excellent",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/quality/technical",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/quality/user-experience",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/reference",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/reference/packages",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/reference/tools/gradle-api",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/samples",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/security",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/security/fraud-prevention",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/social-and-messaging",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/static/videos/design/ui/large-screens/window_size.mp4",
+        "tag": "source",
+        "attr": "src"
+      },
+      {
+        "url": "https://developer.android.com/studio",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/studio/intro",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/studio/preview",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/studio/write",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/tools",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/topic/architecture/intro",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/topic/libraries/view-binding",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/topic/modularization",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/topic/performance/overview",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/training/cars",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/training/connectivity/5g",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/training/testing",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/training/testing/fundamentals",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/training/tv",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/training/wearables",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/training/wearables/versions/latest",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/tv",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/updates",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/wear",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/work/overview",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.android.com/xr",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developer.chrome.com/home",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developers.google.com/",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developers.google.com/android-publisher/api-ref/rest",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developers.google.com/android/reference/packages",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://developers.google.com/products/",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://firebase.google.com",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://fonts.googleapis.com",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://fonts.googleapis.com/css2?family=Material+Icons&family=Material+Symbols+Outlined&display=block",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://fonts.googleapis.com/css?family=Google+Sans:400,500,600,700|Google+Sans+Text:400,400italic,500,500italic,600,600italic,700,700italic|Roboto+Mono:400,500,700&display=swap",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://fonts.gstatic.com",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://g.co/userresearch/androiddeveloperfooter",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://goo.gle/android-ui-kit",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://issuetracker.google.com/issues/new?component=190923&amp;template=841312",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://issuetracker.google.com/issues/new?component=192697",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://m3.material.io",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://m3.material.io/theme-builder#/dynamic",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://play.google.com/console",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://play.google.com/console/about/",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://play.google.com/console/about/guides/play-commerce/",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://play.google.com/console/about/programs",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://play.google.com/sdks",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://policies.google.com/privacy",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://source.android.com",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://support.google.com/googleplay/android-developer",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://www.android.com",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://www.android.com/enterprise/",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://www.android.com/security-center/",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://www.figma.com/@androiddesign",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://www.google-analytics.com",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://www.gstatic.com",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://www.linkedin.com/showcase/androiddev",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://www.youtube.com/user/androiddevelopers",
+        "tag": "a",
+        "attr": "href"
+      },
+      {
+        "url": "https://x.com/AndroidDev",
+        "tag": "a",
+        "attr": "href"
+      }
+    ],
+    "json": [
+      {
+        "url": "https://developer.android.com/_pwa/android/manifest.json",
+        "tag": "link",
+        "attr": "href"
+      }
+    ],
+    "image": [
+      {
+        "url": "https://developer.android.com/_static/android/images/logo-linkedin.svg",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://developer.android.com/_static/android/images/logo-x.svg",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://developer.android.com/static/images/design/ui/large-screens/get-inspired-ls.jpg",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://developer.android.com/static/images/design/ui/mobile/androidDesign_Card.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://developer.android.com/static/images/design/ui/mobile/get-started-accessibility.svg",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://developer.android.com/static/images/design/ui/mobile/get-started-components.svg",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://developer.android.com/static/images/design/ui/mobile/get-started-glossary.svg",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://developer.android.com/static/images/design/ui/mobile/get-started-home-screen.svg",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://developer.android.com/static/images/design/ui/mobile/get-started-layout-content.svg",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://developer.android.com/static/images/design/ui/mobile/get-started-patterns.svg",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://developer.android.com/static/images/design/ui/mobile/get-started-styles.svg",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://developer.android.com/static/images/design/ui/mobile/guides-developer.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://developer.android.com/static/images/design/ui/mobile/guides-quality.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://developer.android.com/static/images/design/ui/mobile/hero-full-v3.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://developer.android.com/static/images/design/ui/mobile/kits-android-ui.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://developer.android.com/static/images/design/ui/mobile/kits-theme-builder.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://developer.android.com/static/images/design/ui/mobile/material-design-3.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://developer.android.com/static/images/design/ui/wear/surfaces.svg",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://www.gstatic.com/devrel-devsite/prod/v5f5028bd8220352863507a1bacc6e2ea79a725fdb2dd736f205c6da16a3d00d1/android/images/favicon.svg",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://www.gstatic.com/devrel-devsite/prod/v5f5028bd8220352863507a1bacc6e2ea79a725fdb2dd736f205c6da16a3d00d1/android/images/lockup-google-for-developers.svg",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://www.gstatic.com/devrel-devsite/prod/v5f5028bd8220352863507a1bacc6e2ea79a725fdb2dd736f205c6da16a3d00d1/android/images/lockup.png",
+        "tag": "img",
+        "attr": "src"
+      },
+      {
+        "url": "https://www.gstatic.com/devrel-devsite/prod/v5f5028bd8220352863507a1bacc6e2ea79a725fdb2dd736f205c6da16a3d00d1/android/images/touchicon-180.png",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://www.gstatic.com/images/icons/material/product/2x/youtube_48dp.png",
+        "tag": "img",
+        "attr": "src"
+      }
+    ],
+    "css": [
+      {
+        "url": "https://developer.android.com/extras.css",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://www.gstatic.com/devrel-devsite/prod/v5f5028bd8220352863507a1bacc6e2ea79a725fdb2dd736f205c6da16a3d00d1/android/css/app.css",
+        "tag": "link",
+        "attr": "href"
+      },
+      {
+        "url": "https://www.gstatic.com/devrel-devsite/prod/v5f5028bd8220352863507a1bacc6e2ea79a725fdb2dd736f205c6da16a3d00d1/android/css/dark-theme.css",
+        "tag": "link",
+        "attr": "href"
+      }
+    ],
+    "xml": [
+      {
+        "url": "https://developer.android.com/s/opensearch.xml",
+        "tag": "link",
+        "attr": "href"
+      }
+    ]
+  }
+}
