@@ -440,7 +440,6 @@ class _ExpressiveTheme {
 
     const r24 = BorderRadius.all(Radius.circular(24));
     const r18 = BorderRadius.all(Radius.circular(18));
-    const r28 = BorderRadius.all(Radius.circular(28));
 
     return base.copyWith(
       textTheme: textTheme,
@@ -458,11 +457,6 @@ class _ExpressiveTheme {
         backgroundColor: scheme.surface,
         foregroundColor: scheme.onSurface,
       ),
-      cardTheme: const CardTheme(
-        elevation: 0,
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(borderRadius: r28),
-      ).copyWith(color: scheme.surfaceContainerHighest),
       listTileTheme: ListTileThemeData(
         shape: const RoundedRectangleBorder(borderRadius: r18),
         iconColor: scheme.onSurfaceVariant,
