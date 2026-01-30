@@ -642,17 +642,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             final cs = Theme.of(context).colorScheme;
             // reveal is already curved (easeOutCubic) from NowPlayingPanel
             final navOpacity = (1.0 - reveal).clamp(0.0, 1.0);
-            final bottomPadding =
-                (lerpDouble(navBarHeight, 0, reveal) ?? navBarHeight)
-                    .clamp(0.0, navBarHeight);
             final navBg = Theme.of(context).navigationBarTheme.backgroundColor ??
                 cs.surfaceContainer;
             return Scaffold(
               body: Stack(
                 children: [
                   // Layer 1: Page content
-                  contentStack(bottomPadding: bottomPadding),
-                  // Layer 2: Navigation bar (below mini player)
+                  contentStack(bottomPadding: navBarHeight + bottomInset),
+                  // Layer 2: Navigation bar
                   Positioned(
                     left: 0,
                     right: 0,
@@ -683,13 +680,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                       ),
                     ),
                   ),
-                  // Layer 3: Now playing panel (above nav bar)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: bottomPadding,
-                    top: 0,
-                    child: NowPlayingPanel(controller: _controller),
+                  // Layer 3: Now playing panel (full screen, minSize handles nav bar offset)
+                  Positioned.fill(
+                    child: NowPlayingPanel(
+                      controller: _controller,
+                      navBarHeight: navBarHeight + bottomInset,
+                    ),
                   ),
                 ],
               ),
@@ -2138,7 +2134,12 @@ class SettingsPage extends StatelessWidget {
 
 class NowPlayingPanel extends StatefulWidget {
   final _AppController controller;
-  const NowPlayingPanel({super.key, required this.controller});
+  final double navBarHeight;
+  const NowPlayingPanel({
+    super.key,
+    required this.controller,
+    this.navBarHeight = 0,
+  });
 
   @override
   State<NowPlayingPanel> createState() => _NowPlayingPanelState();
@@ -2188,9 +2189,10 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
         return LayoutBuilder(
           builder: (context, constraints) {
             final availableH = constraints.biggest.height;
+            // minSize: mini player height + nav bar height (so mini player sits above nav bar)
             final minSize = (availableH <= 0)
                 ? 0.18
-                : (_miniHeightPx / availableH).clamp(0.12, 0.28);
+                : ((widget.navBarHeight + _miniHeightPx) / availableH).clamp(0.12, 0.35);
             const maxSize = 0.98;
             final effectiveExtent = _extent == 0 ? minSize : _extent;
             final tRaw = ((effectiveExtent - minSize) / (maxSize - minSize))
