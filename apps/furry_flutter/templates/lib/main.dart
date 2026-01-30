@@ -594,6 +594,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             children: [
               SafeArea(
                 top: false,
+                bottom: false,
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 250),
                   switchInCurve: Curves.easeOutCubic,
@@ -652,9 +653,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             final t = Curves.easeOutCubic.transform(reveal.clamp(0.0, 1.0));
             final navOpacity = (1.0 - t).clamp(0.0, 1.0);
             final bottomPadding =
-                (lerpDouble(navBarHeight + bottomInset, bottomInset, t) ??
-                        (navBarHeight + bottomInset))
-                    .clamp(bottomInset, navBarHeight + bottomInset);
+                (lerpDouble(navBarHeight, 0, t) ?? navBarHeight)
+                    .clamp(0.0, navBarHeight);
             final navBg = Theme.of(context).navigationBarTheme.backgroundColor ??
                 cs.surfaceContainer;
             return Scaffold(
