@@ -589,23 +589,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           SettingsPage(controller: _controller),
         ];
 
-        Widget contentStack({required double bottomPadding}) {
-          return SafeArea(
-            top: false,
-            bottom: false,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              child: IndexedStack(
-                key: ValueKey<int>(_tabIndex),
-                index: _tabIndex,
-                children: pages,
-              ),
-            ),
-          );
-        }
-
         if (useRail) {
           final railDestinations = destinations
               .map(
@@ -629,7 +612,30 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   ),
                 ),
                 Expanded(
-                  child: contentStack(bottomPadding: bottomInset),
+                  child: Stack(
+                    children: [
+                      SafeArea(
+                        top: false,
+                        bottom: false,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 250),
+                          switchInCurve: Curves.easeOutCubic,
+                          switchOutCurve: Curves.easeInCubic,
+                          child: IndexedStack(
+                            key: ValueKey<int>(_tabIndex),
+                            index: _tabIndex,
+                            children: pages,
+                          ),
+                        ),
+                      ),
+                      Positioned.fill(
+                        child: Padding(
+                          padding: EdgeInsets.only(bottom: bottomInset),
+                          child: NowPlayingPanel(controller: _controller),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -647,8 +653,31 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             return Scaffold(
               body: Stack(
                 children: [
-                  // Layer 1: Page content
-                  contentStack(bottomPadding: navBarHeight + bottomInset),
+                  // Layer 1: Page content + Now playing panel
+                  Stack(
+                    children: [
+                      SafeArea(
+                        top: false,
+                        bottom: false,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 250),
+                          switchInCurve: Curves.easeOutCubic,
+                          switchOutCurve: Curves.easeInCubic,
+                          child: IndexedStack(
+                            key: ValueKey<int>(_tabIndex),
+                            index: _tabIndex,
+                            children: pages,
+                          ),
+                        ),
+                      ),
+                      Positioned.fill(
+                        child: Padding(
+                          padding: EdgeInsets.only(bottom: navBarHeight + bottomInset),
+                          child: NowPlayingPanel(controller: _controller),
+                        ),
+                      ),
+                    ],
+                  ),
                   // Layer 2: Navigation bar
                   Positioned(
                     left: 0,
@@ -678,13 +707,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                  // Layer 3: Now playing panel (full screen, minSize handles nav bar offset)
-                  Positioned.fill(
-                    child: NowPlayingPanel(
-                      controller: _controller,
-                      navBarHeight: navBarHeight + bottomInset,
                     ),
                   ),
                 ],
@@ -2134,12 +2156,7 @@ class SettingsPage extends StatelessWidget {
 
 class NowPlayingPanel extends StatefulWidget {
   final _AppController controller;
-  final double navBarHeight;
-  const NowPlayingPanel({
-    super.key,
-    required this.controller,
-    this.navBarHeight = 0,
-  });
+  const NowPlayingPanel({super.key, required this.controller});
 
   @override
   State<NowPlayingPanel> createState() => _NowPlayingPanelState();
@@ -2189,10 +2206,9 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
         return LayoutBuilder(
           builder: (context, constraints) {
             final availableH = constraints.biggest.height;
-            // minSize: mini player height + nav bar height (so mini player sits above nav bar)
             final minSize = (availableH <= 0)
                 ? 0.18
-                : ((widget.navBarHeight + _miniHeightPx) / availableH).clamp(0.12, 0.35);
+                : (_miniHeightPx / availableH).clamp(0.12, 0.28);
             const maxSize = 0.98;
             final effectiveExtent = _extent == 0 ? minSize : _extent;
             final tRaw = ((effectiveExtent - minSize) / (maxSize - minSize))
