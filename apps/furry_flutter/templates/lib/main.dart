@@ -648,6 +648,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             final cs = Theme.of(context).colorScheme;
             // reveal is already curved (easeOutCubic) from NowPlayingPanel
             final navOpacity = (1.0 - reveal).clamp(0.0, 1.0);
+            // Bottom padding for player panel: full when collapsed, zero when expanded
+            final playerBottomPadding =
+                (lerpDouble(navBarHeight + bottomInset, 0, reveal) ?? (navBarHeight + bottomInset))
+                    .clamp(0.0, navBarHeight + bottomInset);
             final navBg = Theme.of(context).navigationBarTheme.backgroundColor ??
                 cs.surfaceContainer;
             return Scaffold(
@@ -672,7 +676,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                       ),
                       Positioned.fill(
                         child: Padding(
-                          padding: EdgeInsets.only(bottom: navBarHeight + bottomInset),
+                          padding: EdgeInsets.only(bottom: playerBottomPadding),
                           child: NowPlayingPanel(controller: _controller),
                         ),
                       ),
