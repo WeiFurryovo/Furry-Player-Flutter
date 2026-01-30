@@ -589,19 +589,29 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           SettingsPage(controller: _controller),
         ];
 
-        Widget pagesStack() {
-          return SafeArea(
-            top: false,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              child: IndexedStack(
-                key: ValueKey<int>(_tabIndex),
-                index: _tabIndex,
-                children: pages,
+        Widget contentStack({required double bottomPadding}) {
+          return Stack(
+            children: [
+              SafeArea(
+                top: false,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  child: IndexedStack(
+                    key: ValueKey<int>(_tabIndex),
+                    index: _tabIndex,
+                    children: pages,
+                  ),
+                ),
               ),
-            ),
+              Positioned.fill(
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: bottomPadding),
+                  child: NowPlayingPanel(controller: _controller),
+                ),
+              ),
+            ],
           );
         }
 
@@ -628,17 +638,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   ),
                 ),
                 Expanded(
-                  child: Stack(
-                    children: [
-                      pagesStack(),
-                      Positioned.fill(
-                        child: Padding(
-                          padding: EdgeInsets.only(bottom: bottomInset),
-                          child: NowPlayingPanel(controller: _controller),
-                        ),
-                      ),
-                    ],
-                  ),
+                  child: contentStack(bottomPadding: bottomInset),
                 ),
               ],
             ),
@@ -660,6 +660,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             return Scaffold(
               body: Stack(
                 children: [
+                  contentStack(bottomPadding: bottomPadding),
                   Positioned(
                     left: 0,
                     right: 0,
@@ -688,13 +689,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                  pagesStack(),
-                  Positioned.fill(
-                    child: Padding(
-                      padding: EdgeInsets.only(bottom: bottomPadding),
-                      child: NowPlayingPanel(controller: _controller),
                     ),
                   ),
                 ],
