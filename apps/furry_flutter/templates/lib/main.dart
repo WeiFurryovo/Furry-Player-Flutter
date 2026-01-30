@@ -479,7 +479,7 @@ class _ExpressiveTheme {
         textColor: scheme.onSurface,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        height: 56,
+        height: 72,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         backgroundColor: scheme.surfaceContainer,
         indicatorColor: scheme.secondaryContainer,
@@ -577,7 +577,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           label: '设置'),
     ];
 
-    final navBarHeight = NavigationBarTheme.of(context).height ?? 80.0;
+    const navBarHeight = 72.0;
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return LayoutBuilder(
@@ -588,6 +588,32 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           ConverterPage(controller: _controller),
           SettingsPage(controller: _controller),
         ];
+
+        Widget contentStack({required double bottomPadding}) {
+          return Stack(
+            children: [
+              SafeArea(
+                top: false,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  child: IndexedStack(
+                    key: ValueKey<int>(_tabIndex),
+                    index: _tabIndex,
+                    children: pages,
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: bottomPadding),
+                  child: NowPlayingPanel(controller: _controller),
+                ),
+              ),
+            ],
+          );
+        }
 
         if (useRail) {
           final railDestinations = destinations
@@ -612,30 +638,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   ),
                 ),
                 Expanded(
-                  child: Stack(
-                    children: [
-                      SafeArea(
-                        top: false,
-                        bottom: false,
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 250),
-                          switchInCurve: Curves.easeOutCubic,
-                          switchOutCurve: Curves.easeInCubic,
-                          child: IndexedStack(
-                            key: ValueKey<int>(_tabIndex),
-                            index: _tabIndex,
-                            children: pages,
-                          ),
-                        ),
-                      ),
-                      Positioned.fill(
-                        child: Padding(
-                          padding: EdgeInsets.only(bottom: bottomInset),
-                          child: NowPlayingPanel(controller: _controller),
-                        ),
-                      ),
-                    ],
-                  ),
+                  child: contentStack(bottomPadding: bottomInset),
                 ),
               ],
             ),
@@ -645,68 +648,27 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         return ValueListenableBuilder<double>(
           valueListenable: _controller.nowPlayingReveal,
           builder: (context, reveal, _) {
-            final cs = Theme.of(context).colorScheme;
-            // reveal is already curved (easeOutCubic) from NowPlayingPanel
             final navOpacity = (1.0 - reveal).clamp(0.0, 1.0);
-            // Bottom padding for player panel: full when collapsed, zero when expanded
-            final playerBottomPadding =
-                (lerpDouble(navBarHeight + bottomInset, 0, reveal) ?? (navBarHeight + bottomInset))
-                    .clamp(0.0, navBarHeight + bottomInset);
-            final navBg = Theme.of(context).navigationBarTheme.backgroundColor ??
-                cs.surfaceContainer;
             return Scaffold(
               body: Stack(
                 children: [
-                  // Layer 1: Page content + Now playing panel
-                  Stack(
-                    children: [
-                      SafeArea(
-                        top: false,
-                        bottom: false,
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 250),
-                          switchInCurve: Curves.easeOutCubic,
-                          switchOutCurve: Curves.easeInCubic,
-                          child: IndexedStack(
-                            key: ValueKey<int>(_tabIndex),
-                            index: _tabIndex,
-                            children: pages,
-                          ),
-                        ),
-                      ),
-                      Positioned.fill(
-                        child: Padding(
-                          padding: EdgeInsets.only(bottom: playerBottomPadding),
-                          child: NowPlayingPanel(controller: _controller),
-                        ),
-                      ),
-                    ],
-                  ),
-                  // Layer 2: Navigation bar
+                  contentStack(bottomPadding: navBarHeight + bottomInset),
                   Positioned(
                     left: 0,
                     right: 0,
                     bottom: 0,
                     child: IgnorePointer(
-                      ignoring: navOpacity < 0.15,
-                      child: AnimatedSlide(
-                        offset: Offset(0, reveal),
-                        duration: const Duration(milliseconds: 180),
-                        curve: Curves.linear,
-                        child: AnimatedOpacity(
-                          opacity: navOpacity,
-                          duration: const Duration(milliseconds: 180),
-                          curve: Curves.easeOutCubic,
-                          child: ColoredBox(
-                            color: navBg,
-                            child: SafeArea(
-                              top: false,
-                              child: NavigationBar(
-                                selectedIndex: _tabIndex,
-                                destinations: destinations,
-                                onDestinationSelected: (i) =>
-                                    setState(() => _tabIndex = i),
-                              ),
+                      ignoring: navOpacity < 0.1,
+                      child: Opacity(
+                        opacity: navOpacity,
+                        child: Transform.translate(
+                          offset: Offset(0, reveal * (navBarHeight + bottomInset)),
+                          child: SafeArea(
+                            top: false,
+                            child: NavigationBar(
+                              selectedIndex: _tabIndex,
+                              destinations: destinations,
+                              onDestinationSelected: (i) => setState(() => _tabIndex = i),
                             ),
                           ),
                         ),
@@ -2173,9 +2135,7 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
   double? _dragStartExtent;
 
   // Tuned by eye: close to the old mini bar height.
-  // Keep this tight so the mini player doesn't leave a "dead" spacer above the
-  // bottom navigation bar on short lists.
-  static const double _miniHeightPx = 80;
+  static const double _miniHeightPx = 96;
 
   void _expand(double maxSize) {
     _sheetController.animateTo(
@@ -2222,7 +2182,7 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                 (1.0 - Curves.easeOutCubic.transform(tRaw)).clamp(0.0, 1.0);
             final fullOpacity =
                 Curves.easeInOutCubicEmphasized.transform(reveal);
-            // Always update reveal to ensure nav bar state stays in sync
+            // Update reveal for nav bar animation
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted && widget.controller.nowPlayingReveal.value != reveal) {
                 widget.controller.nowPlayingReveal.value = reveal;
