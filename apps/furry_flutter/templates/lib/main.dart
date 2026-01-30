@@ -577,7 +577,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           label: '设置'),
     ];
 
-    const navBarHeight = 72.0;
+    const navBarHeight = 80.0;
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return LayoutBuilder(
@@ -649,10 +649,15 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           valueListenable: _controller.nowPlayingReveal,
           builder: (context, reveal, _) {
             final navOpacity = (1.0 - reveal).clamp(0.0, 1.0);
+            final dynamicBottomPadding = lerpDouble(
+              navBarHeight + bottomInset,
+              bottomInset,
+              reveal,
+            ) ?? (navBarHeight + bottomInset);
             return Scaffold(
               body: Stack(
                 children: [
-                  contentStack(bottomPadding: navBarHeight + bottomInset),
+                  contentStack(bottomPadding: dynamicBottomPadding),
                   Positioned(
                     left: 0,
                     right: 0,
@@ -2173,7 +2178,7 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
             final minSize = (availableH <= 0)
                 ? 0.18
                 : (_miniHeightPx / availableH).clamp(0.12, 0.28);
-            const maxSize = 0.98;
+            const maxSize = 1.0;
             final effectiveExtent = _extent == 0 ? minSize : _extent;
             final tRaw = ((effectiveExtent - minSize) / (maxSize - minSize))
                 .clamp(0.0, 1.0);
