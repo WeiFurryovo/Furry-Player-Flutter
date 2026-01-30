@@ -650,10 +650,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           valueListenable: _controller.nowPlayingReveal,
           builder: (context, reveal, _) {
             final cs = Theme.of(context).colorScheme;
-            final t = Curves.easeOutCubic.transform(reveal.clamp(0.0, 1.0));
-            final navOpacity = (1.0 - t).clamp(0.0, 1.0);
+            // reveal is already curved (easeOutCubic) from NowPlayingPanel
+            final navOpacity = (1.0 - reveal).clamp(0.0, 1.0);
             final bottomPadding =
-                (lerpDouble(navBarHeight, 0, t) ?? navBarHeight)
+                (lerpDouble(navBarHeight, 0, reveal) ?? navBarHeight)
                     .clamp(0.0, navBarHeight);
             final navBg = Theme.of(context).navigationBarTheme.backgroundColor ??
                 cs.surfaceContainer;
@@ -668,9 +668,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     child: IgnorePointer(
                       ignoring: navOpacity < 0.15,
                       child: AnimatedSlide(
-                        offset: Offset(0, 0.25 * (1 - navOpacity)),
+                        offset: Offset(0, reveal),
                         duration: const Duration(milliseconds: 180),
-                        curve: Curves.easeOutCubic,
+                        curve: Curves.linear,
                         child: AnimatedOpacity(
                           opacity: navOpacity,
                           duration: const Duration(milliseconds: 180),
