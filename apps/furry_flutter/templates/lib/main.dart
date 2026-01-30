@@ -590,29 +590,19 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         ];
 
         Widget contentStack({required double bottomPadding}) {
-          return Stack(
-            children: [
-              SafeArea(
-                top: false,
-                bottom: false,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  child: IndexedStack(
-                    key: ValueKey<int>(_tabIndex),
-                    index: _tabIndex,
-                    children: pages,
-                  ),
-                ),
+          return SafeArea(
+            top: false,
+            bottom: false,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              child: IndexedStack(
+                key: ValueKey<int>(_tabIndex),
+                index: _tabIndex,
+                children: pages,
               ),
-              Positioned.fill(
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: bottomPadding),
-                  child: NowPlayingPanel(controller: _controller),
-                ),
-              ),
-            ],
+            ),
           );
         }
 
@@ -660,7 +650,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             return Scaffold(
               body: Stack(
                 children: [
+                  // Layer 1: Page content
                   contentStack(bottomPadding: bottomPadding),
+                  // Layer 2: Navigation bar (below mini player)
                   Positioned(
                     left: 0,
                     right: 0,
@@ -690,6 +682,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                         ),
                       ),
                     ),
+                  ),
+                  // Layer 3: Now playing panel (above nav bar)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: bottomPadding,
+                    top: 0,
+                    child: NowPlayingPanel(controller: _controller),
                   ),
                 ],
               ),
@@ -2200,10 +2200,12 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                 (1.0 - Curves.easeOutCubic.transform(tRaw)).clamp(0.0, 1.0);
             final fullOpacity =
                 Curves.easeInOutCubicEmphasized.transform(reveal);
-            final prevReveal = widget.controller.nowPlayingReveal.value;
-            if ((prevReveal - reveal).abs() > 0.002) {
-              widget.controller.nowPlayingReveal.value = reveal;
-            }
+            // Always update reveal to ensure nav bar state stays in sync
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && widget.controller.nowPlayingReveal.value != reveal) {
+                widget.controller.nowPlayingReveal.value = reveal;
+              }
+            });
             final sheetPixels = _sheetController.isAttached
                 ? _sheetController.pixels
                 : (effectiveExtent * availableH);
