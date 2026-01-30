@@ -2151,7 +2151,9 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
   double? _dragStartExtent;
 
   // Tuned by eye: close to the old mini bar height.
-  static const double _miniHeightPx = 96;
+  // Keep this tight so the mini player doesn't leave a "dead" spacer above the
+  // bottom navigation bar on short lists.
+  static const double _miniHeightPx = 80;
 
   void _expand(double maxSize) {
     _sheetController.animateTo(
