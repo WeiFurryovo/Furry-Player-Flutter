@@ -1,3 +1,0 @@
-## Furry Player
-
-WIP

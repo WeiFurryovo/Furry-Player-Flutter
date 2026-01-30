@@ -577,7 +577,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           label: '设置'),
     ];
 
-    const navBarHeight = 80.0;
+    const navBarHeight = 72.0;
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return LayoutBuilder(
@@ -645,45 +645,25 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           );
         }
 
-        return ValueListenableBuilder<double>(
-          valueListenable: _controller.nowPlayingReveal,
-          builder: (context, reveal, _) {
-            final navOpacity = (1.0 - reveal).clamp(0.0, 1.0);
-            final dynamicBottomPadding = lerpDouble(
-              navBarHeight + bottomInset,
-              bottomInset,
-              reveal,
-            ) ?? (navBarHeight + bottomInset);
-            return Scaffold(
-              body: Stack(
-                children: [
-                  contentStack(bottomPadding: dynamicBottomPadding),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: IgnorePointer(
-                      ignoring: navOpacity < 0.1,
-                      child: Opacity(
-                        opacity: navOpacity,
-                        child: Transform.translate(
-                          offset: Offset(0, reveal * (navBarHeight + bottomInset)),
-                          child: SafeArea(
-                            top: false,
-                            child: NavigationBar(
-                              selectedIndex: _tabIndex,
-                              destinations: destinations,
-                              onDestinationSelected: (i) => setState(() => _tabIndex = i),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+        return Scaffold(
+          body: Stack(
+            children: [
+              contentStack(bottomPadding: navBarHeight + bottomInset),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                // NavigationBar already applies a SafeArea internally. Wrapping
+                // it in another SafeArea adds the bottom inset twice, which
+                // creates an extra blank area that can overlap the mini player.
+                child: NavigationBar(
+                  selectedIndex: _tabIndex,
+                  destinations: destinations,
+                  onDestinationSelected: (i) => setState(() => _tabIndex = i),
+                ),
               ),
-            );
-          },
+            ],
+          ),
         );
       },
     );
@@ -712,7 +692,6 @@ class _AppController {
   final ValueNotifier<List<File>> furryOutputs =
       ValueNotifier<List<File>>(<File>[]);
   final ValueNotifier<String> log = ValueNotifier<String>('');
-  final ValueNotifier<double> nowPlayingReveal = ValueNotifier<double>(0);
 
   List<File>? _queue;
   int _queueIndex = -1;
@@ -820,7 +799,6 @@ class _AppController {
     nowPlaying.dispose();
     furryOutputs.dispose();
     log.dispose();
-    nowPlayingReveal.dispose();
   }
 
   void _wirePlayerDiagnostics() {
@@ -2178,7 +2156,7 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
             final minSize = (availableH <= 0)
                 ? 0.18
                 : (_miniHeightPx / availableH).clamp(0.12, 0.28);
-            const maxSize = 1.0;
+            const maxSize = 0.98;
             final effectiveExtent = _extent == 0 ? minSize : _extent;
             final tRaw = ((effectiveExtent - minSize) / (maxSize - minSize))
                 .clamp(0.0, 1.0);
@@ -2187,12 +2165,6 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                 (1.0 - Curves.easeOutCubic.transform(tRaw)).clamp(0.0, 1.0);
             final fullOpacity =
                 Curves.easeInOutCubicEmphasized.transform(reveal);
-            // Update reveal for nav bar animation
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted && widget.controller.nowPlayingReveal.value != reveal) {
-                widget.controller.nowPlayingReveal.value = reveal;
-              }
-            });
             final sheetPixels = _sheetController.isAttached
                 ? _sheetController.pixels
                 : (effectiveExtent * availableH);
