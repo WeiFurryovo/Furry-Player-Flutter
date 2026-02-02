@@ -480,7 +480,7 @@ class _ExpressiveTheme {
         textColor: scheme.onSurface,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        height: 80,
+        height: 72,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         backgroundColor: scheme.surfaceContainer,
         indicatorColor: scheme.secondaryContainer,
@@ -560,7 +560,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _tabIndex = 0;
   static const double _wideRailBreakpoint = 700;
   static const double _bottomNavMarginH = 16;
-  static const double _bottomNavMarginBottom = 10;
+  static const double _bottomNavMarginBottom = 6;
 
   @override
   void initState() {
@@ -718,14 +718,13 @@ class _ExpressiveBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final navBarHeight = NavigationBarTheme.of(context).height ?? 80.0;
-    final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
         marginH,
         0,
         marginH,
-        marginBottom + bottomInset,
+        marginBottom,
       ),
       child: Material(
         elevation: 2,
@@ -737,17 +736,13 @@ class _ExpressiveBottomNavBar extends StatelessWidget {
           side: BorderSide(color: _withOpacityCompat(cs.outlineVariant, 0.55)),
         ),
         clipBehavior: Clip.antiAlias,
-        child: MediaQuery.removePadding(
-          context: context,
-          removeBottom: true,
-          child: NavigationBar(
-            height: navBarHeight,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            selectedIndex: selectedIndex,
-            destinations: destinations,
-            onDestinationSelected: onDestinationSelected,
-          ),
+        child: NavigationBar(
+          height: navBarHeight,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          selectedIndex: selectedIndex,
+          destinations: destinations,
+          onDestinationSelected: onDestinationSelected,
         ),
       ),
     );
