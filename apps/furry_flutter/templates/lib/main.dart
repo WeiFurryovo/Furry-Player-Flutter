@@ -559,6 +559,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   late final _AppController _controller;
   int _tabIndex = 0;
   static const double _wideRailBreakpoint = 700;
+  static const double _bottomNavMarginH = 16;
+  static const double _bottomNavMarginBottom = 10;
 
   @override
   void initState() {
@@ -612,8 +614,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         // Base distance from the bottom edge that the mini-player should sit above.
         // On phones, this is the bottom NavigationBar + system gesture inset.
         // On wide layouts (rail), it's just the system bottom inset.
-        final bottomOverlayBaseline =
-            useRail ? bottomInset : (navBarHeight + bottomInset);
+        final bottomOverlayBaseline = useRail
+            ? bottomInset
+            : (navBarHeight + bottomInset + _bottomNavMarginBottom);
 
         Widget contentStack() {
           return Stack(
@@ -680,17 +683,73 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                // NavigationBar already applies a SafeArea internally.
-                child: NavigationBar(
+                child: _ExpressiveBottomNavBar(
                   selectedIndex: _tabIndex,
                   destinations: destinations,
                   onDestinationSelected: (i) => setState(() => _tabIndex = i),
+                  marginH: _bottomNavMarginH,
+                  marginBottom: _bottomNavMarginBottom,
                 ),
               ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+class _ExpressiveBottomNavBar extends StatelessWidget {
+  const _ExpressiveBottomNavBar({
+    required this.selectedIndex,
+    required this.destinations,
+    required this.onDestinationSelected,
+    required this.marginH,
+    required this.marginBottom,
+  });
+
+  final int selectedIndex;
+  final List<NavigationDestination> destinations;
+  final ValueChanged<int> onDestinationSelected;
+  final double marginH;
+  final double marginBottom;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final navBarHeight = NavigationBarTheme.of(context).height ?? 80.0;
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        marginH,
+        0,
+        marginH,
+        marginBottom + bottomInset,
+      ),
+      child: Material(
+        elevation: 2,
+        color: cs.surfaceContainer,
+        surfaceTintColor: cs.surfaceTint,
+        shadowColor: _withOpacityCompat(cs.shadow, 0.22),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+          side: BorderSide(color: _withOpacityCompat(cs.outlineVariant, 0.55)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: MediaQuery.removePadding(
+          context: context,
+          removeBottom: true,
+          child: NavigationBar(
+            height: navBarHeight,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            selectedIndex: selectedIndex,
+            destinations: destinations,
+            onDestinationSelected: onDestinationSelected,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -702,6 +761,7 @@ class _BottomOverlaySpacer extends StatelessWidget {
   static const double _extra = 16;
   static const double _wideRailBreakpoint = 700;
   static const double _miniHeight = NowPlayingPanel.miniHeightPx;
+  static const double _bottomNavMarginBottom = _AppShellState._bottomNavMarginBottom;
 
   @override
   Widget build(BuildContext context) {
@@ -712,7 +772,9 @@ class _BottomOverlaySpacer extends StatelessWidget {
       valueListenable: controller.nowPlaying,
       builder: (context, np, _) {
         final useRail = MediaQuery.of(context).size.width >= _wideRailBreakpoint;
-        final bottomBaseline = useRail ? bottomInset : (navBarHeight + bottomInset);
+        final bottomBaseline = useRail
+            ? bottomInset
+            : (navBarHeight + bottomInset + _bottomNavMarginBottom);
         // Keep content scrollable above the overlays:
         // - bottom navigation bar (plus system inset)
         // - mini player (only when active)
