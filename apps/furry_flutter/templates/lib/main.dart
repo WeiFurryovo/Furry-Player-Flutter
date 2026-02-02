@@ -766,7 +766,9 @@ class _ExpressiveBottomNavBar extends StatelessWidget {
             // Reduce only the top in-bar whitespace (circled by the user) while
             // keeping icon positions from shifting downward and still showing
             // labels.
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            // Keep a little breathing room at the top, and compensate by
+            // reducing bottom padding so the content baseline stays stable.
+            padding: const EdgeInsets.fromLTRB(12, 2, 12, 6),
             child: Row(
               children: [
                 for (var i = 0; i < items.length; i++)
