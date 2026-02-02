@@ -564,6 +564,30 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   late final _AppController _controller;
   int _tabIndex = 0;
+  static const double _wideRailBreakpoint = 700;
+
+  Widget? _buildFab() {
+    switch (_tabIndex) {
+      case 0:
+        return FloatingActionButton.extended(
+          onPressed: () async {
+            final f = await _controller.pickForPlay();
+            if (f == null) return;
+            await _controller.playFile(file: f);
+          },
+          icon: const Icon(Icons.play_arrow_rounded),
+          label: const Text('选择并播放'),
+        );
+      case 1:
+        return FloatingActionButton.extended(
+          onPressed: _controller.startPack,
+          icon: const Icon(Icons.auto_fix_high_rounded),
+          label: const Text('开始打包'),
+        );
+      default:
+        return null;
+    }
+  }
 
   @override
   void initState() {
@@ -607,14 +631,20 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final useRail = constraints.maxWidth >= 700;
+        final useRail = constraints.maxWidth >= _wideRailBreakpoint;
         final pages = <Widget>[
           LibraryPage(controller: _controller),
           ConverterPage(controller: _controller),
           SettingsPage(controller: _controller),
         ];
 
-        Widget contentStack({required double bottomPadding}) {
+        // Base distance from the bottom edge that the mini-player should sit above.
+        // On phones, this is the bottom NavigationBar + system gesture inset.
+        // On wide layouts (rail), it's just the system bottom inset.
+        final bottomOverlayBaseline =
+            useRail ? bottomInset : (navBarHeight + bottomInset);
+
+        Widget contentStack() {
           return Stack(
             children: [
               SafeArea(
@@ -631,9 +661,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 ),
               ),
               Positioned.fill(
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: bottomPadding),
-                  child: NowPlayingPanel(controller: _controller),
+                child: NowPlayingPanel(
+                  controller: _controller,
+                  bottomOverlayBaseline: bottomOverlayBaseline,
                 ),
               ),
             ],
@@ -652,6 +682,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               .toList(growable: false);
 
           return Scaffold(
+            floatingActionButton: _buildFab(),
             body: Row(
               children: [
                 SafeArea(
@@ -663,7 +694,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   ),
                 ),
                 Expanded(
-                  child: contentStack(bottomPadding: bottomInset),
+                  child: contentStack(),
                 ),
               ],
             ),
@@ -671,9 +702,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         }
 
         return Scaffold(
+          extendBody: true,
+          floatingActionButton: _buildFab(),
           body: Stack(
             children: [
-              contentStack(bottomPadding: navBarHeight + bottomInset),
+              contentStack(),
               Positioned(
                 left: 0,
                 right: 0,
@@ -698,6 +731,8 @@ class _BottomOverlaySpacer extends StatelessWidget {
 
   final _AppController controller;
   static const double _extra = 16;
+  static const double _wideRailBreakpoint = 700;
+  static const double _miniHeight = NowPlayingPanel.miniHeightPx;
 
   @override
   Widget build(BuildContext context) {
@@ -707,11 +742,13 @@ class _BottomOverlaySpacer extends StatelessWidget {
     return ValueListenableBuilder<_NowPlaying?>(
       valueListenable: controller.nowPlaying,
       builder: (context, np, _) {
+        final useRail = MediaQuery.of(context).size.width >= _wideRailBreakpoint;
+        final bottomBaseline = useRail ? bottomInset : (navBarHeight + bottomInset);
         // Keep content scrollable above the overlays:
         // - bottom navigation bar (plus system inset)
         // - mini player (only when active)
-        final mini = (np == null) ? 0.0 : 96.0;
-        return SizedBox(height: navBarHeight + bottomInset + mini + _extra);
+        final mini = (np == null) ? 0.0 : _miniHeight;
+        return SizedBox(height: bottomBaseline + mini + _extra);
       },
     );
   }
@@ -1628,126 +1665,116 @@ class _LibraryPageState extends State<LibraryPage> {
     final controller = widget.controller;
     final cs = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final f = await controller.pickForPlay();
-          if (f == null) return;
-          await controller.playFile(file: f);
-        },
-        icon: const Icon(Icons.play_arrow_rounded),
-        label: const Text('选择并播放'),
-      ),
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar.large(
-            title: const Text('本地音乐'),
-            actions: [
-              IconButton(
-                tooltip: '刷新',
-                onPressed: controller.refreshOutputs,
-                icon: const Icon(Icons.refresh_rounded),
-              ),
-              const SizedBox(width: 8),
-            ],
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: SearchBar(
-                hintText: '搜索（输出的 .furry）',
-                leading: const Icon(Icons.search_rounded),
-                onChanged: (v) => setState(() => _query = v.trim()),
-              ),
+    return CustomScrollView(
+      slivers: [
+        SliverAppBar.large(
+          title: const Text('本地音乐'),
+          actions: [
+            IconButton(
+              tooltip: '刷新',
+              onPressed: controller.refreshOutputs,
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: SearchBar(
+              hintText: '搜索（输出的 .furry）',
+              leading: const Icon(Icons.search_rounded),
+              onChanged: (v) => setState(() => _query = v.trim()),
             ),
           ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            sliver: SliverToBoxAdapter(
-              child: Row(
-                children: [
-                  Icon(Icons.history_rounded, color: cs.primary),
-                  const SizedBox(width: 8),
-                  Text('最近输出', style: Theme.of(context).textTheme.titleLarge),
-                ],
-              ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          sliver: SliverToBoxAdapter(
+            child: Row(
+              children: [
+                Icon(Icons.history_rounded, color: cs.primary),
+                const SizedBox(width: 8),
+                Text('最近输出', style: Theme.of(context).textTheme.titleLarge),
+              ],
             ),
           ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-            sliver: ValueListenableBuilder<List<File>>(
-              valueListenable: controller.furryOutputs,
-              builder: (context, files, _) {
-                final filtered = files.where((f) {
-                  if (_query.isEmpty) return true;
-                  return p
-                      .basename(f.path)
-                      .toLowerCase()
-                      .contains(_query.toLowerCase());
-                }).toList();
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          sliver: ValueListenableBuilder<List<File>>(
+            valueListenable: controller.furryOutputs,
+            builder: (context, files, _) {
+              final filtered = files.where((f) {
+                if (_query.isEmpty) return true;
+                return p
+                    .basename(f.path)
+                    .toLowerCase()
+                    .contains(_query.toLowerCase());
+              }).toList();
 
-                if (filtered.isEmpty) {
-                  return SliverToBoxAdapter(
-                    child: Card(
-                      margin: EdgeInsets.zero,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            Icon(Icons.queue_music_rounded,
-                                color: cs.primary, size: 28),
-                            const SizedBox(width: 12),
-                            const Expanded(
-                              child: Text('暂无 .furry 输出文件（去“转换”页打包试试）'),
-                            ),
-                          ],
-                        ),
+              if (filtered.isEmpty) {
+                return SliverToBoxAdapter(
+                  child: Card(
+                    margin: EdgeInsets.zero,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Icon(Icons.queue_music_rounded,
+                              color: cs.primary, size: 28),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text('暂无 .furry 输出文件（去“转换”页打包试试）'),
+                          ),
+                        ],
                       ),
                     ),
-                  );
-                }
-
-                return SliverList.separated(
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, i) =>
-                      SizedBox(height: i.isEven ? 10 : 10),
-                  itemBuilder: (context, i) {
-                    final f = filtered[i];
-                    return FutureBuilder<_MetaPreview>(
-                      future: controller.getMetaPreviewForFurry(f),
-                      builder: (context, snap) {
-                        final meta = snap.data;
-                        return Card(
-                          margin: EdgeInsets.zero,
-                          child: ListTile(
-                            leading: _CoverThumb(artUri: meta?.artUri),
-                            title: Text(meta?.title ?? p.basename(f.path),
-                                maxLines: 1, overflow: TextOverflow.ellipsis),
-                            subtitle: Text(
-                              meta == null || meta.subtitle.isEmpty
-                                  ? '${_fmtBytes(f.lengthSync())} · ${f.lastModifiedSync().toLocal()}'
-                                  : meta.subtitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            trailing: const Icon(Icons.chevron_right_rounded),
-                            onTap: () => controller.playFromQueue(
-                              queue: filtered,
-                              index: i,
-                              displayName: p.basename(f.path),
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
+                  ),
                 );
-              },
-            ),
+              }
+
+              return SliverList.separated(
+                itemCount: filtered.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, i) {
+                  final f = filtered[i];
+                  return FutureBuilder<_MetaPreview>(
+                    future: controller.getMetaPreviewForFurry(f),
+                    builder: (context, snap) {
+                      final meta = snap.data;
+                      return Card(
+                        margin: EdgeInsets.zero,
+                        child: ListTile(
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 14),
+                          leading: _CoverThumb(artUri: meta?.artUri),
+                          title: Text(meta?.title ?? p.basename(f.path),
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                          subtitle: Text(
+                            meta == null || meta.subtitle.isEmpty
+                                ? '${_fmtBytes(f.lengthSync())} · ${f.lastModifiedSync().toLocal()}'
+                                : meta.subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => controller.playFromQueue(
+                            queue: filtered,
+                            index: i,
+                            displayName: p.basename(f.path),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            },
           ),
-          SliverToBoxAdapter(child: _BottomOverlaySpacer(controller: controller)),
-        ],
-      ),
+        ),
+        SliverToBoxAdapter(child: _BottomOverlaySpacer(controller: controller)),
+      ],
     );
   }
 
@@ -1825,185 +1852,178 @@ class _ConverterPageState extends State<ConverterPage> {
     final controller = widget.controller;
     final cs = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: controller.startPack,
-        icon: const Icon(Icons.auto_fix_high_rounded),
-        label: const Text('开始打包'),
-      ),
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar.large(
-            title: const Text('转换'),
-            actions: const [SizedBox(width: 8)],
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            sliver: SliverToBoxAdapter(
-              child: Card(
-                margin: EdgeInsets.zero,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+    return CustomScrollView(
+      slivers: [
+        SliverAppBar.large(
+          title: const Text('转换'),
+          actions: const [SizedBox(width: 8)],
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          sliver: SliverToBoxAdapter(
+            child: Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.lock_rounded, color: cs.primary),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text('打包（音频 → .furry）'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '把音频封装成 .furry（含封面与标签），用于快速导入与统一管理。',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            await controller.pickForPack();
+                            setState(() {});
+                          },
+                          icon: const Icon(Icons.audio_file_rounded),
+                          label: const Text('选择音频'),
+                        ),
+                        FilledButton.tonalIcon(
+                          onPressed: controller.pickedForPack == null
+                              ? null
+                              : controller.startPack,
+                          icon: const Icon(Icons.auto_fix_high_rounded),
+                          label: const Text('打包'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainer,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Row(
                         children: [
-                          Icon(Icons.lock_rounded, color: cs.primary),
+                          Icon(Icons.insert_drive_file_rounded,
+                              color: cs.onSurfaceVariant),
                           const SizedBox(width: 10),
-                          const Expanded(
-                            child: Text('打包（音频 → .furry）'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '把音频封装成 .furry（含封面与标签），用于快速导入与统一管理。',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: cs.onSurfaceVariant,
-                            ),
-                      ),
-                      const SizedBox(height: 14),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          OutlinedButton.icon(
-                            onPressed: () async {
-                              await controller.pickForPack();
-                              setState(() {});
-                            },
-                            icon: const Icon(Icons.audio_file_rounded),
-                            label: const Text('选择音频'),
-                          ),
-                          FilledButton.tonalIcon(
-                            onPressed: controller.pickedForPack == null
-                                ? null
-                                : controller.startPack,
-                            icon: const Icon(Icons.auto_fix_high_rounded),
-                            label: const Text('打包'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: cs.surfaceContainer,
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.insert_drive_file_rounded,
-                                color: cs.onSurfaceVariant),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                controller.pickedForPackName == null
-                                    ? '未选择输入文件'
-                                    : '输入：${controller.pickedForPackName}',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          const Text('Padding (KB)'),
-                          const SizedBox(width: 12),
                           Expanded(
-                            child: ValueListenableBuilder<double>(
-                              valueListenable: _paddingDraftKb,
-                              builder: (context, draft, _) {
-                                final clamped =
-                                    draft.clamp(0.0, 1024.0).toDouble();
-                                final rounded = clamped.round();
-                                return Slider(
-                                  value: clamped,
-                                  min: 0,
-                                  max: 1024,
-                                  divisions: null,
-                                  label: '$rounded KB',
-                                  onChanged: (v) {
-                                    _paddingDraftKb.value = v;
-                                    controller.paddingKb = v.round();
-                                  },
-                                );
-                              },
+                            child: Text(
+                              controller.pickedForPackName == null
+                                  ? '未选择输入文件'
+                                  : '输入：${controller.pickedForPackName}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
                       ),
-                      ValueListenableBuilder<double>(
-                        valueListenable: _paddingDraftKb,
-                        builder: (context, draft, _) => Text(
-                          '当前 padding: ${draft.clamp(0.0, 1024.0).round()} KB',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-            sliver: SliverToBoxAdapter(
-              child: Card(
-                margin: EdgeInsets.zero,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.play_circle_rounded, color: cs.primary),
-                          const SizedBox(width: 10),
-                          const Expanded(child: Text('临时播放')),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '从文件选择器中选一个音频或 .furry 立即播放。',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: cs.onSurfaceVariant,
-                            ),
-                      ),
-                      const SizedBox(height: 14),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          FilledButton.tonalIcon(
-                            onPressed: () async {
-                              final f = await controller.pickForPlay();
-                              if (f == null) return;
-                              await controller.playFile(file: f);
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        const Text('Padding (KB)'),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ValueListenableBuilder<double>(
+                            valueListenable: _paddingDraftKb,
+                            builder: (context, draft, _) {
+                              final clamped =
+                                  draft.clamp(0.0, 1024.0).toDouble();
+                              final rounded = clamped.round();
+                              return Slider(
+                                value: clamped,
+                                min: 0,
+                                max: 1024,
+                                divisions: null,
+                                label: '$rounded KB',
+                                onChanged: (v) {
+                                  _paddingDraftKb.value = v;
+                                  controller.paddingKb = v.round();
+                                },
+                              );
                             },
-                            icon: const Icon(Icons.folder_open_rounded),
-                            label: const Text('选择并播放'),
                           ),
-                          OutlinedButton.icon(
-                            onPressed: controller.stop,
-                            icon: const Icon(Icons.stop_rounded),
-                            label: const Text('停止'),
-                          ),
-                        ],
+                        ),
+                      ],
+                    ),
+                    ValueListenableBuilder<double>(
+                      valueListenable: _paddingDraftKb,
+                      builder: (context, draft, _) => Text(
+                        '当前 padding: ${draft.clamp(0.0, 1024.0).round()} KB',
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
-          SliverToBoxAdapter(child: _BottomOverlaySpacer(controller: controller)),
-        ],
-      ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          sliver: SliverToBoxAdapter(
+            child: Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.play_circle_rounded, color: cs.primary),
+                        const SizedBox(width: 10),
+                        const Expanded(child: Text('临时播放')),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '从文件选择器中选一个音频或 .furry 立即播放。',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        FilledButton.tonalIcon(
+                          onPressed: () async {
+                            final f = await controller.pickForPlay();
+                            if (f == null) return;
+                            await controller.playFile(file: f);
+                          },
+                          icon: const Icon(Icons.folder_open_rounded),
+                          label: const Text('选择并播放'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: controller.stop,
+                          icon: const Icon(Icons.stop_rounded),
+                          label: const Text('停止'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(child: _BottomOverlaySpacer(controller: controller)),
+      ],
     );
   }
 }
@@ -2015,127 +2035,126 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          const SliverAppBar.large(title: Text('设置')),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            sliver: SliverToBoxAdapter(
-              child: Card(
-                margin: EdgeInsets.zero,
-                elevation: 0,
-                color: cs.surfaceContainerHighest,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(28),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.bug_report_rounded, color: cs.primary),
-                          const SizedBox(width: 10),
-                          const Expanded(child: Text('诊断日志')),
-                          IconButton(
-                            tooltip: '复制',
-                            onPressed: () async {
-                              final text = controller.log.value;
-                              if (text.trim().isEmpty) return;
-                              await Clipboard.setData(
-                                  ClipboardData(text: text));
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('已复制诊断日志')),
-                                );
-                              }
-                            },
-                            icon: const Icon(Icons.copy_rounded),
-                          ),
-                          IconButton(
-                            tooltip: '清空',
-                            onPressed: () async {
-                              await controller.clearLog();
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('已清空诊断日志')),
-                                );
-                              }
-                            },
-                            icon: const Icon(Icons.delete_outline_rounded),
-                          ),
-                          IconButton(
-                            tooltip: '导出',
-                            onPressed: () async {
-                              final path = await controller.exportLog();
-                              if (!context.mounted) return;
-                              if (path == null) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('导出失败')),
-                                );
-                                return;
-                              }
-                              await Clipboard.setData(
-                                  ClipboardData(text: path));
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text('已导出（路径已复制到剪贴板）')),
-                                );
-                              }
-                            },
-                            icon: const Icon(Icons.file_upload_outlined),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '用于排查闪退/卡顿等问题（持久化保存，重启不会丢）。',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: cs.onSurfaceVariant,
-                            ),
-                      ),
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: cs.surfaceContainer,
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: ValueListenableBuilder<String>(
-                          valueListenable: controller.log,
-                          builder: (context, log, _) {
-                            return SelectableText(
-                              log.isEmpty ? '(empty)' : log,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    fontFamily: 'monospace',
-                                    color: cs.onSurfaceVariant,
-                                  ),
-                            );
+    return CustomScrollView(
+      slivers: [
+        const SliverAppBar.large(title: Text('设置')),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          sliver: SliverToBoxAdapter(
+            child: Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.bug_report_rounded, color: cs.primary),
+                        const SizedBox(width: 10),
+                        const Expanded(child: Text('诊断日志')),
+                        IconButton(
+                          tooltip: '复制',
+                          onPressed: () async {
+                            final text = controller.log.value;
+                            if (text.trim().isEmpty) return;
+                            await Clipboard.setData(ClipboardData(text: text));
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('已复制诊断日志')),
+                              );
+                            }
                           },
+                          icon: const Icon(Icons.copy_rounded),
                         ),
+                        IconButton(
+                          tooltip: '清空',
+                          onPressed: () async {
+                            await controller.clearLog();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('已清空诊断日志')),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.delete_outline_rounded),
+                        ),
+                        IconButton(
+                          tooltip: '导出',
+                          onPressed: () async {
+                            final path = await controller.exportLog();
+                            if (!context.mounted) return;
+                            if (path == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('导出失败')),
+                              );
+                              return;
+                            }
+                            await Clipboard.setData(ClipboardData(text: path));
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('已导出（路径已复制到剪贴板）'),
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.file_upload_outlined),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '用于排查闪退/卡顿等问题（持久化保存，重启不会丢）。',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainer,
+                        borderRadius: BorderRadius.circular(18),
                       ),
-                    ],
-                  ),
+                      child: ValueListenableBuilder<String>(
+                        valueListenable: controller.log,
+                        builder: (context, log, _) {
+                          return SelectableText(
+                            log.isEmpty ? '(empty)' : log,
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      fontFamily: 'monospace',
+                                      color: cs.onSurfaceVariant,
+                                    ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
-          SliverToBoxAdapter(child: _BottomOverlaySpacer(controller: controller)),
-        ],
-      ),
+        ),
+        SliverToBoxAdapter(child: _BottomOverlaySpacer(controller: controller)),
+      ],
     );
   }
 }
 
 class NowPlayingPanel extends StatefulWidget {
   final _AppController controller;
-  const NowPlayingPanel({super.key, required this.controller});
+  final double bottomOverlayBaseline;
+
+  // Tuned by eye: close to M3 bottom sheet mini player height.
+  static const double miniHeightPx = 88;
+
+  const NowPlayingPanel({
+    super.key,
+    required this.controller,
+    required this.bottomOverlayBaseline,
+  });
 
   @override
   State<NowPlayingPanel> createState() => _NowPlayingPanelState();
@@ -2146,9 +2165,6 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
       DraggableScrollableController();
   double _extent = 0;
   double? _dragStartExtent;
-
-  // Tuned by eye: close to the old mini bar height.
-  static const double _miniHeightPx = 96;
 
   void _expand(double maxSize) {
     _sheetController.animateTo(
@@ -2185,7 +2201,7 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
             final availableH = constraints.biggest.height;
             final minSize = (availableH <= 0)
                 ? 0.18
-                : (_miniHeightPx / availableH).clamp(0.12, 0.28);
+                : (NowPlayingPanel.miniHeightPx / availableH).clamp(0.10, 0.24);
             const maxSize = 0.98;
             final effectiveExtent = _extent == 0 ? minSize : _extent;
             final tRaw = ((effectiveExtent - minSize) / (maxSize - minSize))
@@ -2195,6 +2211,15 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                 (1.0 - Curves.easeOutCubic.transform(tRaw)).clamp(0.0, 1.0);
             final fullOpacity =
                 Curves.easeInOutCubicEmphasized.transform(reveal);
+            // When collapsed, keep the mini player above the bottom navigation bar.
+            // When expanded, allow it to cover the whole screen (including nav).
+            final bottomPad = (lerpDouble(
+                      widget.bottomOverlayBaseline,
+                      0,
+                      reveal,
+                    ) ??
+                    widget.bottomOverlayBaseline)
+                .clamp(0.0, widget.bottomOverlayBaseline);
             final sheetPixels = _sheetController.isAttached
                 ? _sheetController.pixels
                 : (effectiveExtent * availableH);
@@ -2262,7 +2287,7 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
                       reveal: reveal,
                       cs: cs,
                       child: Padding(
-                        padding: EdgeInsets.only(top: topPad),
+                        padding: EdgeInsets.only(top: topPad, bottom: bottomPad),
                         child: Column(
                           children: [
                             Padding(
