@@ -480,8 +480,8 @@ class _ExpressiveTheme {
         textColor: scheme.onSurface,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        height: 64,
-        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+        height: 56,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
         backgroundColor: scheme.surfaceContainer,
         indicatorColor: scheme.secondaryContainer,
         indicatorShape: const StadiumBorder(),
