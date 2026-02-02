@@ -560,29 +560,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _tabIndex = 0;
   static const double _wideRailBreakpoint = 700;
 
-  Widget? _buildFab() {
-    switch (_tabIndex) {
-      case 0:
-        return FloatingActionButton.extended(
-          onPressed: () async {
-            final f = await _controller.pickForPlay();
-            if (f == null) return;
-            await _controller.playFile(file: f);
-          },
-          icon: const Icon(Icons.play_arrow_rounded),
-          label: const Text('选择并播放'),
-        );
-      case 1:
-        return FloatingActionButton.extended(
-          onPressed: _controller.startPack,
-          icon: const Icon(Icons.auto_fix_high_rounded),
-          label: const Text('开始打包'),
-        );
-      default:
-        return null;
-    }
-  }
-
   @override
   void initState() {
     super.initState();
@@ -676,7 +653,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               .toList(growable: false);
 
           return Scaffold(
-            floatingActionButton: _buildFab(),
             body: Row(
               children: [
                 SafeArea(
@@ -697,7 +673,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
         return Scaffold(
           extendBody: true,
-          floatingActionButton: _buildFab(),
           body: Stack(
             children: [
               contentStack(),
