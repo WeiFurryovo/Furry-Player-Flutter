@@ -455,7 +455,8 @@ class _ExpressiveTheme {
     );
 
     const r24 = BorderRadius.all(Radius.circular(24));
-    const r18 = BorderRadius.all(Radius.circular(18));
+    const r20 = BorderRadius.all(Radius.circular(20));
+    const r16 = BorderRadius.all(Radius.circular(16));
 
     return base.copyWith(
       textTheme: textTheme,
@@ -469,19 +470,30 @@ class _ExpressiveTheme {
       scaffoldBackgroundColor: scheme.surface,
       appBarTheme: AppBarTheme(
         centerTitle: false,
-        scrolledUnderElevation: 0,
+        scrolledUnderElevation: 1,
         backgroundColor: scheme.surface,
         foregroundColor: scheme.onSurface,
       ),
+      cardTheme: CardTheme(
+        elevation: 0,
+        color: scheme.surfaceContainerHighest,
+        shape: const RoundedRectangleBorder(borderRadius: r24),
+        clipBehavior: Clip.antiAlias,
+      ),
       listTileTheme: ListTileThemeData(
-        shape: const RoundedRectangleBorder(borderRadius: r18),
+        shape: const RoundedRectangleBorder(borderRadius: r20),
         iconColor: scheme.onSurfaceVariant,
         textColor: scheme.onSurface,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        height: 72,
+        height: 80,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         backgroundColor: scheme.surfaceContainer,
+        indicatorColor: scheme.secondaryContainer,
+        indicatorShape: const StadiumBorder(),
+      ),
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: scheme.surfaceContainerLow,
         indicatorColor: scheme.secondaryContainer,
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -500,6 +512,19 @@ class _ExpressiveTheme {
         style: IconButton.styleFrom(
           shape: const StadiumBorder(),
           padding: const EdgeInsets.all(12),
+        ),
+      ),
+      searchBarTheme: SearchBarThemeData(
+        shape: const WidgetStatePropertyAll<OutlinedBorder>(
+          RoundedRectangleBorder(borderRadius: r24),
+        ),
+        elevation: const WidgetStatePropertyAll<double>(0),
+        backgroundColor: WidgetStatePropertyAll<Color>(scheme.surfaceContainer),
+        textStyle: WidgetStatePropertyAll<TextStyle?>(
+          textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        hintStyle: WidgetStatePropertyAll<TextStyle?>(
+          textTheme.titleMedium?.copyWith(color: scheme.onSurfaceVariant),
         ),
       ),
       sliderTheme: base.sliderTheme.copyWith(
@@ -521,7 +546,7 @@ class _ExpressiveTheme {
         contentTextStyle: textTheme.bodyMedium?.copyWith(
           color: scheme.onInverseSurface,
         ),
-        shape: const RoundedRectangleBorder(borderRadius: r18),
+        shape: const RoundedRectangleBorder(borderRadius: r16),
       ),
     );
   }
@@ -577,7 +602,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           label: '设置'),
     ];
 
-    const navBarHeight = 72.0;
+    final navBarHeight = NavigationBarTheme.of(context).height ?? 80.0;
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return LayoutBuilder(
@@ -653,9 +678,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                // NavigationBar already applies a SafeArea internally. Wrapping
-                // it in another SafeArea adds the bottom inset twice, which
-                // creates an extra blank area that can overlap the mini player.
+                // NavigationBar already applies a SafeArea internally.
                 child: NavigationBar(
                   selectedIndex: _tabIndex,
                   destinations: destinations,
@@ -665,6 +688,30 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             ],
           ),
         );
+      },
+    );
+  }
+}
+
+class _BottomOverlaySpacer extends StatelessWidget {
+  const _BottomOverlaySpacer({required this.controller});
+
+  final _AppController controller;
+  static const double _extra = 16;
+
+  @override
+  Widget build(BuildContext context) {
+    final navBarHeight = NavigationBarTheme.of(context).height ?? 80.0;
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+
+    return ValueListenableBuilder<_NowPlaying?>(
+      valueListenable: controller.nowPlaying,
+      builder: (context, np, _) {
+        // Keep content scrollable above the overlays:
+        // - bottom navigation bar (plus system inset)
+        // - mini player (only when active)
+        final mini = (np == null) ? 0.0 : 96.0;
+        return SizedBox(height: navBarHeight + bottomInset + mini + _extra);
       },
     );
   }
@@ -1643,11 +1690,6 @@ class _LibraryPageState extends State<LibraryPage> {
                   return SliverToBoxAdapter(
                     child: Card(
                       margin: EdgeInsets.zero,
-                      elevation: 0,
-                      color: cs.surfaceContainerHighest,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
-                      ),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: Row(
@@ -1677,11 +1719,6 @@ class _LibraryPageState extends State<LibraryPage> {
                         final meta = snap.data;
                         return Card(
                           margin: EdgeInsets.zero,
-                          elevation: 0,
-                          color: cs.surfaceContainerHighest,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(28),
-                          ),
                           child: ListTile(
                             leading: _CoverThumb(artUri: meta?.artUri),
                             title: Text(meta?.title ?? p.basename(f.path),
@@ -1708,6 +1745,7 @@ class _LibraryPageState extends State<LibraryPage> {
               },
             ),
           ),
+          SliverToBoxAdapter(child: _BottomOverlaySpacer(controller: controller)),
         ],
       ),
     );
@@ -1731,11 +1769,11 @@ class _CoverThumb extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final uri = artUri;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        width: 44,
-        height: 44,
-        color: cs.surfaceContainerHighest,
+        width: 48,
+        height: 48,
+        color: cs.surfaceContainerHigh,
         child: uri == null
             ? Icon(Icons.music_note, color: cs.primary)
             : Image.file(
@@ -1804,11 +1842,6 @@ class _ConverterPageState extends State<ConverterPage> {
             sliver: SliverToBoxAdapter(
               child: Card(
                 margin: EdgeInsets.zero,
-                elevation: 0,
-                color: cs.surfaceContainerHighest,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(28),
-                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -1922,11 +1955,6 @@ class _ConverterPageState extends State<ConverterPage> {
             sliver: SliverToBoxAdapter(
               child: Card(
                 margin: EdgeInsets.zero,
-                elevation: 0,
-                color: cs.surfaceContainerHighest,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(28),
-                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -1973,6 +2001,7 @@ class _ConverterPageState extends State<ConverterPage> {
               ),
             ),
           ),
+          SliverToBoxAdapter(child: _BottomOverlaySpacer(controller: controller)),
         ],
       ),
     );
@@ -2097,6 +2126,7 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
           ),
+          SliverToBoxAdapter(child: _BottomOverlaySpacer(controller: controller)),
         ],
       ),
     );
@@ -2457,9 +2487,12 @@ class _NowPlayingMorphHeader extends StatelessWidget {
                       child: Card(
                         margin: EdgeInsets.zero,
                         elevation: 0,
-                        color: cs.surfaceContainerHighest,
+                        color: cs.surfaceContainerHigh,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(28),
+                          side: BorderSide(
+                            color: _withOpacityCompat(cs.outlineVariant, 0.55),
+                          ),
                         ),
                         child: InkWell(
                           onTap: onExpand,
@@ -2495,7 +2528,7 @@ class _NowPlayingMorphHeader extends StatelessWidget {
                                     ],
                                   ),
                                 ),
-                                IconButton(
+                                IconButton.filledTonal(
                                   tooltip: '上一首',
                                   onPressed: controller.canPlayPreviousTrack
                                       ? controller.playPreviousTrack
@@ -2535,7 +2568,7 @@ class _NowPlayingMorphHeader extends StatelessWidget {
                                     );
                                   },
                                 ),
-                                IconButton(
+                                IconButton.filledTonal(
                                   tooltip: '下一首',
                                   onPressed: controller.canPlayNextTrack
                                       ? controller.playNextTrack
@@ -2577,7 +2610,7 @@ class _NowPlayingMorphHeader extends StatelessWidget {
                       // Match the "最近输出" thumbnail feel: no border/shadow when small.
                       if (isThumb) {
                         return ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(16),
                           child: ColoredBox(
                             color: cs.surfaceContainerHighest,
                             child: image,
