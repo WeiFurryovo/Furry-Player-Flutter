@@ -474,12 +474,6 @@ class _ExpressiveTheme {
         backgroundColor: scheme.surface,
         foregroundColor: scheme.onSurface,
       ),
-      cardTheme: CardTheme(
-        elevation: 0,
-        color: scheme.surfaceContainerHighest,
-        shape: const RoundedRectangleBorder(borderRadius: r24),
-        clipBehavior: Clip.antiAlias,
-      ),
       listTileTheme: ListTileThemeData(
         shape: const RoundedRectangleBorder(borderRadius: r20),
         iconColor: scheme.onSurfaceVariant,
@@ -1736,7 +1730,8 @@ class _LibraryPageState extends State<LibraryPage> {
 
               return SliverList.separated(
                 itemCount: filtered.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 10),
                 itemBuilder: (context, i) {
                   final f = filtered[i];
                   return FutureBuilder<_MetaPreview>(
