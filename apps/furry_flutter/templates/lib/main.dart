@@ -480,7 +480,7 @@ class _ExpressiveTheme {
         textColor: scheme.onSurface,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        height: 56,
+        height: 48,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
         backgroundColor: scheme.surfaceContainer,
         indicatorColor: scheme.secondaryContainer,
