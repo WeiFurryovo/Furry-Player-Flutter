@@ -851,6 +851,7 @@ class _BottomOverlaySpacer extends StatelessWidget {
   static const double _extra = 16;
   static const double _wideRailBreakpoint = 700;
   static const double _miniHeight = NowPlayingPanel.miniHeightPx;
+  static const double _miniGap = NowPlayingPanel.miniGapPx;
   static const double _bottomNavMarginBottom =
       _AppShellState._bottomNavMarginBottom;
 
@@ -871,7 +872,7 @@ class _BottomOverlaySpacer extends StatelessWidget {
         // - bottom navigation bar (plus system inset)
         // - mini player (only when active)
         final mini = (np == null) ? 0.0 : _miniHeight;
-        return SizedBox(height: bottomBaseline + mini + _extra);
+        return SizedBox(height: bottomBaseline + mini + _miniGap + _extra);
       },
     );
   }
@@ -2267,24 +2268,28 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-class NowPlayingPanel extends StatefulWidget {
+// Kept temporarily for reference while iterating on the player UI.
+// ignore: unused_element
+class _NowPlayingPanelDeprecated extends StatefulWidget {
   final _AppController controller;
   final double bottomOverlayBaseline;
 
   // Tuned by eye: close to M3 bottom sheet mini player height.
+  // ignore: unused_field
   static const double miniHeightPx = 88;
 
-  const NowPlayingPanel({
-    super.key,
+  const _NowPlayingPanelDeprecated({
     required this.controller,
     required this.bottomOverlayBaseline,
   });
 
   @override
-  State<NowPlayingPanel> createState() => _NowPlayingPanelState();
+  State<_NowPlayingPanelDeprecated> createState() =>
+      _NowPlayingPanelDeprecatedState();
 }
 
-class _NowPlayingPanelState extends State<NowPlayingPanel> {
+class _NowPlayingPanelDeprecatedState
+    extends State<_NowPlayingPanelDeprecated> {
   final DraggableScrollableController _sheetController =
       DraggableScrollableController();
   double _extent = 0;
@@ -2847,6 +2852,372 @@ class _NowPlayingMorphHeader extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class NowPlayingPanel extends StatefulWidget {
+  final _AppController controller;
+  final double bottomOverlayBaseline;
+
+  // Tuned by eye: close to M3 mini player height.
+  static const double miniHeightPx = 88;
+  static const double miniGapPx = 10;
+
+  const NowPlayingPanel({
+    super.key,
+    required this.controller,
+    required this.bottomOverlayBaseline,
+  });
+
+  @override
+  State<NowPlayingPanel> createState() => _NowPlayingPanelState();
+}
+
+class _NowPlayingPanelState extends State<NowPlayingPanel> {
+  bool _sheetOpen = false;
+
+  Future<void> _openSheet(_NowPlaying np) async {
+    if (_sheetOpen) return;
+    setState(() => _sheetOpen = true);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        return _NowPlayingSheet(controller: widget.controller, np: np);
+      },
+    );
+    if (mounted) setState(() => _sheetOpen = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<_NowPlaying?>(
+      valueListenable: widget.controller.nowPlaying,
+      builder: (context, np, _) {
+        if (np == null) return const SizedBox.shrink();
+
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              0,
+              16,
+              widget.bottomOverlayBaseline + NowPlayingPanel.miniGapPx,
+            ),
+            child: _NowPlayingMiniBar(
+              controller: widget.controller,
+              np: np,
+              onOpen: () => _openSheet(np),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _NowPlayingMiniBar extends StatelessWidget {
+  const _NowPlayingMiniBar({
+    required this.controller,
+    required this.np,
+    required this.onOpen,
+  });
+
+  final _AppController controller;
+  final _NowPlaying np;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final titleStyle = Theme.of(context).textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+        );
+    final subtitleStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: cs.onSurfaceVariant,
+        );
+
+    return Semantics(
+      button: true,
+      label: '正在播放：${np.title}',
+      child: Material(
+        elevation: 2,
+        color: cs.surfaceContainerHigh,
+        surfaceTintColor: cs.surfaceTint,
+        shadowColor: _withOpacityCompat(cs.shadow, 0.22),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+          side: BorderSide(color: _withOpacityCompat(cs.outlineVariant, 0.55)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onOpen,
+          borderRadius: BorderRadius.circular(28),
+          child: SizedBox(
+            height: NowPlayingPanel.miniHeightPx,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Row(
+                children: [
+                  _CoverThumb(artUri: np.artUri),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          np.title,
+                          style: titleStyle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          np.subtitle,
+                          style: subtitleStyle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 8),
+                        _MiniProgress(controller: controller),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  IconButton.filledTonal(
+                    tooltip: '上一首',
+                    onPressed: controller.canPlayPreviousTrack
+                        ? controller.playPreviousTrack
+                        : null,
+                    icon: const Icon(Icons.skip_previous_rounded),
+                  ),
+                  const SizedBox(width: 8),
+                  _MiniPlayPause(controller: controller),
+                  const SizedBox(width: 8),
+                  IconButton.filledTonal(
+                    tooltip: '下一首',
+                    onPressed: controller.canPlayNextTrack
+                        ? controller.playNextTrack
+                        : null,
+                    icon: const Icon(Icons.skip_next_rounded),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniPlayPause extends StatelessWidget {
+  const _MiniPlayPause({required this.controller});
+  final _AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<PlayerState>(
+      stream: controller.playerStateStream,
+      builder: (context, snap) {
+        final playing = snap.data?.playing ?? false;
+        final processing = snap.data?.processingState ?? ProcessingState.idle;
+        final busy = processing == ProcessingState.loading ||
+            processing == ProcessingState.buffering;
+        return IconButton.filled(
+          tooltip: playing ? '暂停' : '播放',
+          onPressed: busy
+              ? null
+              : () async {
+                  if (playing) {
+                    await controller.pause();
+                  } else {
+                    await controller.play();
+                  }
+                },
+          icon: busy
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(
+                  playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                ),
+        );
+      },
+    );
+  }
+}
+
+class _MiniProgress extends StatelessWidget {
+  const _MiniProgress({required this.controller});
+  final _AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return StreamBuilder<Duration?>(
+      stream: controller.durationStream,
+      builder: (context, durSnap) {
+        final duration = durSnap.data ?? Duration.zero;
+        final maxMs = duration.inMilliseconds <= 0
+            ? 1.0
+            : duration.inMilliseconds.toDouble();
+        return StreamBuilder<Duration>(
+          stream: controller.positionStream,
+          builder: (context, posSnap) {
+            final pos = posSnap.data ?? Duration.zero;
+            final posMs = pos.inMilliseconds.toDouble().clamp(0.0, maxMs);
+            final progress = (posMs / maxMs).clamp(0.0, 1.0);
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: progress.isFinite ? progress : 0,
+                minHeight: 3,
+                backgroundColor: _withOpacityCompat(cs.onSurfaceVariant, 0.16),
+                valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _NowPlayingSheet extends StatelessWidget {
+  const _NowPlayingSheet({required this.controller, required this.np});
+
+  final _AppController controller;
+  final _NowPlaying np;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final w = MediaQuery.of(context).size.width;
+    final coverSize = (w - 48).clamp(220.0, 360.0);
+
+    Widget cover() {
+      final uri = np.artUri;
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          width: coverSize,
+          height: coverSize,
+          color: cs.surfaceContainerHigh,
+          child: uri == null
+              ? Icon(
+                  Icons.album_rounded,
+                  size: coverSize * 0.28,
+                  color: cs.primary,
+                )
+              : Image.file(
+                  File.fromUri(uri),
+                  fit: BoxFit.cover,
+                  cacheWidth: 1024,
+                  cacheHeight: 1024,
+                  gaplessPlayback: true,
+                  filterQuality: FilterQuality.medium,
+                ),
+        ),
+      );
+    }
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '正在播放',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '关闭',
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Center(child: cover()),
+              const SizedBox(height: 16),
+              Text(np.title, style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: 6),
+              Text(
+                np.subtitle,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(color: cs.onSurfaceVariant),
+              ),
+              const SizedBox(height: 18),
+              _NowPlayingSeekBar(controller: controller),
+              const SizedBox(height: 16),
+              _NowPlayingControls(controller: controller),
+              const SizedBox(height: 18),
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.insert_drive_file_rounded, color: cs.primary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('文件',
+                                style: Theme.of(context).textTheme.titleMedium),
+                            const SizedBox(height: 6),
+                            SelectableText(
+                              np.sourcePath,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: '复制路径',
+                        onPressed: () async {
+                          await Clipboard.setData(
+                            ClipboardData(text: np.sourcePath),
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('已复制路径')),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.copy_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
