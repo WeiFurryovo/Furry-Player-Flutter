@@ -897,6 +897,8 @@ class _AppController {
 
   final ValueNotifier<_NowPlaying?> nowPlaying =
       ValueNotifier<_NowPlaying?>(null);
+  final ValueNotifier<_QueueState> queueState =
+      ValueNotifier<_QueueState>(const _QueueState(queue: <File>[], index: -1));
   final ValueNotifier<List<File>> furryOutputs =
       ValueNotifier<List<File>>(<File>[]);
   final ValueNotifier<String> log = ValueNotifier<String>('');
@@ -944,6 +946,18 @@ class _AppController {
     } catch (e) {
       appendLog('Native init failed: $e');
     }
+  }
+
+  void _publishQueueState() {
+    final q = _queue;
+    if (q == null || q.isEmpty) {
+      queueState.value = const _QueueState(queue: <File>[], index: -1);
+      return;
+    }
+    queueState.value = _QueueState(
+      queue: List<File>.unmodifiable(q),
+      index: _queueIndex,
+    );
   }
 
   Future<void> cleanupTempArtifacts() async {
@@ -1005,6 +1019,7 @@ class _AppController {
     player.dispose();
     systemMedia.dispose();
     nowPlaying.dispose();
+    queueState.dispose();
     furryOutputs.dispose();
     log.dispose();
   }
@@ -1063,6 +1078,7 @@ class _AppController {
       if (idx == _queueIndex) return;
       _lastPreviousPressedAt = null;
       _queueIndex = idx;
+      _publishQueueState();
       unawaited(_syncNowPlayingFromQueueIndex(idx));
       unawaited(systemMedia.setQueueAvailability(
         canGoNext: canPlayNextTrack,
@@ -1297,6 +1313,7 @@ class _AppController {
       _queueIndex = -1;
       _androidPlaylistActive = false;
     }
+    _publishQueueState();
     unawaited(systemMedia.setQueueAvailability(
       canGoNext: canPlayNextTrack,
       canGoPrevious: canPlayPreviousTrack,
@@ -1355,7 +1372,7 @@ class _AppController {
         final mediaItem = MediaItem(
           id: file.path,
           title: meta.title.isEmpty ? name : meta.title,
-          artist: meta.subtitle,
+          artist: meta.artist.isNotEmpty ? meta.artist : meta.subtitle,
           artUri: artUriSystem,
         );
         if (unpacked != null) {
@@ -1471,6 +1488,7 @@ class _AppController {
       _queue = List<File>.from(queue);
       _queueIndex = index;
       _androidPlaylistActive = true;
+      _publishQueueState();
       unawaited(systemMedia.setQueueAvailability(
         canGoNext: canPlayNextTrack,
         canGoPrevious: canPlayPreviousTrack,
@@ -1531,7 +1549,7 @@ class _AppController {
           uri = playable.uri;
           final meta = await getMetaPreviewForFurry(f);
           title = meta.title.isEmpty ? base : meta.title;
-          artist = meta.subtitle;
+          artist = meta.artist.isNotEmpty ? meta.artist : meta.subtitle;
           artUri = meta.artUri;
         } else {
           uri = f.uri;
@@ -1568,6 +1586,7 @@ class _AppController {
     _androidPlaylistActive = false;
     _queue = List<File>.from(queue);
     _queueIndex = index;
+    _publishQueueState();
     unawaited(systemMedia.setQueueAvailability(
       canGoNext: canPlayNextTrack,
       canGoPrevious: canPlayPreviousTrack,
@@ -1599,6 +1618,7 @@ class _AppController {
     final nextIdx = (_queueIndex - 1 + queue.length) % queue.length;
     if (_androidPlaylistActive && !kIsWeb && Platform.isAndroid) {
       _queueIndex = nextIdx;
+      _publishQueueState();
       unawaited(systemMedia.setQueueAvailability(
         canGoNext: canPlayNextTrack,
         canGoPrevious: canPlayPreviousTrack,
@@ -1618,6 +1638,7 @@ class _AppController {
     final nextIdx = (_queueIndex + 1) % queue.length;
     if (_androidPlaylistActive && !kIsWeb && Platform.isAndroid) {
       _queueIndex = nextIdx;
+      _publishQueueState();
       unawaited(systemMedia.setQueueAvailability(
         canGoNext: canPlayNextTrack,
         canGoPrevious: canPlayPreviousTrack,
@@ -1684,6 +1705,117 @@ class _AppController {
     }
   }
 
+  Future<void> playAtQueueIndex(int index) async {
+    final queue = _queue;
+    if (queue == null || queue.isEmpty) return;
+    if (index < 0 || index >= queue.length) return;
+
+    if (_androidPlaylistActive && !kIsWeb && Platform.isAndroid) {
+      _queueIndex = index;
+      _publishQueueState();
+      unawaited(systemMedia.setQueueAvailability(
+        canGoNext: canPlayNextTrack,
+        canGoPrevious: canPlayPreviousTrack,
+      ));
+      await player.seek(Duration.zero, index: index);
+      await play();
+      await _syncNowPlayingFromQueueIndex(index);
+      return;
+    }
+
+    await playFromQueue(queue: queue, index: index);
+  }
+
+  void clearQueue({bool keepPlaying = true}) {
+    _queue = null;
+    _queueIndex = -1;
+    _androidPlaylistActive = false;
+    _publishQueueState();
+    unawaited(systemMedia.setQueueAvailability(
+      canGoNext: canPlayNextTrack,
+      canGoPrevious: canPlayPreviousTrack,
+    ));
+    if (!keepPlaying) {
+      unawaited(stop());
+      nowPlaying.value = null;
+    }
+  }
+
+  Future<void> removeFromQueueByPath(String path) async {
+    final queue = _queue;
+    if (queue == null || queue.isEmpty) return;
+
+    final idx = queue.indexWhere((f) => f.path == path);
+    if (idx < 0) return;
+
+    final currentPath = nowPlaying.value?.sourcePath;
+    queue.removeAt(idx);
+    if (queue.isEmpty) {
+      clearQueue(keepPlaying: false);
+      return;
+    }
+
+    // Keep the current track if possible.
+    if (currentPath != null) {
+      final newIdx = queue.indexWhere((f) => f.path == currentPath);
+      _queueIndex = newIdx >= 0 ? newIdx : 0;
+    } else {
+      _queueIndex = _queueIndex.clamp(0, queue.length - 1);
+    }
+    _publishQueueState();
+    unawaited(systemMedia.setQueueAvailability(
+      canGoNext: canPlayNextTrack,
+      canGoPrevious: canPlayPreviousTrack,
+    ));
+  }
+
+  Future<void> enqueueFile(File file, {bool playNext = false}) async {
+    final currentPath = nowPlaying.value?.sourcePath;
+    final q = _queue == null ? <File>[] : List<File>.from(_queue!);
+
+    // If no explicit queue exists yet, bootstrap from the current track.
+    if (q.isEmpty && currentPath != null) {
+      q.add(File(currentPath));
+      _queueIndex = 0;
+    }
+
+    // De-dupe by path (keep earliest).
+    if (q.any((f) => f.path == file.path)) return;
+
+    if (playNext && q.isNotEmpty && _queueIndex >= 0) {
+      q.insert((_queueIndex + 1).clamp(0, q.length), file);
+    } else {
+      q.add(file);
+    }
+
+    _queue = q;
+    _publishQueueState();
+    unawaited(systemMedia.setQueueAvailability(
+      canGoNext: canPlayNextTrack,
+      canGoPrevious: canPlayPreviousTrack,
+    ));
+  }
+
+  void moveQueueItem(int oldIndex, int newIndex) {
+    final queue = _queue;
+    if (queue == null || queue.isEmpty) return;
+    if (oldIndex < 0 || oldIndex >= queue.length) return;
+    if (newIndex < 0 || newIndex >= queue.length) return;
+    if (oldIndex == newIndex) return;
+
+    final currentPath = nowPlaying.value?.sourcePath;
+    final item = queue.removeAt(oldIndex);
+    queue.insert(newIndex, item);
+
+    if (currentPath != null) {
+      final idx = queue.indexWhere((f) => f.path == currentPath);
+      _queueIndex = idx;
+    } else {
+      _queueIndex = _queueIndex.clamp(0, queue.length - 1);
+    }
+    _publishQueueState();
+  }
+
   Future<_MetaPreview> getMetaPreviewForFurry(File furryFile) {
     final key = furryFile.path;
     final existing = _metaPreviewCache[key];
@@ -1730,6 +1862,8 @@ class _AppController {
 
       return _MetaPreview(
         title: title.isNotEmpty ? title : fallbackTitle,
+        artist: artist,
+        album: album,
         subtitle: subtitleParts.join(' · '),
         artUri: artUri,
         coverBytesLen: coverBytesLen,
@@ -1742,6 +1876,87 @@ class _AppController {
       _metaPreviewCache.remove(firstKey);
     }
     return future;
+  }
+
+  Future<_LibraryIndex> buildLibraryIndex(List<File> files) async {
+    final tracks = <_TrackEntry>[];
+    for (final f in files) {
+      try {
+        final meta = await getMetaPreviewForFurry(f);
+        final stat = await f.stat();
+        tracks.add(
+          _TrackEntry(
+            file: f,
+            meta: meta,
+            modified: stat.modified,
+            bytes: stat.size,
+          ),
+        );
+      } catch (e, st) {
+        appendLog('Index meta failed: ${f.path}: $e\n$st');
+        final stat = await f.stat();
+        tracks.add(
+          _TrackEntry(
+            file: f,
+            meta: _MetaPreview(
+              title: p.basename(f.path),
+              artist: '',
+              album: '',
+              subtitle: '',
+              artUri: null,
+              coverBytesLen: null,
+            ),
+            modified: stat.modified,
+            bytes: stat.size,
+          ),
+        );
+      }
+    }
+
+    final albumsByKey = <String, _AlbumGroup>{};
+    final artistsByKey = <String, _ArtistGroup>{};
+
+    for (final t in tracks) {
+      final albumName = t.meta.album.trim();
+      final artistName = t.meta.artist.trim();
+      final albumKey = '${artistName.toLowerCase()}|${albumName.toLowerCase()}';
+      final artistKey = artistName.toLowerCase();
+
+      final album = albumsByKey.putIfAbsent(
+        albumKey,
+        () => _AlbumGroup(
+          album: albumName,
+          artist: artistName,
+          artUri: t.meta.artUri,
+        ),
+      );
+      album.tracks.add(t);
+      album.artUri ??= t.meta.artUri;
+
+      final artist = artistsByKey.putIfAbsent(
+        artistKey,
+        () => _ArtistGroup(artist: artistName, artUri: t.meta.artUri),
+      );
+      artist.tracks.add(t);
+      artist.artUri ??= t.meta.artUri;
+      artist.albumsByKey.putIfAbsent(albumKey, () => album);
+    }
+
+    final albums = albumsByKey.values.toList(growable: false)
+      ..sort((a, b) => a.title.compareTo(b.title));
+    final artists = artistsByKey.values.toList(growable: false)
+      ..sort((a, b) => a.title.compareTo(b.title));
+
+    for (final a in albums) {
+      a.tracks.sort((x, y) => x.displayTitle.compareTo(y.displayTitle));
+    }
+    for (final ar in artists) {
+      for (final alb in ar.albumsByKey.values) {
+        alb.tracks.sort((x, y) => x.displayTitle.compareTo(y.displayTitle));
+      }
+    }
+
+    return _LibraryIndex(tracks: tracks, albums: albums, artists: artists);
   }
 }
 
@@ -1759,17 +1974,119 @@ class _NowPlaying {
   });
 }
 
+class _QueueState {
+  final List<File> queue;
+  final int index;
+
+  const _QueueState({required this.queue, required this.index});
+
+  bool get hasQueue => queue.isNotEmpty;
+
+  File? get currentFile {
+    if (index < 0 || index >= queue.length) return null;
+    return queue[index];
+  }
+}
+
 class _MetaPreview {
   final String title;
+  final String artist;
+  final String album;
   final String subtitle;
   final Uri? artUri;
   final int? coverBytesLen;
 
   _MetaPreview({
     required this.title,
+    required this.artist,
+    required this.album,
     required this.subtitle,
     required this.artUri,
     required this.coverBytesLen,
+  });
+}
+
+enum _LibraryView { tracks, albums, artists, queue }
+
+enum _LibrarySort { recent, title, artist, album, size }
+
+class _LibraryOptions {
+  final _LibraryView view;
+  final _LibrarySort sort;
+  final bool ascending;
+  final bool onlyWithCover;
+
+  const _LibraryOptions({
+    required this.view,
+    required this.sort,
+    required this.ascending,
+    required this.onlyWithCover,
+  });
+}
+
+class _TrackEntry {
+  final File file;
+  final _MetaPreview meta;
+  final DateTime modified;
+  final int bytes;
+
+  const _TrackEntry({
+    required this.file,
+    required this.meta,
+    required this.modified,
+    required this.bytes,
+  });
+
+  String get path => file.path;
+
+  String get displayTitle =>
+      meta.title.isEmpty ? p.basename(file.path) : meta.title;
+
+  String get displayArtist {
+    if (meta.artist.isNotEmpty) return meta.artist;
+    final parts = meta.subtitle.split(' · ');
+    return parts.isEmpty ? '' : parts.first;
+  }
+
+  String get displayAlbum => meta.album;
+}
+
+class _AlbumGroup {
+  final String album;
+  final String artist;
+  Uri? artUri;
+  final List<_TrackEntry> tracks = <_TrackEntry>[];
+
+  _AlbumGroup({
+    required this.album,
+    required this.artist,
+    required this.artUri,
+  });
+
+  String get title => album.isEmpty ? '未知专辑' : album;
+  String get subtitle => artist.isEmpty ? '未知歌手' : artist;
+}
+
+class _ArtistGroup {
+  final String artist;
+  Uri? artUri;
+  final Map<String, _AlbumGroup> albumsByKey = <String, _AlbumGroup>{};
+  final List<_TrackEntry> tracks = <_TrackEntry>[];
+
+  _ArtistGroup({required this.artist, required this.artUri});
+
+  String get title => artist.isEmpty ? '未知歌手' : artist;
+}
+
+class _LibraryIndex {
+  final List<_TrackEntry> tracks;
+  final List<_AlbumGroup> albums;
+  final List<_ArtistGroup> artists;
+
+  const _LibraryIndex({
+    required this.tracks,
+    required this.albums,
+    required this.artists,
   });
 }
 
@@ -1782,7 +2099,66 @@ class LibraryPage extends StatefulWidget {
 }
 
 class _LibraryPageState extends State<LibraryPage> {
+  final SearchController _searchController = SearchController();
   String _query = '';
+  _LibraryView _view = _LibraryView.tracks;
+  _LibrarySort _sort = _LibrarySort.recent;
+  bool _ascending = false;
+  bool _onlyWithCover = false;
+
+  int? _lastFilesHash;
+  Future<_LibraryIndex>? _indexFuture;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<_LibraryIndex> _getIndexFuture(
+      _AppController controller, List<File> files) {
+    final hash =
+        Object.hash(files.length, Object.hashAll(files.map((f) => f.path)));
+    if (_indexFuture == null || _lastFilesHash != hash) {
+      _lastFilesHash = hash;
+      _indexFuture = controller.buildLibraryIndex(files);
+    }
+    return _indexFuture!;
+  }
+
+  bool _matchesQuery(_TrackEntry t, String queryLower) {
+    if (queryLower.isEmpty) return true;
+    final base = p.basename(t.file.path).toLowerCase();
+    final title = t.displayTitle.toLowerCase();
+    final artist = t.meta.artist.toLowerCase();
+    final album = t.meta.album.toLowerCase();
+    return base.contains(queryLower) ||
+        title.contains(queryLower) ||
+        artist.contains(queryLower) ||
+        album.contains(queryLower);
+  }
+
+  Future<void> _openOptionsSheet() async {
+    final current = _LibraryOptions(
+      view: _view,
+      sort: _sort,
+      ascending: _ascending,
+      onlyWithCover: _onlyWithCover,
+    );
+    final next = await showModalBottomSheet<_LibraryOptions>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => _LibraryOptionsSheet(value: current),
+    );
+    if (!mounted || next == null) return;
+    setState(() {
+      _view = next.view;
+      _sort = next.sort;
+      _ascending = next.ascending;
+      _onlyWithCover = next.onlyWithCover;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1799,28 +2175,159 @@ class _LibraryPageState extends State<LibraryPage> {
               onPressed: controller.refreshOutputs,
               icon: const Icon(Icons.refresh_rounded),
             ),
+            IconButton(
+              tooltip: '排序/筛选',
+              onPressed: _openOptionsSheet,
+              icon: const Icon(Icons.tune_rounded),
+            ),
             const SizedBox(width: 8),
           ],
         ),
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: SearchBar(
-              hintText: '搜索（输出的 .furry）',
-              leading: const Icon(Icons.search_rounded),
+            child: SearchAnchor.bar(
+              searchController: _searchController,
+              barHintText: '搜索（歌曲 / 专辑 / 歌手）',
+              barLeading: const Icon(Icons.search_rounded),
+              suggestionsBuilder: (context, searchController) {
+                final q = searchController.text.trim().toLowerCase();
+                final files = controller.furryOutputs.value;
+                if (files.isEmpty) {
+                  return <Widget>[
+                    const ListTile(
+                      leading: Icon(Icons.music_off_rounded),
+                      title: Text('暂无可搜索内容'),
+                    ),
+                  ];
+                }
+                return <Widget>[
+                  FutureBuilder<_LibraryIndex>(
+                    future: _getIndexFuture(controller, files),
+                    builder: (context, snap) {
+                      final idx = snap.data;
+                      if (idx == null) {
+                        return const ListTile(
+                          leading: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          title: Text('正在加载…'),
+                        );
+                      }
+
+                      final tracks = idx.tracks;
+                      final suggestions = <_TrackEntry>[];
+                      if (q.isNotEmpty) {
+                        for (final t in tracks) {
+                          if (_matchesQuery(t, q)) suggestions.add(t);
+                          if (suggestions.length >= 8) break;
+                        }
+                      }
+
+                      if (q.isEmpty) {
+                        final hot = tracks.take(6).toList(growable: false);
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const ListTile(
+                              leading: Icon(Icons.auto_awesome_rounded),
+                              title: Text('建议'),
+                              subtitle: Text('试试搜索歌名、专辑或歌手'),
+                            ),
+                            for (final t in hot)
+                              ListTile(
+                                leading: _CoverThumb(artUri: t.meta.artUri),
+                                title: Text(t.displayTitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis),
+                                subtitle: Text(
+                                  t.meta.subtitle.isEmpty
+                                      ? '本地文件'
+                                      : t.meta.subtitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                onTap: () {
+                                  searchController.closeView(t.displayTitle);
+                                  setState(() => _query = t.displayTitle);
+                                },
+                              ),
+                          ],
+                        );
+                      }
+
+                      if (suggestions.isEmpty) {
+                        return ListTile(
+                          leading: const Icon(Icons.search_off_rounded),
+                          title: Text('无结果：${searchController.text}'),
+                          subtitle: const Text('试试更短的关键词'),
+                        );
+                      }
+
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final t in suggestions)
+                            ListTile(
+                              leading: _CoverThumb(artUri: t.meta.artUri),
+                              title: Text(t.displayTitle,
+                                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                              subtitle: Text(
+                                t.meta.subtitle.isEmpty
+                                    ? '本地文件'
+                                    : t.meta.subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: const Icon(Icons.north_west_rounded),
+                              onTap: () {
+                                searchController.closeView(t.displayTitle);
+                                setState(() => _query = t.displayTitle);
+                              },
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ];
+              },
               onChanged: (v) => setState(() => _query = v.trim()),
             ),
           ),
         ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          sliver: SliverToBoxAdapter(
-            child: Row(
-              children: [
-                Icon(Icons.history_rounded, color: cs.primary),
-                const SizedBox(width: 8),
-                Text('最近输出', style: Theme.of(context).textTheme.titleLarge),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: SegmentedButton<_LibraryView>(
+              segments: const [
+                ButtonSegment(
+                    value: _LibraryView.tracks,
+                    label: Text('歌曲'),
+                    icon: Icon(Icons.music_note_rounded)),
+                ButtonSegment(
+                    value: _LibraryView.albums,
+                    label: Text('专辑'),
+                    icon: Icon(Icons.album_rounded)),
+                ButtonSegment(
+                    value: _LibraryView.artists,
+                    label: Text('歌手'),
+                    icon: Icon(Icons.person_rounded)),
+                ButtonSegment(
+                    value: _LibraryView.queue,
+                    label: Text('队列'),
+                    icon: Icon(Icons.queue_music_rounded)),
               ],
+              selected: <_LibraryView>{_view},
+              onSelectionChanged: (s) => setState(() => _view = s.first),
+              style: ButtonStyle(
+                visualDensity: VisualDensity.compact,
+                shape: WidgetStatePropertyAll(
+                  RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18)),
+                ),
+              ),
             ),
           ),
         ),
@@ -1829,15 +2336,7 @@ class _LibraryPageState extends State<LibraryPage> {
           sliver: ValueListenableBuilder<List<File>>(
             valueListenable: controller.furryOutputs,
             builder: (context, files, _) {
-              final filtered = files.where((f) {
-                if (_query.isEmpty) return true;
-                return p
-                    .basename(f.path)
-                    .toLowerCase()
-                    .contains(_query.toLowerCase());
-              }).toList();
-
-              if (filtered.isEmpty) {
+              if (files.isEmpty) {
                 return SliverToBoxAdapter(
                   child: Card(
                     margin: EdgeInsets.zero,
@@ -1858,41 +2357,82 @@ class _LibraryPageState extends State<LibraryPage> {
                 );
               }
 
-              return SliverList.separated(
-                itemCount: filtered.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 10),
-                itemBuilder: (context, i) {
-                  final f = filtered[i];
-                  return FutureBuilder<_MetaPreview>(
-                    future: controller.getMetaPreviewForFurry(f),
-                    builder: (context, snap) {
-                      final meta = snap.data;
-                      return Card(
-                        margin: EdgeInsets.zero,
-                        child: ListTile(
-                          contentPadding:
-                              const EdgeInsets.symmetric(horizontal: 14),
-                          leading: _CoverThumb(artUri: meta?.artUri),
-                          title: Text(meta?.title ?? p.basename(f.path),
-                              maxLines: 1, overflow: TextOverflow.ellipsis),
-                          subtitle: Text(
-                            meta == null || meta.subtitle.isEmpty
-                                ? '${_fmtBytes(f.lengthSync())} · ${f.lastModifiedSync().toLocal()}'
-                                : meta.subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          trailing: const Icon(Icons.chevron_right_rounded),
-                          onTap: () => controller.playFromQueue(
-                            queue: filtered,
-                            index: i,
-                            displayName: p.basename(f.path),
-                          ),
+              return FutureBuilder<_LibraryIndex>(
+                future: _getIndexFuture(controller, files),
+                builder: (context, snap) {
+                  final idx = snap.data;
+                  if (idx == null) {
+                    return const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.only(top: 12),
+                        child: Center(
+                          child: CircularProgressIndicator(),
                         ),
+                      ),
+                    );
+                  }
+
+                  final q = _query.trim().toLowerCase();
+                  final tracks = idx.tracks
+                      .where((t) => (!_onlyWithCover || t.meta.artUri != null))
+                      .where((t) => _matchesQuery(t, q))
+                      .toList(growable: false);
+
+                  int compareTrack(_TrackEntry a, _TrackEntry b) {
+                    int r;
+                    switch (_sort) {
+                      case _LibrarySort.recent:
+                        r = b.modified.compareTo(a.modified);
+                        break;
+                      case _LibrarySort.title:
+                        r = a.displayTitle.compareTo(b.displayTitle);
+                        break;
+                      case _LibrarySort.artist:
+                        r = a.meta.artist.compareTo(b.meta.artist);
+                        break;
+                      case _LibrarySort.album:
+                        r = a.meta.album.compareTo(b.meta.album);
+                        break;
+                      case _LibrarySort.size:
+                        r = b.bytes.compareTo(a.bytes);
+                        break;
+                    }
+                    return _ascending ? -r : r;
+                  }
+
+                  final sortedTracks = tracks.toList()..sort(compareTrack);
+
+                  switch (_view) {
+                    case _LibraryView.tracks:
+                      return _TracksSliver(
+                        controller: controller,
+                        tracks: sortedTracks,
+                        bytesFmt: _fmtBytes,
                       );
-                    },
-                  );
+                    case _LibraryView.albums:
+                      final albums = idx.albums.where((a) {
+                        if (!_onlyWithCover) return true;
+                        return a.artUri != null;
+                      }).where((a) {
+                        if (q.isEmpty) return true;
+                        return a.title.toLowerCase().contains(q) ||
+                            a.subtitle.toLowerCase().contains(q);
+                      }).toList(growable: false);
+                      return _AlbumsSliver(
+                          controller: controller, albums: albums);
+                    case _LibraryView.artists:
+                      final artists = idx.artists.where((a) {
+                        if (!_onlyWithCover) return true;
+                        return a.artUri != null;
+                      }).where((a) {
+                        if (q.isEmpty) return true;
+                        return a.title.toLowerCase().contains(q);
+                      }).toList(growable: false);
+                      return _ArtistsSliver(
+                          controller: controller, artists: artists);
+                    case _LibraryView.queue:
+                      return _QueueSliver(controller: controller);
+                  }
                 },
               );
             },
@@ -1902,13 +2442,839 @@ class _LibraryPageState extends State<LibraryPage> {
       ],
     );
   }
+}
 
-  String _fmtBytes(int bytes) {
-    const kb = 1024;
-    const mb = 1024 * 1024;
-    if (bytes >= mb) return '${(bytes / mb).toStringAsFixed(1)} MB';
-    if (bytes >= kb) return '${(bytes / kb).toStringAsFixed(1)} KB';
-    return '$bytes B';
+String _fmtBytes(int bytes) {
+  const kb = 1024;
+  const mb = 1024 * 1024;
+  if (bytes >= mb) return '${(bytes / mb).toStringAsFixed(1)} MB';
+  if (bytes >= kb) return '${(bytes / kb).toStringAsFixed(1)} KB';
+  return '$bytes B';
+}
+
+class _LibraryOptionsSheet extends StatefulWidget {
+  const _LibraryOptionsSheet({required this.value});
+
+  final _LibraryOptions value;
+
+  @override
+  State<_LibraryOptionsSheet> createState() => _LibraryOptionsSheetState();
+}
+
+class _LibraryOptionsSheetState extends State<_LibraryOptionsSheet> {
+  late _LibraryView _view;
+  late _LibrarySort _sort;
+  late bool _ascending;
+  late bool _onlyWithCover;
+
+  @override
+  void initState() {
+    super.initState();
+    _view = widget.value.view;
+    _sort = widget.value.sort;
+    _ascending = widget.value.ascending;
+    _onlyWithCover = widget.value.onlyWithCover;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '排序与筛选',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            SegmentedButton<_LibraryView>(
+              segments: const [
+                ButtonSegment(
+                  value: _LibraryView.tracks,
+                  label: Text('歌曲'),
+                  icon: Icon(Icons.music_note_rounded),
+                ),
+                ButtonSegment(
+                  value: _LibraryView.albums,
+                  label: Text('专辑'),
+                  icon: Icon(Icons.album_rounded),
+                ),
+                ButtonSegment(
+                  value: _LibraryView.artists,
+                  label: Text('歌手'),
+                  icon: Icon(Icons.person_rounded),
+                ),
+                ButtonSegment(
+                  value: _LibraryView.queue,
+                  label: Text('队列'),
+                  icon: Icon(Icons.queue_music_rounded),
+                ),
+              ],
+              selected: <_LibraryView>{_view},
+              onSelectionChanged: (s) => setState(() => _view = s.first),
+            ),
+            const SizedBox(height: 16),
+            Text('排序', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _SortChip(
+                  label: '最近',
+                  selected: _sort == _LibrarySort.recent,
+                  onTap: () => setState(() => _sort = _LibrarySort.recent),
+                ),
+                _SortChip(
+                  label: '标题',
+                  selected: _sort == _LibrarySort.title,
+                  onTap: () => setState(() => _sort = _LibrarySort.title),
+                ),
+                _SortChip(
+                  label: '歌手',
+                  selected: _sort == _LibrarySort.artist,
+                  onTap: () => setState(() => _sort = _LibrarySort.artist),
+                ),
+                _SortChip(
+                  label: '专辑',
+                  selected: _sort == _LibrarySort.album,
+                  onTap: () => setState(() => _sort = _LibrarySort.album),
+                ),
+                _SortChip(
+                  label: '大小',
+                  selected: _sort == _LibrarySort.size,
+                  onTap: () => setState(() => _sort = _LibrarySort.size),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              value: _ascending,
+              onChanged: (v) => setState(() => _ascending = v),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('升序'),
+              subtitle: const Text('关闭时为降序/最近优先'),
+            ),
+            const SizedBox(height: 4),
+            SwitchListTile(
+              value: _onlyWithCover,
+              onChanged: (v) => setState(() => _onlyWithCover = v),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('仅显示有封面'),
+              subtitle: const Text('用于快速筛选更完整的条目'),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('取消'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(
+                        _LibraryOptions(
+                          view: _view,
+                          sort: _sort,
+                          ascending: _ascending,
+                          onlyWithCover: _onlyWithCover,
+                        ),
+                      );
+                    },
+                    child: const Text('应用'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SortChip extends StatelessWidget {
+  const _SortChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilterChip(
+      selected: selected,
+      label: Text(label),
+      onSelected: (_) => onTap(),
+      showCheckmark: false,
+      selectedColor: Theme.of(context).colorScheme.secondaryContainer,
+    );
+  }
+}
+
+typedef _BytesFmt = String Function(int bytes);
+
+class _TracksSliver extends StatelessWidget {
+  const _TracksSliver({
+    required this.controller,
+    required this.tracks,
+    required this.bytesFmt,
+  });
+
+  final _AppController controller;
+  final List<_TrackEntry> tracks;
+  final _BytesFmt bytesFmt;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    if (tracks.isEmpty) {
+      return SliverToBoxAdapter(
+        child: Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(Icons.filter_alt_off_rounded, color: cs.primary),
+                const SizedBox(width: 12),
+                const Expanded(child: Text('没有匹配结果')),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final queueFiles = tracks.map((t) => t.file).toList(growable: false);
+
+    return SliverList.separated(
+      itemCount: tracks.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 10),
+      itemBuilder: (context, i) {
+        final t = tracks[i];
+        final subtitle = t.meta.subtitle.isNotEmpty
+            ? t.meta.subtitle
+            : '${bytesFmt(t.bytes)} · ${t.modified.toLocal()}';
+
+        return Card(
+          margin: EdgeInsets.zero,
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+            leading: _CoverThumb(artUri: t.meta.artUri),
+            title: Text(
+              t.displayTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: _TrackOverflowMenu(
+              controller: controller,
+              track: t,
+              queueFiles: queueFiles,
+              indexInQueue: i,
+            ),
+            onTap: () => controller.playFromQueue(
+              queue: queueFiles,
+              index: i,
+              displayName: p.basename(t.file.path),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _TrackOverflowMenu extends StatelessWidget {
+  const _TrackOverflowMenu({
+    required this.controller,
+    required this.track,
+    required this.queueFiles,
+    required this.indexInQueue,
+  });
+
+  final _AppController controller;
+  final _TrackEntry track;
+  final List<File> queueFiles;
+  final int indexInQueue;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      tooltip: '更多',
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: 'play',
+          child: ListTile(
+            leading: Icon(Icons.play_arrow_rounded),
+            title: Text('播放'),
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'play_next',
+          child: ListTile(
+            leading: Icon(Icons.playlist_play_rounded),
+            title: Text('下一首播放（加入队列）'),
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'add_queue',
+          child: ListTile(
+            leading: Icon(Icons.queue_music_rounded),
+            title: Text('加入队列'),
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'copy_path',
+          child: ListTile(
+            leading: Icon(Icons.copy_rounded),
+            title: Text('复制路径'),
+          ),
+        ),
+      ],
+      onSelected: (v) async {
+        switch (v) {
+          case 'play':
+            await controller.playFromQueue(
+              queue: queueFiles,
+              index: indexInQueue,
+              displayName: p.basename(track.file.path),
+            );
+            break;
+          case 'play_next':
+            await controller.enqueueFile(track.file, playNext: true);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('已加入“下一首播放”')),
+              );
+            }
+            break;
+          case 'add_queue':
+            await controller.enqueueFile(track.file, playNext: false);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('已加入队列')),
+              );
+            }
+            break;
+          case 'copy_path':
+            await Clipboard.setData(ClipboardData(text: track.file.path));
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('已复制路径')),
+              );
+            }
+            break;
+        }
+      },
+      icon: const Icon(Icons.more_vert_rounded),
+    );
+  }
+}
+
+class _AlbumsSliver extends StatelessWidget {
+  const _AlbumsSliver({required this.controller, required this.albums});
+
+  final _AppController controller;
+  final List<_AlbumGroup> albums;
+
+  @override
+  Widget build(BuildContext context) {
+    if (albums.isEmpty) {
+      return const SliverToBoxAdapter(
+        child: Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('没有匹配的专辑'),
+          ),
+        ),
+      );
+    }
+
+    return SliverLayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.crossAxisExtent;
+        final crossAxisCount = w >= 980
+            ? 5
+            : w >= 760
+                ? 4
+                : w >= 520
+                    ? 3
+                    : 2;
+        return SliverGrid(
+          delegate: SliverChildBuilderDelegate(
+            childCount: albums.length,
+            (context, i) {
+              final a = albums[i];
+              return _AlbumTile(
+                album: a,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => _AlbumDetailPage(
+                        controller: controller,
+                        album: a,
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.85,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AlbumTile extends StatelessWidget {
+  const _AlbumTile({required this.album, required this.onTap});
+
+  final _AlbumGroup album;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: Container(
+                    width: double.infinity,
+                    color: cs.surfaceContainerHigh,
+                    child: album.artUri == null
+                        ? Center(
+                            child: Icon(
+                              Icons.album_rounded,
+                              color: cs.primary,
+                              size: 44,
+                            ),
+                          )
+                        : Image.file(
+                            File.fromUri(album.artUri!),
+                            fit: BoxFit.cover,
+                            cacheWidth: 512,
+                            cacheHeight: 512,
+                            gaplessPlayback: true,
+                          ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                album.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${album.subtitle} · ${album.tracks.length} 首',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ArtistsSliver extends StatelessWidget {
+  const _ArtistsSliver({required this.controller, required this.artists});
+
+  final _AppController controller;
+  final List<_ArtistGroup> artists;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    if (artists.isEmpty) {
+      return const SliverToBoxAdapter(
+        child: Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('没有匹配的歌手'),
+          ),
+        ),
+      );
+    }
+
+    return SliverList.separated(
+      itemCount: artists.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 10),
+      itemBuilder: (context, i) {
+        final a = artists[i];
+        final albums = a.albumsByKey.values.length;
+        return Card(
+          margin: EdgeInsets.zero,
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: cs.secondaryContainer,
+              foregroundColor: cs.onSecondaryContainer,
+              child: const Icon(Icons.person_rounded),
+            ),
+            title: Text(
+              a.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              '$albums 张专辑 · ${a.tracks.length} 首',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      _ArtistDetailPage(controller: controller, artist: a),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _QueueSliver extends StatelessWidget {
+  const _QueueSliver({required this.controller});
+
+  final _AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return ValueListenableBuilder<_QueueState>(
+      valueListenable: controller.queueState,
+      builder: (context, qs, _) {
+        if (!qs.hasQueue) {
+          return SliverToBoxAdapter(
+            child: Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Icon(Icons.queue_music_rounded,
+                        color: cs.primary, size: 28),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                        child: Text('队列为空：从“歌曲/专辑/歌手”里添加或直接播放即可生成队列')),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        return SliverToBoxAdapter(
+          child: Column(
+            children: [
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  child: Row(
+                    children: [
+                      Icon(Icons.queue_music_rounded, color: cs.primary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '播放队列 · ${qs.queue.length} 首',
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () =>
+                            controller.clearQueue(keepPlaying: true),
+                        icon: const Icon(Icons.clear_all_rounded),
+                        label: const Text('清空'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              ReorderableListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: qs.queue.length,
+                onReorder: (oldIndex, newIndex) {
+                  var target = newIndex;
+                  if (target > oldIndex) target -= 1;
+                  controller.moveQueueItem(oldIndex, target);
+                },
+                itemBuilder: (context, i) {
+                  final f = qs.queue[i];
+                  final key = ValueKey<String>('q_${f.path}');
+                  return _QueueRow(
+                    key: key,
+                    controller: controller,
+                    file: f,
+                    index: i,
+                    isCurrent: i == qs.index,
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _QueueRow extends StatelessWidget {
+  const _QueueRow({
+    super.key,
+    required this.controller,
+    required this.file,
+    required this.index,
+    required this.isCurrent,
+  });
+
+  final _AppController controller;
+  final File file;
+  final int index;
+  final bool isCurrent;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final base = p.basename(file.path);
+    final ext = p.extension(base).toLowerCase();
+    final isFurry = ext == '.furry';
+
+    return Card(
+      key: key,
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        leading: isCurrent
+            ? CircleAvatar(
+                backgroundColor: cs.primary,
+                foregroundColor: cs.onPrimary,
+                child: const Icon(Icons.equalizer_rounded),
+              )
+            : CircleAvatar(
+                backgroundColor: cs.surfaceContainerHigh,
+                foregroundColor: cs.onSurfaceVariant,
+                child: Text('${index + 1}'),
+              ),
+        title: isFurry
+            ? FutureBuilder<_MetaPreview>(
+                future: controller.getMetaPreviewForFurry(file),
+                builder: (context, snap) {
+                  final meta = snap.data;
+                  return Text(
+                    meta?.title ?? base,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  );
+                },
+              )
+            : Text(base, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: isFurry
+            ? FutureBuilder<_MetaPreview>(
+                future: controller.getMetaPreviewForFurry(file),
+                builder: (context, snap) {
+                  final meta = snap.data;
+                  final subtitle = meta?.subtitle ?? '';
+                  return Text(
+                    subtitle.isEmpty ? '本地文件' : subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  );
+                },
+              )
+            : const Text('本地文件'),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: '移除',
+              onPressed: () => controller.removeFromQueueByPath(file.path),
+              icon: const Icon(Icons.close_rounded),
+            ),
+            ReorderableDragStartListener(
+              index: index,
+              child: const Icon(Icons.drag_handle_rounded),
+            ),
+          ],
+        ),
+        onTap: () => controller.playAtQueueIndex(index),
+      ),
+    );
+  }
+}
+
+class _AlbumDetailPage extends StatelessWidget {
+  const _AlbumDetailPage({required this.controller, required this.album});
+
+  final _AppController controller;
+  final _AlbumGroup album;
+
+  @override
+  Widget build(BuildContext context) {
+    final tracks = album.tracks;
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar.large(
+            title: Text(album.title),
+            actions: [
+              FilledButton.tonalIcon(
+                onPressed: tracks.isEmpty
+                    ? null
+                    : () => controller.playFromQueue(
+                          queue:
+                              tracks.map((t) => t.file).toList(growable: false),
+                          index: 0,
+                          displayName: p.basename(tracks.first.file.path),
+                        ),
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: const Text('播放全部'),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            sliver: _TracksSliver(
+              controller: controller,
+              tracks: tracks,
+              bytesFmt: _fmtBytes,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ArtistDetailPage extends StatelessWidget {
+  const _ArtistDetailPage({required this.controller, required this.artist});
+
+  final _AppController controller;
+  final _ArtistGroup artist;
+
+  @override
+  Widget build(BuildContext context) {
+    final albums = artist.albumsByKey.values.toList(growable: false)
+      ..sort((a, b) => a.title.compareTo(b.title));
+    final tracks = artist.tracks.toList(growable: false)
+      ..sort((a, b) => a.displayTitle.compareTo(b.displayTitle));
+    final cs = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar.large(
+            title: Text(artist.title),
+            actions: [
+              FilledButton.tonalIcon(
+                onPressed: tracks.isEmpty
+                    ? null
+                    : () => controller.playFromQueue(
+                          queue:
+                              tracks.map((t) => t.file).toList(growable: false),
+                          index: 0,
+                          displayName: p.basename(tracks.first.file.path),
+                        ),
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: const Text('播放全部'),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            sliver: SliverToBoxAdapter(
+              child: Row(
+                children: [
+                  Icon(Icons.album_rounded, color: cs.primary),
+                  const SizedBox(width: 8),
+                  Text('专辑', style: Theme.of(context).textTheme.titleLarge),
+                ],
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            sliver: _AlbumsSliver(controller: controller, albums: albums),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            sliver: SliverToBoxAdapter(
+              child: Row(
+                children: [
+                  Icon(Icons.music_note_rounded, color: cs.primary),
+                  const SizedBox(width: 8),
+                  Text('歌曲', style: Theme.of(context).textTheme.titleLarge),
+                ],
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            sliver: _TracksSliver(
+              controller: controller,
+              tracks: tracks,
+              bytesFmt: _fmtBytes,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -2919,6 +4285,110 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
   }
 }
 
+Future<void> _showNowPlayingActionsSheet({
+  required BuildContext context,
+  required _AppController controller,
+  required _NowPlaying np,
+}) async {
+  final file = File(np.sourcePath);
+  final qs = controller.queueState.value;
+  final inQueue = qs.queue.any((f) => f.path == np.sourcePath);
+
+  await showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) {
+      return SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.queue_music_rounded),
+                title: const Text('加入队列'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await controller.enqueueFile(file, playNext: false);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('已加入队列')),
+                    );
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.playlist_play_rounded),
+                title: const Text('下一首播放'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await controller.enqueueFile(file, playNext: true);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('已加入“下一首播放”')),
+                    );
+                  }
+                },
+              ),
+              if (inQueue)
+                ListTile(
+                  leading: const Icon(Icons.playlist_remove_rounded),
+                  title: const Text('从队列移除'),
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    await controller.removeFromQueueByPath(np.sourcePath);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('已从队列移除')),
+                      );
+                    }
+                  },
+                ),
+              if (qs.hasQueue)
+                ListTile(
+                  leading: const Icon(Icons.clear_all_rounded),
+                  title: const Text('清空队列（不停止播放）'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    controller.clearQueue(keepPlaying: true);
+                  },
+                ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.copy_rounded),
+                title: const Text('复制标题'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await Clipboard.setData(ClipboardData(text: np.title));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('已复制标题')),
+                    );
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.copy_rounded),
+                title: const Text('复制路径'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await Clipboard.setData(ClipboardData(text: np.sourcePath));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('已复制路径')),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
 class _NowPlayingMiniBar extends StatelessWidget {
   const _NowPlayingMiniBar({
     required this.controller,
@@ -2940,77 +4410,95 @@ class _NowPlayingMiniBar extends StatelessWidget {
           color: cs.onSurfaceVariant,
         );
 
-    return Semantics(
-      button: true,
-      label: '正在播放：${np.title}',
-      child: Material(
-        elevation: 2,
-        color: cs.surfaceContainerHigh,
-        surfaceTintColor: cs.surfaceTint,
-        shadowColor: _withOpacityCompat(cs.shadow, 0.22),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
-          side: BorderSide(color: _withOpacityCompat(cs.outlineVariant, 0.55)),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onOpen,
-          borderRadius: BorderRadius.circular(28),
-          child: SizedBox(
-            height: NowPlayingPanel.miniHeightPx,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-              child: Row(
-                children: [
-                  _CoverThumb(artUri: np.artUri),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          np.title,
-                          style: titleStyle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final showMore = constraints.maxWidth >= 420;
+        return Semantics(
+          button: true,
+          label: '正在播放：${np.title}',
+          child: Material(
+            elevation: 2,
+            color: cs.surfaceContainerHigh,
+            surfaceTintColor: cs.surfaceTint,
+            shadowColor: _withOpacityCompat(cs.shadow, 0.22),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+              side: BorderSide(
+                  color: _withOpacityCompat(cs.outlineVariant, 0.55)),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onOpen,
+              borderRadius: BorderRadius.circular(28),
+              child: SizedBox(
+                height: NowPlayingPanel.miniHeightPx,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  child: Row(
+                    children: [
+                      _CoverThumb(artUri: np.artUri),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              np.title,
+                              style: titleStyle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              np.subtitle,
+                              style: subtitleStyle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 8),
+                            _MiniProgress(controller: controller),
+                          ],
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          np.subtitle,
-                          style: subtitleStyle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(width: 10),
+                      IconButton.filledTonal(
+                        tooltip: '上一首',
+                        onPressed: controller.canPlayPreviousTrack
+                            ? controller.playPreviousTrack
+                            : null,
+                        icon: const Icon(Icons.skip_previous_rounded),
+                      ),
+                      const SizedBox(width: 8),
+                      _MiniPlayPause(controller: controller),
+                      const SizedBox(width: 8),
+                      IconButton.filledTonal(
+                        tooltip: '下一首',
+                        onPressed: controller.canPlayNextTrack
+                            ? controller.playNextTrack
+                            : null,
+                        icon: const Icon(Icons.skip_next_rounded),
+                      ),
+                      if (showMore) ...[
+                        const SizedBox(width: 8),
+                        IconButton.filledTonal(
+                          tooltip: '更多',
+                          onPressed: () => _showNowPlayingActionsSheet(
+                            context: context,
+                            controller: controller,
+                            np: np,
+                          ),
+                          icon: const Icon(Icons.more_horiz_rounded),
                         ),
-                        const SizedBox(height: 8),
-                        _MiniProgress(controller: controller),
                       ],
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  IconButton.filledTonal(
-                    tooltip: '上一首',
-                    onPressed: controller.canPlayPreviousTrack
-                        ? controller.playPreviousTrack
-                        : null,
-                    icon: const Icon(Icons.skip_previous_rounded),
-                  ),
-                  const SizedBox(width: 8),
-                  _MiniPlayPause(controller: controller),
-                  const SizedBox(width: 8),
-                  IconButton.filledTonal(
-                    tooltip: '下一首',
-                    onPressed: controller.canPlayNextTrack
-                        ? controller.playNextTrack
-                        : null,
-                    icon: const Icon(Icons.skip_next_rounded),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -3145,6 +4633,15 @@ class _NowPlayingSheet extends StatelessWidget {
                             fontWeight: FontWeight.w800,
                           ),
                     ),
+                  ),
+                  IconButton(
+                    tooltip: '更多',
+                    onPressed: () => _showNowPlayingActionsSheet(
+                      context: context,
+                      controller: controller,
+                      np: np,
+                    ),
+                    icon: const Icon(Icons.more_horiz_rounded),
                   ),
                   IconButton(
                     tooltip: '关闭',
