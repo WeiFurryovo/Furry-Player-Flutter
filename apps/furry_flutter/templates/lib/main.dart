@@ -2667,9 +2667,16 @@ class _TracksSliver extends StatelessWidget {
       separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, i) {
         final t = tracks[i];
-        final subtitle = t.meta.subtitle.isNotEmpty
-            ? t.meta.subtitle
-            : '${bytesFmt(t.bytes)} · ${t.modified.toLocal()}';
+        final meta = t.meta;
+        final subtitleParts = <String>[
+          if (meta.artist.isNotEmpty) meta.artist,
+          if (meta.album.isNotEmpty) meta.album,
+        ];
+        final subtitle = subtitleParts.isNotEmpty
+            ? subtitleParts.join(' · ')
+            : (meta.subtitle.isNotEmpty
+                ? meta.subtitle
+                : '${bytesFmt(t.bytes)} · ${t.modified.toLocal()}');
 
         return Card(
           margin: EdgeInsets.zero,
@@ -2686,11 +2693,28 @@ class _TracksSliver extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            trailing: _TrackOverflowMenu(
-              controller: controller,
-              track: t,
-              queueFiles: queueFiles,
-              indexInQueue: i,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: '加入队列',
+                  onPressed: () async {
+                    await controller.enqueueFile(t.file, playNext: false);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('已加入队列')),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.queue_music_rounded),
+                ),
+                _TrackOverflowMenu(
+                  controller: controller,
+                  track: t,
+                  queueFiles: queueFiles,
+                  indexInQueue: i,
+                ),
+              ],
             ),
             onTap: () => controller.playFromQueue(
               queue: queueFiles,
@@ -2875,24 +2899,57 @@ class _AlbumTile extends StatelessWidget {
               Expanded(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(18),
-                  child: Container(
-                    width: double.infinity,
-                    color: cs.surfaceContainerHigh,
-                    child: album.artUri == null
-                        ? Center(
-                            child: Icon(
-                              Icons.album_rounded,
-                              color: cs.primary,
-                              size: 44,
-                            ),
-                          )
-                        : Image.file(
-                            File.fromUri(album.artUri!),
-                            fit: BoxFit.cover,
-                            cacheWidth: 512,
-                            cacheHeight: 512,
-                            gaplessPlayback: true,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Container(
+                        color: cs.surfaceContainerHigh,
+                        child: album.artUri == null
+                            ? Center(
+                                child: Icon(
+                                  Icons.album_rounded,
+                                  color: cs.primary,
+                                  size: 44,
+                                ),
+                              )
+                            : Image.file(
+                                File.fromUri(album.artUri!),
+                                fit: BoxFit.cover,
+                                cacheWidth: 512,
+                                cacheHeight: 512,
+                                gaplessPlayback: true,
+                              ),
+                      ),
+                      Positioned(
+                        right: 10,
+                        top: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
                           ),
+                          decoration: BoxDecoration(
+                            color: _withOpacityCompat(
+                                cs.surfaceContainerHighest, 0.9),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color:
+                                  _withOpacityCompat(cs.outlineVariant, 0.55),
+                            ),
+                          ),
+                          child: Text(
+                            '${album.tracks.length} 首',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: cs.onSurface,
+                                ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -2907,7 +2964,7 @@ class _AlbumTile extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                '${album.subtitle} · ${album.tracks.length} 首',
+                album.subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -2949,14 +3006,33 @@ class _ArtistsSliver extends StatelessWidget {
       itemBuilder: (context, i) {
         final a = artists[i];
         final albums = a.albumsByKey.values.length;
+        final initial = a.title.isEmpty ? '?' : a.title.characters.first;
         return Card(
           margin: EdgeInsets.zero,
           child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: cs.secondaryContainer,
-              foregroundColor: cs.onSecondaryContainer,
-              child: const Icon(Icons.person_rounded),
-            ),
+            leading: a.artUri == null
+                ? CircleAvatar(
+                    backgroundColor: cs.secondaryContainer,
+                    foregroundColor: cs.onSecondaryContainer,
+                    child: Text(
+                      initial,
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  )
+                : ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Image.file(
+                        File.fromUri(a.artUri!),
+                        fit: BoxFit.cover,
+                        cacheWidth: 96,
+                        cacheHeight: 96,
+                        gaplessPlayback: true,
+                      ),
+                    ),
+                  ),
             title: Text(
               a.title,
               maxLines: 1,
@@ -3099,16 +3175,69 @@ class _QueueRow extends StatelessWidget {
       key: key,
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
-        leading: isCurrent
-            ? CircleAvatar(
-                backgroundColor: cs.primary,
-                foregroundColor: cs.onPrimary,
-                child: const Icon(Icons.equalizer_rounded),
+        leading: isFurry
+            ? FutureBuilder<_MetaPreview>(
+                future: controller.getMetaPreviewForFurry(file),
+                builder: (context, snap) {
+                  final meta = snap.data;
+                  final art = meta?.artUri;
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      _CoverThumb(artUri: art),
+                      if (isCurrent)
+                        Positioned(
+                          right: -6,
+                          bottom: -6,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: cs.primary,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: _withOpacityCompat(cs.surface, 0.85),
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.equalizer_rounded,
+                              size: 14,
+                              color: cs.onPrimary,
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               )
-            : CircleAvatar(
-                backgroundColor: cs.surfaceContainerHigh,
-                foregroundColor: cs.onSurfaceVariant,
-                child: Text('${index + 1}'),
+            : Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  CircleAvatar(
+                    backgroundColor: cs.surfaceContainerHigh,
+                    foregroundColor: cs.onSurfaceVariant,
+                    child: Text('${index + 1}'),
+                  ),
+                  if (isCurrent)
+                    Positioned(
+                      right: -6,
+                      bottom: -6,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: cs.primary,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: _withOpacityCompat(cs.surface, 0.85),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.equalizer_rounded,
+                          size: 14,
+                          color: cs.onPrimary,
+                        ),
+                      ),
+                    ),
+                ],
               ),
         title: isFurry
             ? FutureBuilder<_MetaPreview>(
@@ -3128,7 +3257,13 @@ class _QueueRow extends StatelessWidget {
                 future: controller.getMetaPreviewForFurry(file),
                 builder: (context, snap) {
                   final meta = snap.data;
-                  final subtitle = meta?.subtitle ?? '';
+                  final subtitleParts = <String>[
+                    if ((meta?.artist ?? '').isNotEmpty) meta!.artist,
+                    if ((meta?.album ?? '').isNotEmpty) meta!.album,
+                  ];
+                  final subtitle = subtitleParts.isNotEmpty
+                      ? subtitleParts.join(' · ')
+                      : (meta?.subtitle ?? '');
                   return Text(
                     subtitle.isEmpty ? '本地文件' : subtitle,
                     maxLines: 1,
@@ -4427,72 +4562,84 @@ class _NowPlayingMiniBar extends StatelessWidget {
                   color: _withOpacityCompat(cs.outlineVariant, 0.55)),
             ),
             clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: onOpen,
-              borderRadius: BorderRadius.circular(28),
-              child: SizedBox(
-                height: NowPlayingPanel.miniHeightPx,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                  child: Row(
-                    children: [
-                      _CoverThumb(artUri: np.artUri),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
+            child: SizedBox(
+              height: NowPlayingPanel.miniHeightPx,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: onOpen,
+                        borderRadius: BorderRadius.circular(22),
+                        child: Row(
                           children: [
-                            Text(
-                              np.title,
-                              style: titleStyle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            _CoverThumb(artUri: np.artUri),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    np.title,
+                                    style: titleStyle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    np.subtitle,
+                                    style: subtitleStyle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  _MiniProgress(controller: controller),
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              np.subtitle,
-                              style: subtitleStyle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 8),
-                            _MiniProgress(controller: controller),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      IconButton.filledTonal(
-                        tooltip: '上一首',
-                        onPressed: controller.canPlayPreviousTrack
-                            ? controller.playPreviousTrack
-                            : null,
-                        icon: const Icon(Icons.skip_previous_rounded),
-                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    IconButton.filledTonal(
+                      tooltip: '上一首',
+                      onPressed: controller.canPlayPreviousTrack
+                          ? controller.playPreviousTrack
+                          : null,
+                      icon: const Icon(Icons.skip_previous_rounded),
+                    ),
+                    const SizedBox(width: 8),
+                    _MiniPlayPause(controller: controller),
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      tooltip: '下一首',
+                      onPressed: controller.canPlayNextTrack
+                          ? controller.playNextTrack
+                          : null,
+                      icon: const Icon(Icons.skip_next_rounded),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      tooltip: '展开',
+                      onPressed: onOpen,
+                      icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                    ),
+                    if (showMore) ...[
                       const SizedBox(width: 8),
-                      _MiniPlayPause(controller: controller),
-                      const SizedBox(width: 8),
                       IconButton.filledTonal(
-                        tooltip: '下一首',
-                        onPressed: controller.canPlayNextTrack
-                            ? controller.playNextTrack
-                            : null,
-                        icon: const Icon(Icons.skip_next_rounded),
-                      ),
-                      if (showMore) ...[
-                        const SizedBox(width: 8),
-                        IconButton.filledTonal(
-                          tooltip: '更多',
-                          onPressed: () => _showNowPlayingActionsSheet(
-                            context: context,
-                            controller: controller,
-                            np: np,
-                          ),
-                          icon: const Icon(Icons.more_horiz_rounded),
+                        tooltip: '更多',
+                        onPressed: () => _showNowPlayingActionsSheet(
+                          context: context,
+                          controller: controller,
+                          np: np,
                         ),
-                      ],
+                        icon: const Icon(Icons.more_horiz_rounded),
+                      ),
                     ],
-                  ),
+                  ],
                 ),
               ),
             ),
