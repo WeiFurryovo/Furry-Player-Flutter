@@ -2452,6 +2452,33 @@ String _fmtBytes(int bytes) {
   return '$bytes B';
 }
 
+PageRoute<T> _expressivePageRoute<T>(Widget page) {
+  return PageRouteBuilder<T>(
+    pageBuilder: (context, animation, secondaryAnimation) => page,
+    transitionDuration: const Duration(milliseconds: 260),
+    reverseTransitionDuration: const Duration(milliseconds: 220),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      final offset = Tween<Offset>(
+        begin: const Offset(0.06, 0),
+        end: Offset.zero,
+      ).animate(curved);
+      return FadeTransition(
+        opacity: curved,
+        child: SlideTransition(position: offset, child: child),
+      );
+    },
+  );
+}
+
+String _albumHeroTag(_AlbumGroup album) {
+  return 'album_${album.artist.toLowerCase()}|${album.album.toLowerCase()}';
+}
+
 class _LibraryOptionsSheet extends StatefulWidget {
   const _LibraryOptionsSheet({required this.value});
 
@@ -2854,11 +2881,8 @@ class _AlbumsSliver extends StatelessWidget {
                 album: a,
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => _AlbumDetailPage(
-                        controller: controller,
-                        album: a,
-                      ),
+                    _expressivePageRoute(
+                      _AlbumDetailPage(controller: controller, album: a),
                     ),
                   );
                 },
@@ -2886,6 +2910,7 @@ class _AlbumTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final heroTag = _albumHeroTag(album);
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
@@ -2902,23 +2927,26 @@ class _AlbumTile extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Container(
-                        color: cs.surfaceContainerHigh,
-                        child: album.artUri == null
-                            ? Center(
-                                child: Icon(
-                                  Icons.album_rounded,
-                                  color: cs.primary,
-                                  size: 44,
+                      Hero(
+                        tag: heroTag,
+                        child: Container(
+                          color: cs.surfaceContainerHigh,
+                          child: album.artUri == null
+                              ? Center(
+                                  child: Icon(
+                                    Icons.album_rounded,
+                                    color: cs.primary,
+                                    size: 44,
+                                  ),
+                                )
+                              : Image.file(
+                                  File.fromUri(album.artUri!),
+                                  fit: BoxFit.cover,
+                                  cacheWidth: 512,
+                                  cacheHeight: 512,
+                                  gaplessPlayback: true,
                                 ),
-                              )
-                            : Image.file(
-                                File.fromUri(album.artUri!),
-                                fit: BoxFit.cover,
-                                cacheWidth: 512,
-                                cacheHeight: 512,
-                                gaplessPlayback: true,
-                              ),
+                        ),
                       ),
                       Positioned(
                         right: 10,
@@ -3046,9 +3074,8 @@ class _ArtistsSliver extends StatelessWidget {
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      _ArtistDetailPage(controller: controller, artist: a),
+                _expressivePageRoute(
+                  _ArtistDetailPage(controller: controller, artist: a),
                 ),
               );
             },
@@ -3189,19 +3216,28 @@ class _QueueRow extends StatelessWidget {
                         Positioned(
                           right: -6,
                           bottom: -6,
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: cs.primary,
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: _withOpacityCompat(cs.surface, 0.85),
+                          child: AnimatedScale(
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeOutBack,
+                            scale: isCurrent ? 1 : 0.8,
+                            child: AnimatedOpacity(
+                              duration: const Duration(milliseconds: 180),
+                              opacity: isCurrent ? 1 : 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: cs.primary,
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(
+                                    color: _withOpacityCompat(cs.surface, 0.85),
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons.equalizer_rounded,
+                                  size: 14,
+                                  color: cs.onPrimary,
+                                ),
                               ),
-                            ),
-                            child: Icon(
-                              Icons.equalizer_rounded,
-                              size: 14,
-                              color: cs.onPrimary,
                             ),
                           ),
                         ),
@@ -3221,19 +3257,28 @@ class _QueueRow extends StatelessWidget {
                     Positioned(
                       right: -6,
                       bottom: -6,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: cs.primary,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: _withOpacityCompat(cs.surface, 0.85),
+                      child: AnimatedScale(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOutBack,
+                        scale: isCurrent ? 1 : 0.8,
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 180),
+                          opacity: isCurrent ? 1 : 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: cs.primary,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: _withOpacityCompat(cs.surface, 0.85),
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.equalizer_rounded,
+                              size: 14,
+                              color: cs.onPrimary,
+                            ),
                           ),
-                        ),
-                        child: Icon(
-                          Icons.equalizer_rounded,
-                          size: 14,
-                          color: cs.onPrimary,
                         ),
                       ),
                     ),
@@ -3300,7 +3345,11 @@ class _AlbumDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final tracks = album.tracks;
+    final heroTag = _albumHeroTag(album);
+    final w = MediaQuery.of(context).size.width;
+    final coverSize = (w - 48).clamp(200.0, 320.0);
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -3321,6 +3370,74 @@ class _AlbumDetailPage extends StatelessWidget {
               ),
               const SizedBox(width: 8),
             ],
+          ),
+          SliverToBoxAdapter(
+            child: TweenAnimationBuilder<double>(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              tween: Tween<double>(begin: 0, end: 1),
+              builder: (context, t, child) {
+                return Opacity(
+                  opacity: t,
+                  child: Transform.translate(
+                    offset: Offset(0, lerpDouble(12, 0, t)!),
+                    child: child,
+                  ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: SizedBox(
+                          width: coverSize,
+                          height: coverSize,
+                          child: Hero(
+                            tag: heroTag,
+                            child: album.artUri == null
+                                ? ColoredBox(
+                                    color: cs.surfaceContainerHigh,
+                                    child: Icon(
+                                      Icons.album_rounded,
+                                      size: coverSize * 0.28,
+                                      color: cs.primary,
+                                    ),
+                                  )
+                                : Image.file(
+                                    File.fromUri(album.artUri!),
+                                    fit: BoxFit.cover,
+                                    cacheWidth: 1024,
+                                    cacheHeight: 1024,
+                                    gaplessPlayback: true,
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      album.subtitle,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${tracks.length} 首',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -4674,15 +4791,24 @@ class _MiniPlayPause extends StatelessWidget {
                     await controller.play();
                   }
                 },
-          icon: busy
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Icon(
-                  playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                ),
+          icon: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, anim) =>
+                ScaleTransition(scale: anim, child: child),
+            child: busy
+                ? const SizedBox(
+                    key: ValueKey<String>('busy'),
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(
+                    key: ValueKey<bool>(playing),
+                    playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                  ),
+          ),
         );
       },
     );
@@ -4739,26 +4865,40 @@ class _NowPlayingSheet extends StatelessWidget {
 
     Widget cover() {
       final uri = np.artUri;
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          width: coverSize,
-          height: coverSize,
-          color: cs.surfaceContainerHigh,
-          child: uri == null
-              ? Icon(
-                  Icons.album_rounded,
-                  size: coverSize * 0.28,
-                  color: cs.primary,
-                )
-              : Image.file(
-                  File.fromUri(uri),
-                  fit: BoxFit.cover,
-                  cacheWidth: 1024,
-                  cacheHeight: 1024,
-                  gaplessPlayback: true,
-                  filterQuality: FilterQuality.medium,
-                ),
+      return TweenAnimationBuilder<double>(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        tween: Tween<double>(begin: 0.0, end: 1.0),
+        builder: (context, t, child) {
+          return Opacity(
+            opacity: t,
+            child: Transform.scale(
+              scale: lerpDouble(0.96, 1.0, t)!,
+              child: child,
+            ),
+          );
+        },
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Container(
+            width: coverSize,
+            height: coverSize,
+            color: cs.surfaceContainerHigh,
+            child: uri == null
+                ? Icon(
+                    Icons.album_rounded,
+                    size: coverSize * 0.28,
+                    color: cs.primary,
+                  )
+                : Image.file(
+                    File.fromUri(uri),
+                    fit: BoxFit.cover,
+                    cacheWidth: 1024,
+                    cacheHeight: 1024,
+                    gaplessPlayback: true,
+                    filterQuality: FilterQuality.medium,
+                  ),
+          ),
         ),
       );
     }
