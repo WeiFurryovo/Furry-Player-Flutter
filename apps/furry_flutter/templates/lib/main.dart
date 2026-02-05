@@ -562,17 +562,27 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   static const double _bottomNavMarginH = 16;
   static const double _bottomNavMarginBottom = 6;
 
+  void _onRequestedTab() {
+    final idx = _controller.requestedTab.value;
+    if (idx == null) return;
+    _controller.requestedTab.value = null;
+    if (!mounted) return;
+    setState(() => _tabIndex = idx.clamp(0, 2));
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _controller = _AppController(widget.player);
+    _controller.requestedTab.addListener(_onRequestedTab);
     _controller.init();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _controller.requestedTab.removeListener(_onRequestedTab);
     _controller.dispose();
     super.dispose();
   }
@@ -897,6 +907,7 @@ class _AppController {
 
   final ValueNotifier<_NowPlaying?> nowPlaying =
       ValueNotifier<_NowPlaying?>(null);
+  final ValueNotifier<int?> requestedTab = ValueNotifier<int?>(null);
   final ValueNotifier<_QueueState> queueState =
       ValueNotifier<_QueueState>(const _QueueState(queue: <File>[], index: -1));
   final ValueNotifier<List<File>> furryOutputs =
@@ -960,6 +971,10 @@ class _AppController {
     );
   }
 
+  void requestTabIndex(int index) {
+    requestedTab.value = index;
+  }
+
   Future<void> cleanupTempArtifacts() async {
     try {
       final tmp = await getTemporaryDirectory();
@@ -1019,6 +1034,7 @@ class _AppController {
     player.dispose();
     systemMedia.dispose();
     nowPlaying.dispose();
+    requestedTab.dispose();
     queueState.dispose();
     furryOutputs.dispose();
     log.dispose();
@@ -2323,9 +2339,32 @@ class _LibraryPageState extends State<LibraryPage> {
               onSelectionChanged: (s) => setState(() => _view = s.first),
               style: ButtonStyle(
                 visualDensity: VisualDensity.compact,
+                padding: const WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
                 shape: WidgetStatePropertyAll(
                   RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(18)),
+                ),
+                side: WidgetStatePropertyAll(
+                  BorderSide(
+                      color: _withOpacityCompat(cs.outlineVariant, 0.35)),
+                ),
+                backgroundColor: WidgetStateProperty.resolveWith<Color?>(
+                  (states) {
+                    if (states.contains(WidgetState.selected)) {
+                      return cs.secondaryContainer;
+                    }
+                    return cs.surfaceContainerLow;
+                  },
+                ),
+                foregroundColor: WidgetStateProperty.resolveWith<Color?>(
+                  (states) {
+                    if (states.contains(WidgetState.selected)) {
+                      return cs.onSecondaryContainer;
+                    }
+                    return cs.onSurface;
+                  },
                 ),
               ),
             ),
@@ -2341,14 +2380,81 @@ class _LibraryPageState extends State<LibraryPage> {
                   child: Card(
                     margin: EdgeInsets.zero,
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
+                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.queue_music_rounded,
-                              color: cs.primary, size: 28),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Text('暂无 .furry 输出文件（去“转换”页打包试试）'),
+                          Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: cs.secondaryContainer,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Icon(
+                                  Icons.queue_music_rounded,
+                                  color: cs.onSecondaryContainer,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  '还没有音乐库内容',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleLarge
+                                      ?.copyWith(fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            '当前没有检测到 .furry 输出文件。你可以先去“转换”页打包，或直接选择一个音频文件开始播放。',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                ),
+                          ),
+                          const SizedBox(height: 14),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              FilledButton.tonalIcon(
+                                onPressed: () {
+                                  HapticFeedback.selectionClick();
+                                  controller.requestTabIndex(1);
+                                },
+                                icon: const Icon(Icons.swap_horiz_rounded),
+                                label: const Text('去转换'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: () async {
+                                  HapticFeedback.selectionClick();
+                                  final f = await controller.pickForPlay();
+                                  if (f == null) return;
+                                  await controller.playFile(
+                                    file: f,
+                                    displayName: p.basename(f.path),
+                                  );
+                                },
+                                icon: const Icon(Icons.audio_file_rounded),
+                                label: const Text('选择音频播放'),
+                              ),
+                              TextButton.icon(
+                                onPressed: () async {
+                                  HapticFeedback.selectionClick();
+                                  await controller.refreshOutputs();
+                                },
+                                icon: const Icon(Icons.refresh_rounded),
+                                label: const Text('重新扫描'),
+                              ),
+                            ],
                           ),
                         ],
                       ),
