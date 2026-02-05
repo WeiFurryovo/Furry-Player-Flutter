@@ -2479,6 +2479,12 @@ String _albumHeroTag(_AlbumGroup album) {
   return 'album_${album.artist.toLowerCase()}|${album.album.toLowerCase()}';
 }
 
+String _nowPlayingHeroTag(String sourcePath) {
+  // Keep it stable and reasonably short; Hero tags can be any object, but we
+  // prefer a string for easier debugging.
+  return 'np_${sourcePath.hashCode}';
+}
+
 class _LibraryOptionsSheet extends StatefulWidget {
   const _LibraryOptionsSheet({required this.value});
 
@@ -2669,6 +2675,7 @@ class _TracksSliver extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final nowPlayingPath = controller.nowPlaying.value?.sourcePath;
     if (tracks.isEmpty) {
       return SliverToBoxAdapter(
         child: Card(
@@ -2694,6 +2701,7 @@ class _TracksSliver extends StatelessWidget {
       separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, i) {
         final t = tracks[i];
+        final isCurrent = nowPlayingPath != null && nowPlayingPath == t.path;
         final meta = t.meta;
         final subtitleParts = <String>[
           if (meta.artist.isNotEmpty) meta.artist,
@@ -2707,9 +2715,42 @@ class _TracksSliver extends StatelessWidget {
 
         return Card(
           margin: EdgeInsets.zero,
+          color: isCurrent
+              ? _withOpacityCompat(cs.secondaryContainer, 0.55)
+              : null,
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-            leading: _CoverThumb(artUri: t.meta.artUri),
+            leading: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                _CoverThumb(artUri: t.meta.artUri),
+                if (isCurrent)
+                  Positioned(
+                    right: -6,
+                    bottom: -6,
+                    child: AnimatedScale(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutBack,
+                      scale: 1,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: cs.primary,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: _withOpacityCompat(cs.surface, 0.85),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.equalizer_rounded,
+                          size: 14,
+                          color: cs.onPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             title: Text(
               t.displayTitle,
               maxLines: 1,
@@ -2726,6 +2767,7 @@ class _TracksSliver extends StatelessWidget {
                 IconButton(
                   tooltip: '加入队列',
                   onPressed: () async {
+                    HapticFeedback.selectionClick();
                     await controller.enqueueFile(t.file, playNext: false);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -2805,6 +2847,7 @@ class _TrackOverflowMenu extends StatelessWidget {
       onSelected: (v) async {
         switch (v) {
           case 'play':
+            HapticFeedback.selectionClick();
             await controller.playFromQueue(
               queue: queueFiles,
               index: indexInQueue,
@@ -2812,6 +2855,7 @@ class _TrackOverflowMenu extends StatelessWidget {
             );
             break;
           case 'play_next':
+            HapticFeedback.selectionClick();
             await controller.enqueueFile(track.file, playNext: true);
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -2820,6 +2864,7 @@ class _TrackOverflowMenu extends StatelessWidget {
             }
             break;
           case 'add_queue':
+            HapticFeedback.selectionClick();
             await controller.enqueueFile(track.file, playNext: false);
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -2828,6 +2873,7 @@ class _TrackOverflowMenu extends StatelessWidget {
             }
             break;
           case 'copy_path':
+            HapticFeedback.selectionClick();
             await Clipboard.setData(ClipboardData(text: track.file.path));
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -4665,6 +4711,7 @@ class _NowPlayingMiniBar extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final showMore = constraints.maxWidth >= 420;
+        final heroTag = _nowPlayingHeroTag(np.sourcePath);
         return Semantics(
           button: true,
           label: '正在播放：${np.title}',
@@ -4691,7 +4738,10 @@ class _NowPlayingMiniBar extends StatelessWidget {
                         borderRadius: BorderRadius.circular(22),
                         child: Row(
                           children: [
-                            _CoverThumb(artUri: np.artUri),
+                            Hero(
+                              tag: heroTag,
+                              child: _CoverThumb(artUri: np.artUri),
+                            ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
@@ -4724,7 +4774,10 @@ class _NowPlayingMiniBar extends StatelessWidget {
                     IconButton.filledTonal(
                       tooltip: '上一首',
                       onPressed: controller.canPlayPreviousTrack
-                          ? controller.playPreviousTrack
+                          ? () {
+                              HapticFeedback.selectionClick();
+                              controller.playPreviousTrack();
+                            }
                           : null,
                       icon: const Icon(Icons.skip_previous_rounded),
                     ),
@@ -4734,25 +4787,34 @@ class _NowPlayingMiniBar extends StatelessWidget {
                     IconButton.filledTonal(
                       tooltip: '下一首',
                       onPressed: controller.canPlayNextTrack
-                          ? controller.playNextTrack
+                          ? () {
+                              HapticFeedback.selectionClick();
+                              controller.playNextTrack();
+                            }
                           : null,
                       icon: const Icon(Icons.skip_next_rounded),
                     ),
                     const SizedBox(width: 8),
                     IconButton.filledTonal(
                       tooltip: '展开',
-                      onPressed: onOpen,
+                      onPressed: () {
+                        HapticFeedback.selectionClick();
+                        onOpen();
+                      },
                       icon: const Icon(Icons.keyboard_arrow_up_rounded),
                     ),
                     if (showMore) ...[
                       const SizedBox(width: 8),
                       IconButton.filledTonal(
                         tooltip: '更多',
-                        onPressed: () => _showNowPlayingActionsSheet(
-                          context: context,
-                          controller: controller,
-                          np: np,
-                        ),
+                        onPressed: () {
+                          HapticFeedback.selectionClick();
+                          _showNowPlayingActionsSheet(
+                            context: context,
+                            controller: controller,
+                            np: np,
+                          );
+                        },
                         icon: const Icon(Icons.more_horiz_rounded),
                       ),
                     ],
@@ -4785,6 +4847,7 @@ class _MiniPlayPause extends StatelessWidget {
           onPressed: busy
               ? null
               : () async {
+                  HapticFeedback.selectionClick();
                   if (playing) {
                     await controller.pause();
                   } else {
@@ -4837,11 +4900,22 @@ class _MiniProgress extends StatelessWidget {
             final progress = (posMs / maxMs).clamp(0.0, 1.0);
             return ClipRRect(
               borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: progress.isFinite ? progress : 0,
-                minHeight: 3,
-                backgroundColor: _withOpacityCompat(cs.onSurfaceVariant, 0.16),
-                valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+              child: TweenAnimationBuilder<double>(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                tween: Tween<double>(
+                  begin: 0,
+                  end: progress.isFinite ? progress : 0,
+                ),
+                builder: (context, v, _) {
+                  return LinearProgressIndicator(
+                    value: v,
+                    minHeight: 3,
+                    backgroundColor:
+                        _withOpacityCompat(cs.onSurfaceVariant, 0.16),
+                    valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+                  );
+                },
               ),
             );
           },
@@ -4862,6 +4936,7 @@ class _NowPlayingSheet extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final w = MediaQuery.of(context).size.width;
     final coverSize = (w - 48).clamp(220.0, 360.0);
+    final heroTag = _nowPlayingHeroTag(np.sourcePath);
 
     Widget cover() {
       final uri = np.artUri;
@@ -4878,26 +4953,29 @@ class _NowPlayingSheet extends StatelessWidget {
             ),
           );
         },
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Container(
-            width: coverSize,
-            height: coverSize,
-            color: cs.surfaceContainerHigh,
-            child: uri == null
-                ? Icon(
-                    Icons.album_rounded,
-                    size: coverSize * 0.28,
-                    color: cs.primary,
-                  )
-                : Image.file(
-                    File.fromUri(uri),
-                    fit: BoxFit.cover,
-                    cacheWidth: 1024,
-                    cacheHeight: 1024,
-                    gaplessPlayback: true,
-                    filterQuality: FilterQuality.medium,
-                  ),
+        child: Hero(
+          tag: heroTag,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Container(
+              width: coverSize,
+              height: coverSize,
+              color: cs.surfaceContainerHigh,
+              child: uri == null
+                  ? Icon(
+                      Icons.album_rounded,
+                      size: coverSize * 0.28,
+                      color: cs.primary,
+                    )
+                  : Image.file(
+                      File.fromUri(uri),
+                      fit: BoxFit.cover,
+                      cacheWidth: 1024,
+                      cacheHeight: 1024,
+                      gaplessPlayback: true,
+                      filterQuality: FilterQuality.medium,
+                    ),
+            ),
           ),
         ),
       );
