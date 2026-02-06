@@ -2135,105 +2135,122 @@ class _LibraryModulesCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    const outerRadius = BorderRadius.all(Radius.circular(28));
-    final dividerColor = _withOpacityCompat(cs.outlineVariant, 0.28);
-
-    Widget tile({
-      required _LibraryView v,
-      required IconData icon,
-      required String title,
-      required String subtitle,
-      required bool first,
-      required bool last,
-    }) {
-      final selected = value == v;
-      final fg = selected ? cs.onSecondaryContainer : cs.onSurface;
-      final iconColor = selected ? cs.onSecondaryContainer : cs.primary;
-      final subtitleColor = selected
-          ? _withOpacityCompat(cs.onSecondaryContainer, 0.78)
-          : cs.onSurfaceVariant;
-
-      return ListTile(
-        onTap: () => onChanged(v),
-        selected: selected,
-        selectedTileColor: cs.secondaryContainer,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-        minVerticalPadding: 14,
-        leading: Icon(icon, color: iconColor),
-        title: Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: fg,
-              ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: subtitleColor,
-              ),
-        ),
-        trailing: Icon(
-          Icons.chevron_right_rounded,
-          color: selected
-              ? _withOpacityCompat(cs.onSecondaryContainer, 0.82)
-              : cs.onSurfaceVariant,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-            topLeft: first ? outerRadius.topLeft : Radius.zero,
-            topRight: first ? outerRadius.topRight : Radius.zero,
-            bottomLeft: last ? outerRadius.bottomLeft : Radius.zero,
-            bottomRight: last ? outerRadius.bottomRight : Radius.zero,
-          ),
-        ),
-      );
-    }
+    const modules = <({
+      _LibraryView view,
+      IconData icon,
+      String title,
+      String subtitle,
+    })>[
+      (
+        view: _LibraryView.tracks,
+        icon: Icons.music_note_rounded,
+        title: '歌曲',
+        subtitle: '按单曲浏览与播放',
+      ),
+      (
+        view: _LibraryView.albums,
+        icon: Icons.album_rounded,
+        title: '专辑',
+        subtitle: '按专辑归类，沉浸式封面网格',
+      ),
+      (
+        view: _LibraryView.artists,
+        icon: Icons.person_rounded,
+        title: '歌手',
+        subtitle: '按歌手整理，快速定位作品',
+      ),
+      (
+        view: _LibraryView.queue,
+        icon: Icons.queue_music_rounded,
+        title: '队列',
+        subtitle: '管理接下来要播放的内容',
+      ),
+    ];
 
     return Card(
-      clipBehavior: Clip.antiAlias,
       elevation: 0,
+      margin: EdgeInsets.zero,
       color: cs.surfaceContainer,
-      shape: const RoundedRectangleBorder(borderRadius: outerRadius),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          tile(
-            v: _LibraryView.tracks,
-            icon: Icons.music_note_rounded,
-            title: '歌曲',
-            subtitle: '按单曲浏览与播放',
-            first: true,
-            last: false,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final item in modules) ...[
+                _LibraryModuleChip(
+                  selected: value == item.view,
+                  icon: item.icon,
+                  label: item.title,
+                  semanticHint: item.subtitle,
+                  onTap: () => onChanged(item.view),
+                ),
+                if (item != modules.last) const SizedBox(width: 8),
+              ],
+            ],
           ),
-          Divider(height: 1, thickness: 1, color: dividerColor, indent: 72),
-          tile(
-            v: _LibraryView.albums,
-            icon: Icons.album_rounded,
-            title: '专辑',
-            subtitle: '按专辑归类，沉浸式封面网格',
-            first: false,
-            last: false,
+        ),
+      ),
+    );
+  }
+}
+
+class _LibraryModuleChip extends StatelessWidget {
+  const _LibraryModuleChip({
+    required this.selected,
+    required this.icon,
+    required this.label,
+    required this.semanticHint,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final IconData icon;
+  final String label;
+  final String semanticHint;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final bg = selected
+        ? cs.secondaryContainer
+        : _withOpacityCompat(cs.surfaceContainerHighest, 0.8);
+    final fg = selected ? cs.onSecondaryContainer : cs.onSurfaceVariant;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      hint: semanticHint,
+      child: Material(
+        color: bg,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            constraints: const BoxConstraints(minHeight: 44),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 20, color: fg),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: fg,
+                      ),
+                ),
+              ],
+            ),
           ),
-          Divider(height: 1, thickness: 1, color: dividerColor, indent: 72),
-          tile(
-            v: _LibraryView.artists,
-            icon: Icons.person_rounded,
-            title: '歌手',
-            subtitle: '按歌手整理，快速定位作品',
-            first: false,
-            last: false,
-          ),
-          Divider(height: 1, thickness: 1, color: dividerColor, indent: 72),
-          tile(
-            v: _LibraryView.queue,
-            icon: Icons.queue_music_rounded,
-            title: '队列',
-            subtitle: '管理接下来要播放的内容',
-            first: false,
-            last: true,
-          ),
-        ],
+        ),
       ),
     );
   }
