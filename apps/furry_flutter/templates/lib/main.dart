@@ -1546,6 +1546,9 @@ class LibraryPage extends StatefulWidget {
 class _LibraryPageState extends State<LibraryPage> {
   final SearchController _searchController = SearchController();
   String _query = '';
+  String _pendingQuery = '';
+  Timer? _queryDebounceTimer;
+  static const Duration _searchDebounceDelay = Duration(milliseconds: 180);
   _LibraryView _view = _LibraryView.tracks;
   _LibrarySort _sort = _LibrarySort.recent;
   bool _ascending = false;
@@ -1556,8 +1559,27 @@ class _LibraryPageState extends State<LibraryPage> {
 
   @override
   void dispose() {
+    _queryDebounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _applyQueryImmediately(String value) {
+    final next = value.trim();
+    _queryDebounceTimer?.cancel();
+    _pendingQuery = next;
+    if (_query == next) return;
+    setState(() => _query = next);
+  }
+
+  void _scheduleQueryUpdate(String value) {
+    final next = value.trim();
+    _pendingQuery = next;
+    _queryDebounceTimer?.cancel();
+    _queryDebounceTimer = Timer(_searchDebounceDelay, () {
+      if (!mounted || _query == _pendingQuery) return;
+      setState(() => _query = _pendingQuery);
+    });
   }
 
   Future<_LibraryIndex> _getIndexFuture(
@@ -1655,7 +1677,7 @@ class _LibraryPageState extends State<LibraryPage> {
                 ),
               ],
               suggestionsBuilder: (context, searchController) {
-                final q = searchController.text.trim().toLowerCase();
+                final q = _pendingQuery.toLowerCase();
                 final files = controller.furryOutputs.value;
                 if (files.isEmpty) {
                   return <Widget>[
@@ -1715,7 +1737,7 @@ class _LibraryPageState extends State<LibraryPage> {
                                 ),
                                 onTap: () {
                                   searchController.closeView(t.displayTitle);
-                                  setState(() => _query = t.displayTitle);
+                                  _applyQueryImmediately(t.displayTitle);
                                 },
                               ),
                           ],
@@ -1748,7 +1770,7 @@ class _LibraryPageState extends State<LibraryPage> {
                               trailing: const Icon(Icons.north_west_rounded),
                               onTap: () {
                                 searchController.closeView(t.displayTitle);
-                                setState(() => _query = t.displayTitle);
+                                _applyQueryImmediately(t.displayTitle);
                               },
                             ),
                         ],
@@ -1757,7 +1779,7 @@ class _LibraryPageState extends State<LibraryPage> {
                   ),
                 ];
               },
-              onChanged: (v) => setState(() => _query = v.trim()),
+              onChanged: _scheduleQueryUpdate,
             ),
           ),
         ),
