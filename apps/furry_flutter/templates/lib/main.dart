@@ -1549,6 +1549,10 @@ class _LibraryPageState extends State<LibraryPage> {
   String _pendingQuery = '';
   Timer? _queryDebounceTimer;
   static const Duration _searchDebounceDelay = Duration(milliseconds: 180);
+  int? _suggestionCacheSourceHash;
+  final Map<String, List<_TrackEntry>> _suggestionCache =
+      <String, List<_TrackEntry>>{};
+  static const int _suggestionCacheLimit = 32;
   _LibraryView _view = _LibraryView.tracks;
   _LibrarySort _sort = _LibrarySort.recent;
   bool _ascending = false;
@@ -1560,6 +1564,7 @@ class _LibraryPageState extends State<LibraryPage> {
   @override
   void dispose() {
     _queryDebounceTimer?.cancel();
+    _suggestionCache.clear();
     _searchController.dispose();
     super.dispose();
   }
@@ -1607,6 +1612,38 @@ class _LibraryPageState extends State<LibraryPage> {
       }
     }
     return Object.hash(files.length, Object.hashAll(fileHashes));
+  }
+
+  List<_TrackEntry> _buildSuggestions(
+    List<_TrackEntry> tracks,
+    String queryLower,
+    int sourceHash,
+  ) {
+    if (queryLower.isEmpty) {
+      return tracks.take(6).toList(growable: false);
+    }
+
+    if (_suggestionCacheSourceHash != sourceHash) {
+      _suggestionCacheSourceHash = sourceHash;
+      _suggestionCache.clear();
+    }
+
+    final cached = _suggestionCache[queryLower];
+    if (cached != null) return cached;
+
+    final suggestions = <_TrackEntry>[];
+    for (final track in tracks) {
+      if (_matchesQuery(track, queryLower)) {
+        suggestions.add(track);
+      }
+      if (suggestions.length >= 8) break;
+    }
+
+    _suggestionCache[queryLower] = List<_TrackEntry>.unmodifiable(suggestions);
+    if (_suggestionCache.length > _suggestionCacheLimit) {
+      _suggestionCache.remove(_suggestionCache.keys.first);
+    }
+    return suggestions;
   }
 
   bool _matchesQuery(_TrackEntry t, String queryLower) {
@@ -1704,16 +1741,11 @@ class _LibraryPageState extends State<LibraryPage> {
                       }
 
                       final tracks = idx.tracks;
-                      final suggestions = <_TrackEntry>[];
-                      if (q.isNotEmpty) {
-                        for (final t in tracks) {
-                          if (_matchesQuery(t, q)) suggestions.add(t);
-                          if (suggestions.length >= 8) break;
-                        }
-                      }
+                      final sourceHash = _lastFilesHash ?? 0;
+                      final suggestions =
+                          _buildSuggestions(tracks, q, sourceHash);
 
                       if (q.isEmpty) {
-                        final hot = tracks.take(6).toList(growable: false);
                         return Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -1722,7 +1754,7 @@ class _LibraryPageState extends State<LibraryPage> {
                               title: Text('建议'),
                               subtitle: Text('试试搜索歌名、专辑或歌手'),
                             ),
-                            for (final t in hot)
+                            for (final t in suggestions)
                               ListTile(
                                 leading: _CoverThumb(artUri: t.meta.artUri),
                                 title: Text(t.displayTitle,
