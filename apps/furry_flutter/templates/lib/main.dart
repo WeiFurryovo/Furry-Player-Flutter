@@ -2191,11 +2191,6 @@ class _LibraryPageState extends State<LibraryPage> {
               onPressed: controller.refreshOutputs,
               icon: const Icon(Icons.refresh_rounded),
             ),
-            IconButton(
-              tooltip: '排序/筛选',
-              onPressed: _openOptionsSheet,
-              icon: const Icon(Icons.tune_rounded),
-            ),
             const SizedBox(width: 8),
           ],
         ),
@@ -2204,8 +2199,18 @@ class _LibraryPageState extends State<LibraryPage> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             child: SearchAnchor.bar(
               searchController: _searchController,
-              barHintText: '搜索（歌曲 / 专辑 / 歌手）',
+              barHintText: '搜索音乐库',
               barLeading: const Icon(Icons.search_rounded),
+              barTrailing: <Widget>[
+                IconButton.filledTonal(
+                  tooltip: '排序/筛选',
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    _openOptionsSheet();
+                  },
+                  icon: const Icon(Icons.tune_rounded),
+                ),
+              ],
               suggestionsBuilder: (context, searchController) {
                 final q = searchController.text.trim().toLowerCase();
                 final files = controller.furryOutputs.value;
@@ -2335,6 +2340,7 @@ class _LibraryPageState extends State<LibraryPage> {
                     label: Text('队列'),
                     icon: Icon(Icons.queue_music_rounded)),
               ],
+              showSelectedIcon: false,
               selected: <_LibraryView>{_view},
               onSelectionChanged: (s) => setState(() => _view = s.first),
               style: ButtonStyle(
@@ -2344,7 +2350,7 @@ class _LibraryPageState extends State<LibraryPage> {
                 ),
                 shape: WidgetStatePropertyAll(
                   RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18)),
+                      borderRadius: BorderRadius.circular(24)),
                 ),
                 side: WidgetStatePropertyAll(
                   BorderSide(
@@ -2377,88 +2383,83 @@ class _LibraryPageState extends State<LibraryPage> {
             builder: (context, files, _) {
               if (files.isEmpty) {
                 return SliverToBoxAdapter(
-                  child: Card(
-                    margin: EdgeInsets.zero,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: cs.secondaryContainer,
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Icon(
-                                  Icons.queue_music_rounded,
-                                  color: cs.onSecondaryContainer,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  '还没有音乐库内容',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleLarge
-                                      ?.copyWith(fontWeight: FontWeight.w800),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            '当前没有检测到 .furry 输出文件。你可以先去“转换”页打包，或直接选择一个音频文件开始播放。',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
-                                  color: cs.onSurfaceVariant,
-                                ),
-                          ),
-                          const SizedBox(height: 14),
-                          Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: [
-                              FilledButton.tonalIcon(
-                                onPressed: () {
-                                  HapticFeedback.selectionClick();
-                                  controller.requestTabIndex(1);
-                                },
-                                icon: const Icon(Icons.swap_horiz_rounded),
-                                label: const Text('去转换'),
-                              ),
-                              OutlinedButton.icon(
-                                onPressed: () async {
-                                  HapticFeedback.selectionClick();
-                                  final f = await controller.pickForPlay();
-                                  if (f == null) return;
-                                  await controller.playFile(
-                                    file: f,
-                                    displayName: p.basename(f.path),
-                                  );
-                                },
-                                icon: const Icon(Icons.audio_file_rounded),
-                                label: const Text('选择音频播放'),
-                              ),
-                              TextButton.icon(
-                                onPressed: () async {
-                                  HapticFeedback.selectionClick();
-                                  await controller.refreshOutputs();
-                                },
-                                icon: const Icon(Icons.refresh_rounded),
-                                label: const Text('重新扫描'),
-                              ),
-                            ],
-                          ),
-                        ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 6, 4, 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '还没有音乐库内容',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge
+                                  ?.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '当前没有检测到 .furry 输出文件。先去“转换”页打包，或直接选择一个音频文件开始播放。',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                      Card(
+                        margin: EdgeInsets.zero,
+                        color: cs.surfaceContainer,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                        child: Column(
+                          children: [
+                            ListTile(
+                              leading: Icon(Icons.swap_horiz_rounded,
+                                  color: cs.primary),
+                              title: const Text('去转换'),
+                              subtitle: const Text('把音频打包成 .furry 并写入封面/标签'),
+                              trailing: const Icon(Icons.chevron_right_rounded),
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                controller.requestTabIndex(1);
+                              },
+                            ),
+                            const Divider(height: 1),
+                            ListTile(
+                              leading: Icon(Icons.audio_file_rounded,
+                                  color: cs.primary),
+                              title: const Text('选择音频播放'),
+                              subtitle: const Text('无需 .furry，也可以先体验播放器'),
+                              trailing: const Icon(Icons.chevron_right_rounded),
+                              onTap: () async {
+                                HapticFeedback.selectionClick();
+                                final f = await controller.pickForPlay();
+                                if (f == null) return;
+                                await controller.playFile(
+                                  file: f,
+                                  displayName: p.basename(f.path),
+                                );
+                              },
+                            ),
+                            const Divider(height: 1),
+                            ListTile(
+                              leading: Icon(Icons.refresh_rounded,
+                                  color: cs.primary),
+                              title: const Text('重新扫描'),
+                              subtitle: const Text('更新“最近输出”列表'),
+                              onTap: () async {
+                                HapticFeedback.selectionClick();
+                                await controller.refreshOutputs();
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 );
               }
