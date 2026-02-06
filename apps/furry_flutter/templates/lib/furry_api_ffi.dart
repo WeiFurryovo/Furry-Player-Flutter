@@ -7,16 +7,30 @@ import 'package:ffi/ffi.dart';
 
 import 'furry_api.dart';
 
+/// 桌面端实现：通过 Dart FFI 调用 `furry_ffi` 动态库。
+///
+/// 设计要点：
+/// - 所有可能阻塞的操作（封装/解包/读取大块 META）都放到 `Isolate.run`，
+///   避免卡住 UI isolate。
+/// - 该类只保留轻量函数指针（如校验、读取格式），重操作每次在 worker 内 open lib。
 class FurryApiFfi implements FurryApi {
   FurryApiFfi()
-      : _isValid = _openLib().lookupFunction<_IsValidC, _IsValidDart>('furry_is_valid_furry_file'),
-        _getOriginalFormat = _openLib().lookupFunction<_GetOriginalFormatC, _GetOriginalFormatDart>(
+      : _isValid = _openLib().lookupFunction<_IsValidC, _IsValidDart>(
+            'furry_is_valid_furry_file'),
+        _getOriginalFormat = _openLib()
+            .lookupFunction<_GetOriginalFormatC, _GetOriginalFormatDart>(
           'furry_get_original_format',
         );
 
   late final _IsValidDart _isValid;
   late final _GetOriginalFormatDart _getOriginalFormat;
 
+  /// 动态库加载策略：
+  /// - Windows：`furry_ffi.dll`
+  /// - Linux：`libfurry_ffi.so`
+  /// - macOS：`libfurry_ffi.dylib`
+  ///
+  /// 如果打包方式把符号链接进当前进程，也允许使用 `process()`。
   static ffi.DynamicLibrary _openLib() {
     if (Platform.isWindows) return ffi.DynamicLibrary.open('furry_ffi.dll');
     if (Platform.isLinux) return ffi.DynamicLibrary.open('libfurry_ffi.so');
@@ -34,7 +48,8 @@ class FurryApiFfi implements FurryApi {
     required int paddingKb,
   }) async {
     // Avoid blocking UI isolate on desktop.
-    return Isolate.run(() => _ffiPackToFurryWorker((inputPath, outputPath, paddingKb)));
+    return Isolate.run(
+        () => _ffiPackToFurryWorker((inputPath, outputPath, paddingKb)));
   }
 
   @override
@@ -68,7 +83,8 @@ class FurryApiFfi implements FurryApi {
   }
 
   @override
-  Future<int> unpackToFile({required String inputPath, required String outputPath}) async {
+  Future<int> unpackToFile(
+      {required String inputPath, required String outputPath}) async {
     // Avoid blocking UI isolate on desktop.
     return Isolate.run(() => _ffiUnpackToFileWorker((inputPath, outputPath)));
   }
@@ -89,7 +105,8 @@ typedef _UnpackFileArgs = (String inputPath, String outputPath);
 
 int _ffiPackToFurryWorker(_PackArgs args) {
   final lib = FurryApiFfi._openLib();
-  final pack = lib.lookupFunction<_PackToFurryC, _PackToFurryDart>('furry_pack_to_furry');
+  final pack = lib
+      .lookupFunction<_PackToFurryC, _PackToFurryDart>('furry_pack_to_furry');
   final (inputPath, outputPath, paddingKb) = args;
 
   final inPtr = inputPath.toNativeUtf8();
@@ -104,9 +121,10 @@ int _ffiPackToFurryWorker(_PackArgs args) {
 
 Uint8List? _ffiUnpackToBytesWorker(String inputPath) {
   final lib = FurryApiFfi._openLib();
-  final unpack =
-      lib.lookupFunction<_UnpackToBytesC, _UnpackToBytesDart>('furry_unpack_from_furry_to_bytes');
-  final freeBytes = lib.lookupFunction<_FreeBytesC, _FreeBytesDart>('furry_free_bytes');
+  final unpack = lib.lookupFunction<_UnpackToBytesC, _UnpackToBytesDart>(
+      'furry_unpack_from_furry_to_bytes');
+  final freeBytes =
+      lib.lookupFunction<_FreeBytesC, _FreeBytesDart>('furry_free_bytes');
 
   final p = inputPath.toNativeUtf8();
   final outPtr = calloc<ffi.Pointer<ffi.Uint8>>();
@@ -130,8 +148,8 @@ Uint8List? _ffiUnpackToBytesWorker(String inputPath) {
 
 int _ffiUnpackToFileWorker(_UnpackFileArgs args) {
   final lib = FurryApiFfi._openLib();
-  final unpackToFile =
-      lib.lookupFunction<_UnpackToFileC, _UnpackToFileDart>('furry_unpack_from_furry_to_file');
+  final unpackToFile = lib.lookupFunction<_UnpackToFileC, _UnpackToFileDart>(
+      'furry_unpack_from_furry_to_file');
   final (inputPath, outputPath) = args;
 
   final inPtr = inputPath.toNativeUtf8();
@@ -146,10 +164,12 @@ int _ffiUnpackToFileWorker(_UnpackFileArgs args) {
 
 String _ffiGetTagsJsonWorker(String filePath) {
   final lib = FurryApiFfi._openLib();
-  final getTagsJsonToBytes = lib.lookupFunction<_GetTagsJsonToBytesC, _GetTagsJsonToBytesDart>(
+  final getTagsJsonToBytes =
+      lib.lookupFunction<_GetTagsJsonToBytesC, _GetTagsJsonToBytesDart>(
     'furry_get_tags_json_to_bytes',
   );
-  final freeBytes = lib.lookupFunction<_FreeBytesC, _FreeBytesDart>('furry_free_bytes');
+  final freeBytes =
+      lib.lookupFunction<_FreeBytesC, _FreeBytesDart>('furry_free_bytes');
 
   final p = filePath.toNativeUtf8();
   final outPtr = calloc<ffi.Pointer<ffi.Uint8>>();
@@ -173,10 +193,12 @@ String _ffiGetTagsJsonWorker(String filePath) {
 
 Uint8List? _ffiGetCoverArtWorker(String filePath) {
   final lib = FurryApiFfi._openLib();
-  final getCoverArtToBytes = lib.lookupFunction<_GetCoverArtToBytesC, _GetCoverArtToBytesDart>(
+  final getCoverArtToBytes =
+      lib.lookupFunction<_GetCoverArtToBytesC, _GetCoverArtToBytesDart>(
     'furry_get_cover_art_to_bytes',
   );
-  final freeBytes = lib.lookupFunction<_FreeBytesC, _FreeBytesDart>('furry_free_bytes');
+  final freeBytes =
+      lib.lookupFunction<_FreeBytesC, _FreeBytesDart>('furry_free_bytes');
 
   final p = filePath.toNativeUtf8();
   final outPtr = calloc<ffi.Pointer<ffi.Uint8>>();

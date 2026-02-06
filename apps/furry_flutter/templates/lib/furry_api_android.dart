@@ -2,6 +2,10 @@ import 'package:flutter/services.dart';
 
 import 'furry_api.dart';
 
+/// Android 平台实现：通过 `MethodChannel` 调用 Kotlin/Java 原生层。
+///
+/// 该实现适用于移动端（不依赖桌面动态库），且可在原生层处理文件 IO、
+/// 访问媒体能力等。方法名与参数结构需要与 Android 工程保持一致。
 class FurryApiAndroid implements FurryApi {
   static const MethodChannel _channel = MethodChannel('furry/native');
 
@@ -30,7 +34,8 @@ class FurryApiAndroid implements FurryApi {
   }
 
   @override
-  Future<int> unpackToFile({required String inputPath, required String outputPath}) async {
+  Future<int> unpackToFile(
+      {required String inputPath, required String outputPath}) async {
     final rc = await _channel.invokeMethod<int>('unpackToFile', {
       'inputPath': inputPath,
       'outputPath': outputPath,

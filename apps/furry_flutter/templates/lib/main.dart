@@ -1,3 +1,15 @@
+// Furry Player Flutter UI（模板）。
+//
+// 说明：
+// - 该仓库同时包含 Rust 核心（`.furry` 格式/加密/转换/播放引擎）与多端 UI。
+// - Flutter 工程的“源码入口”是 `apps/furry_flutter/templates/`，运行工程
+//   `apps/furry_flutter/furry_flutter_app/` 通常由脚本覆盖生成（见
+//   `apps/furry_flutter/create_flutter_app.sh`）。
+//
+// 交互/设计目标：
+// - UI 以 Material 3 Expressive 为基线（层级清晰、触达舒适、对比度可读）。
+// - 播放器逻辑集中在 `_AppController`，页面只消费状态并触发意图。
+// - 跨平台能力通过 `FurryApi`（Android MethodChannel / Desktop FFI）注入。
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -20,7 +32,12 @@ import 'furry_api_selector.dart';
 import 'in_memory_audio_source.dart';
 import 'system_media_bridge.dart';
 
+/// 启动阶段日志（用于诊断启动失败/权限问题等）。
 final List<String> _startupDiagnostics = <String>[];
+
+/// 全局共享播放器实例。
+///
+/// 原因：系统媒体中心/AudioService/各页面都需要统一的播放状态与队列。
 late final AudioPlayer _sharedPlayer;
 
 Color _withOpacityCompat(Color color, double opacity) =>

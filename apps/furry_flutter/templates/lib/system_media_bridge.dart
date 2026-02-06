@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:smtc_windows/smtc_windows.dart';
 
+/// 系统媒体中心需要展示的元信息（标题/歌手/专辑/封面/时长）。
 class SystemMediaMetadata {
   final String title;
   final String artist;
@@ -22,6 +23,15 @@ class SystemMediaMetadata {
   });
 }
 
+/// 将播放器状态同步到系统媒体中心（跨平台桥接层）。
+///
+/// 当前支持：
+/// - Windows：SMTC（系统媒体传输控件）
+/// - Linux：MPRIS（DBus）
+///
+/// 设计目标：
+/// - UI 只关心播放器行为；系统媒体中心的接入细节集中在这里
+/// - 可选绑定“上一曲/下一曲”回调，不强制依赖队列功能
 class SystemMediaBridge {
   SystemMediaBridge(this._player);
 
@@ -49,6 +59,10 @@ class SystemMediaBridge {
     await _linux?.setMetadata(meta);
   }
 
+  /// 绑定“上一曲/下一曲”操作到系统媒体中心按钮。
+  ///
+  /// 注意：如果队列不可用，建议通过 `setQueueAvailability` 禁用按钮，
+  /// 避免系统 UI 显示可点击但没有效果的控制。
   void bindQueueControls({
     Future<void> Function()? onNext,
     Future<void> Function()? onPrevious,
