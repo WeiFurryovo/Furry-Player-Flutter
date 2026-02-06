@@ -10,8 +10,6 @@
 // - UI 以 Material 3 Expressive 为基线（层级清晰、触达舒适、对比度可读）。
 // - 播放器逻辑集中在 `_AppController`，页面只消费状态并触发意图。
 // - 跨平台能力通过 `FurryApi`（Android MethodChannel / Desktop FFI）注入。
-library furry_player_flutter_app;
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
