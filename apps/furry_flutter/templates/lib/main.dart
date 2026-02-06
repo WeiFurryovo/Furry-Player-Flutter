@@ -322,10 +322,35 @@ class _AppController {
       final artDir = Directory(p.join(tmp.path, 'furry_media_art'));
       if (await artDir.exists()) {
         final cutoff = DateTime.now().subtract(const Duration(days: 7));
-        for (final f in artDir.listSync().whereType<File>()) {
+        final artFiles = artDir.listSync().whereType<File>().toList();
+        for (final f in artFiles) {
           if (f.lastModifiedSync().isBefore(cutoff)) {
             try {
               await f.delete();
+            } catch (_) {}
+          }
+        }
+
+        // Cap total cover cache size (LRU by modified time).
+        const maxArtCacheBytes = 256 * 1024 * 1024; // 256 MiB
+        var totalBytes = 0;
+        final alive = <File>[];
+        for (final file in artFiles) {
+          try {
+            if (!file.existsSync()) continue;
+            totalBytes += file.lengthSync();
+            alive.add(file);
+          } catch (_) {}
+        }
+        if (totalBytes > maxArtCacheBytes) {
+          alive.sort(
+              (a, b) => a.lastModifiedSync().compareTo(b.lastModifiedSync()));
+          for (final file in alive) {
+            if (totalBytes <= maxArtCacheBytes) break;
+            try {
+              final size = file.lengthSync();
+              await file.delete();
+              totalBytes -= size;
             } catch (_) {}
           }
         }
@@ -1465,6 +1490,16 @@ class _LibraryOptions {
   });
 }
 
+class _SuggestionCacheEntry {
+  final List<_TrackEntry> matches;
+  final bool complete;
+
+  const _SuggestionCacheEntry({
+    required this.matches,
+    required this.complete,
+  });
+}
+
 class _TrackEntry {
   final File file;
   final _MetaPreview meta;
@@ -1550,9 +1585,10 @@ class _LibraryPageState extends State<LibraryPage> {
   Timer? _queryDebounceTimer;
   static const Duration _searchDebounceDelay = Duration(milliseconds: 180);
   int? _suggestionCacheSourceHash;
-  final Map<String, List<_TrackEntry>> _suggestionCache =
-      <String, List<_TrackEntry>>{};
+  final Map<String, _SuggestionCacheEntry> _suggestionCache =
+      <String, _SuggestionCacheEntry>{};
   static const int _suggestionCacheLimit = 32;
+  static const int _suggestionMaxStoredMatches = 256;
   _LibraryView _view = _LibraryView.tracks;
   _LibrarySort _sort = _LibrarySort.recent;
   bool _ascending = false;
@@ -1628,22 +1664,50 @@ class _LibraryPageState extends State<LibraryPage> {
       _suggestionCache.clear();
     }
 
-    final cached = _suggestionCache[queryLower];
-    if (cached != null) return cached;
-
-    final suggestions = <_TrackEntry>[];
-    for (final track in tracks) {
-      if (_matchesQuery(track, queryLower)) {
-        suggestions.add(track);
-      }
-      if (suggestions.length >= 8) break;
+    final exactCached = _suggestionCache[queryLower];
+    if (exactCached != null) {
+      return exactCached.matches.take(8).toList(growable: false);
     }
 
-    _suggestionCache[queryLower] = List<_TrackEntry>.unmodifiable(suggestions);
+    List<_TrackEntry>? basePool;
+    if (queryLower.length >= 2) {
+      final prefixes = _suggestionCache.keys
+          .where((key) =>
+              key.isNotEmpty &&
+              queryLower.startsWith(key) &&
+              _suggestionCache[key]!.complete)
+          .toList(growable: false)
+        ..sort((a, b) => b.length.compareTo(a.length));
+      if (prefixes.isNotEmpty) {
+        basePool = _suggestionCache[prefixes.first]!.matches;
+      }
+    }
+
+    final input = basePool ?? tracks;
+    final matches = <_TrackEntry>[];
+    var complete = true;
+    for (final track in input) {
+      if (_matchesQuery(track, queryLower)) {
+        if (matches.length < _suggestionMaxStoredMatches) {
+          matches.add(track);
+        } else {
+          complete = false;
+          break;
+        }
+      }
+    }
+
+    final entry = _SuggestionCacheEntry(
+      matches: List<_TrackEntry>.unmodifiable(matches),
+      complete: complete,
+    );
+    _suggestionCache[queryLower] = entry;
+
     if (_suggestionCache.length > _suggestionCacheLimit) {
       _suggestionCache.remove(_suggestionCache.keys.first);
     }
-    return suggestions;
+
+    return matches.take(8).toList(growable: false);
   }
 
   Widget _buildSuggestionTile(
