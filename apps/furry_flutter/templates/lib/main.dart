@@ -169,6 +169,28 @@ class _MetaPreviewCacheEntry {
   });
 }
 
+class _TrackEntryCacheEntry {
+  final DateTime modified;
+  final int bytes;
+  final _TrackEntry track;
+
+  const _TrackEntryCacheEntry({
+    required this.modified,
+    required this.bytes,
+    required this.track,
+  });
+}
+
+class _LibraryIndexCacheEntry {
+  final int signature;
+  final _LibraryIndex index;
+
+  const _LibraryIndexCacheEntry({
+    required this.signature,
+    required this.index,
+  });
+}
+
 class _AppController {
   _AppController(this.player);
 
@@ -204,6 +226,9 @@ class _AppController {
   // Keep this bounded to avoid unbounded RAM growth (cover bytes can be large).
   final Map<String, _MetaPreviewCacheEntry> _metaPreviewCache =
       <String, _MetaPreviewCacheEntry>{};
+  final Map<String, _TrackEntryCacheEntry> _trackEntryCache =
+      <String, _TrackEntryCacheEntry>{};
+  _LibraryIndexCacheEntry? _libraryIndexCache;
   static const int _metaPreviewCacheLimit = 64;
 
   int paddingKb = 0;
@@ -1227,39 +1252,90 @@ class _AppController {
   }
 
   Future<_LibraryIndex> buildLibraryIndex(List<File> files) async {
-    final tracks = <_TrackEntry>[];
-    for (final f in files) {
+    final states = <(File file, DateTime modified, int bytes)>[];
+    for (final file in files) {
       try {
-        final stat = await f.stat();
-        final meta = await getMetaPreviewForFurry(f, modified: stat.modified);
-        tracks.add(
-          _TrackEntry(
-            file: f,
-            meta: meta,
-            modified: stat.modified,
-            bytes: stat.size,
-          ),
-        );
+        final stat = await file.stat();
+        states.add((file, stat.modified, stat.size));
       } catch (e, st) {
-        appendLog('Index meta failed: ${f.path}: $e\n$st');
-        final stat = await f.stat();
-        tracks.add(
-          _TrackEntry(
-            file: f,
-            meta: _MetaPreview(
-              title: p.basename(f.path),
-              artist: '',
-              album: '',
-              subtitle: '',
-              artUri: null,
-              coverBytesLen: null,
-            ),
-            modified: stat.modified,
-            bytes: stat.size,
-          ),
-        );
+        appendLog('Index stat failed: ${file.path}: $e\n$st');
       }
     }
+
+    final signature = Object.hash(
+      states.length,
+      Object.hashAll(
+        states.map(
+          (state) => Object.hash(
+            state.$1.path,
+            state.$2.microsecondsSinceEpoch,
+            state.$3,
+          ),
+        ),
+      ),
+    );
+    final cached = _libraryIndexCache;
+    if (cached != null && cached.signature == signature) {
+      return cached.index;
+    }
+
+    final activePaths = <String>{};
+    final tracks = <_TrackEntry>[];
+    for (final state in states) {
+      final file = state.$1;
+      final modified = state.$2;
+      final bytes = state.$3;
+      final path = file.path;
+      activePaths.add(path);
+
+      final trackCached = _trackEntryCache[path];
+      if (trackCached != null &&
+          trackCached.modified == modified &&
+          trackCached.bytes == bytes) {
+        tracks.add(trackCached.track);
+        continue;
+      }
+
+      try {
+        final meta = await getMetaPreviewForFurry(file, modified: modified);
+        final track = _TrackEntry(
+          file: file,
+          meta: meta,
+          modified: modified,
+          bytes: bytes,
+        );
+        _trackEntryCache[path] = _TrackEntryCacheEntry(
+          modified: modified,
+          bytes: bytes,
+          track: track,
+        );
+        tracks.add(track);
+      } catch (e, st) {
+        appendLog('Index meta failed: $path: $e\n$st');
+        final track = _TrackEntry(
+          file: file,
+          meta: _MetaPreview(
+            title: p.basename(path),
+            artist: '',
+            album: '',
+            subtitle: '',
+            artUri: null,
+            coverBytesLen: null,
+          ),
+          modified: modified,
+          bytes: bytes,
+        );
+        _trackEntryCache[path] = _TrackEntryCacheEntry(
+          modified: modified,
+          bytes: bytes,
+          track: track,
+        );
+        tracks.add(track);
+      }
+    }
+
+    _trackEntryCache.removeWhere((path, _) => !activePaths.contains(path));
+    _metaPreviewCache.removeWhere((path, _) => !activePaths.contains(path));
 
     final albumsByKey = <String, _AlbumGroup>{};
     final artistsByKey = <String, _ArtistGroup>{};
@@ -1304,7 +1380,13 @@ class _AppController {
       }
     }
 
-    return _LibraryIndex(tracks: tracks, albums: albums, artists: artists);
+    final result =
+        _LibraryIndex(tracks: tracks, albums: albums, artists: artists);
+    _libraryIndexCache = _LibraryIndexCacheEntry(
+      signature: signature,
+      index: result,
+    );
+    return result;
   }
 }
 
@@ -1480,13 +1562,29 @@ class _LibraryPageState extends State<LibraryPage> {
 
   Future<_LibraryIndex> _getIndexFuture(
       _AppController controller, List<File> files) {
-    final hash =
-        Object.hash(files.length, Object.hashAll(files.map((f) => f.path)));
+    final hash = _filesStateHash(files);
     if (_indexFuture == null || _lastFilesHash != hash) {
       _lastFilesHash = hash;
       _indexFuture = controller.buildLibraryIndex(files);
     }
     return _indexFuture!;
+  }
+
+  int _filesStateHash(List<File> files) {
+    final fileHashes = <int>[];
+    for (final file in files) {
+      try {
+        final stat = file.statSync();
+        fileHashes.add(Object.hash(
+          file.path,
+          stat.modified.microsecondsSinceEpoch,
+          stat.size,
+        ));
+      } catch (_) {
+        fileHashes.add(Object.hash(file.path, 0, 0));
+      }
+    }
+    return Object.hash(files.length, Object.hashAll(fileHashes));
   }
 
   bool _matchesQuery(_TrackEntry t, String queryLower) {
