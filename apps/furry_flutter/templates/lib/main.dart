@@ -55,6 +55,13 @@ List<String> _takeStartupDiagnostics() {
   return out;
 }
 
+/// Android 后台播放 / 通知栏（锁屏）控制的适配层。
+///
+/// 该类把 `just_audio` 的队列/播放状态同步到 `audio_service` 的 `AudioHandler`：
+/// - 系统媒体中心可显示当前曲目、进度、播放状态
+/// - 系统按钮（播放/暂停/上一首/下一首）能回调到播放器
+///
+/// 重要：Flutter UI 的业务逻辑仍由 `_AppController` 驱动；此 handler 只负责系统集成。
 class _FurryAudioHandler extends BaseAudioHandler
     with SeekHandler, QueueHandler {
   _FurryAudioHandler(this._player) {
@@ -259,6 +266,10 @@ class _DiagnosticsLog {
   static const int _maxBytes = 512 * 1024; // 512 KiB
   static const int _keepBytes = 256 * 1024; // 256 KiB
 
+  /// 初始化诊断日志文件（`ApplicationSupportDirectory/diagnostics.log`）。
+  ///
+  /// 该文件用于收集启动阶段与运行阶段的关键错误信息，便于用户反馈问题。
+  /// 为避免日志无限增长，这里会在写入时做大小裁剪（保留尾部 `_keepBytes`）。
   static Future<void> init() async {
     if (_file != null) return;
     final dir = await getApplicationSupportDirectory();
@@ -325,6 +336,14 @@ class _DiagnosticsLog {
   }
 }
 
+/// 应用入口。
+///
+/// 启动顺序（高层）：
+/// 1) 初始化持久化诊断日志 + 全局错误钩子（便于收集崩溃信息）
+/// 2) 创建全局共享 `AudioPlayer`
+/// 3) Android 上初始化 `AudioService`（通知栏/锁屏媒体控件）
+/// 4) 移动端配置 `AudioSession`（与系统音频焦点/混音策略协作）
+/// 5) 进入 `FurryApp`（Material 3 Expressive UI）
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _DiagnosticsLog.init();
@@ -373,6 +392,11 @@ Future<void> main() async {
   runApp(FurryApp(player: _sharedPlayer));
 }
 
+/// MaterialApp 外壳：动态色（如 Android 12+）+ M3 Expressive 主题。
+///
+/// 说明：
+/// - 主题构建集中在 `_ExpressiveTheme`，以保证全局一致的层级与可读性
+/// - `AppShell` 承载 3 个主 tab 与底部迷你播放器浮层
 class FurryApp extends StatelessWidget {
   const FurryApp({super.key, required this.player});
 
@@ -563,6 +587,11 @@ class _ExpressiveTheme {
   }
 }
 
+/// 应用主壳（3 个主 tab + 自定义底部导航 + 迷你播放器浮层）。
+///
+/// - 窄屏：底部导航（自定义 Expressive 样式，减少无效留白）
+/// - 宽屏：NavigationRail
+/// - `NowPlayingPanel` 作为底部浮层，始终保持在页面内容上方
 class AppShell extends StatefulWidget {
   const AppShell({super.key, required this.player});
 
@@ -741,6 +770,13 @@ class _NavItem {
   });
 }
 
+/// 自定义的 M3 Expressive 底部导航栏。
+///
+/// Flutter 的 `NavigationBar` 在某些布局下会带来较大的内部留白（尤其顶部），
+/// 且 icon/label 的位置不易精细控制。这里使用自定义 layout：
+/// - 保留 label（提升可读性）
+/// - 不下移 icon（保持稳定的视觉锚点）
+/// - 通过轻微阴影与 `surfaceContainer` 强化“悬浮”层级
 class _ExpressiveBottomNavBar extends StatelessWidget {
   const _ExpressiveBottomNavBar({
     required this.selectedIndex,
@@ -871,6 +907,10 @@ class _NavItemButton extends StatelessWidget {
   }
 }
 
+/// 给 `CustomScrollView` 的底部留出空间，避免内容被：
+/// - 底部导航栏
+/// - 迷你播放器
+/// 覆盖。
 class _BottomOverlaySpacer extends StatelessWidget {
   const _BottomOverlaySpacer({required this.controller});
 
@@ -905,6 +945,14 @@ class _BottomOverlaySpacer extends StatelessWidget {
   }
 }
 
+/// 应用核心控制器（UI 只发出意图，状态由这里统一协调）。
+///
+/// 主要职责：
+/// - 播放：驱动 `just_audio`，维护播放队列与当前曲目（`nowPlaying` / `queueState`）
+/// - 跨平台能力：通过 `FurryApi` 进行 `.furry` 的封装/解包/读取元数据
+/// - 系统媒体中心：通过 `SystemMediaBridge` 同步标题/封面/进度，并绑定上一首/下一首
+/// - 页面协作：用 `requestedTab` 支持跨 tab 跳转（例如从搜索建议“去转换”）
+/// - 数据缓存：封面/标签等元信息通过 `_metaPreviewCache` 做有界缓存
 class _AppController {
   _AppController(this.player);
 
@@ -947,6 +995,7 @@ class _AppController {
   File? pickedForPack;
   String? pickedForPackName;
 
+  /// 初始化控制器：加载平台能力、绑定系统媒体中心、恢复/刷新数据并写入诊断日志。
   Future<void> init() async {
     final persisted = await _DiagnosticsLog.readAll();
     if (persisted.trim().isNotEmpty) {
@@ -1993,6 +2042,10 @@ class _AppController {
   }
 }
 
+/// 当前正在播放的条目（供 UI 展示）。
+///
+/// 该结构只保存 UI 需要的摘要信息：标题/副标题/来源路径/封面 URI。
+/// 真实播放源与队列由 `_AppController.player` / `_AppController.queueState` 管理。
 class _NowPlaying {
   final String title;
   final String subtitle;
@@ -2007,6 +2060,9 @@ class _NowPlaying {
   });
 }
 
+/// 播放队列快照（供 UI 订阅）。
+///
+/// `queue` 是文件列表；`index` 指向当前播放项（-1 表示无有效索引）。
 class _QueueState {
   final List<File> queue;
   final int index;
@@ -2021,6 +2077,12 @@ class _QueueState {
   }
 }
 
+/// `.furry` 文件的轻量元信息预览（用于列表页快速渲染）。
+///
+/// 该结构会从 `.furry` 的 tags JSON + cover payload 中提取：
+/// - 标题/歌手/专辑
+/// - 组合副标题（artist · album）
+/// - 封面临时文件 URI（避免在列表里直接持有大字节数组）
 class _MetaPreview {
   final String title;
   final String artist;
@@ -2121,6 +2183,10 @@ class _LibraryIndex {
   });
 }
 
+/// 本地音乐库页：搜索 + 模块入口（歌曲/专辑/歌手/队列）+ 内容区。
+///
+/// 数据来源：`_AppController.furryOutputs`（最近输出的 `.furry` 文件列表）。
+/// 为避免重复解析，索引构建使用 `Future<_LibraryIndex>` + hash 缓存。
 class LibraryPage extends StatefulWidget {
   final _AppController controller;
   const LibraryPage({super.key, required this.controller});
