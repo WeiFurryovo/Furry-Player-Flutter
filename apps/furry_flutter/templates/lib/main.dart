@@ -1737,6 +1737,81 @@ class _LibraryPageState extends State<LibraryPage> {
     });
   }
 
+  int _compareTrack(_TrackEntry a, _TrackEntry b) {
+    int result;
+    switch (_sort) {
+      case _LibrarySort.recent:
+        result = b.modified.compareTo(a.modified);
+        break;
+      case _LibrarySort.title:
+        result = a.displayTitle.compareTo(b.displayTitle);
+        break;
+      case _LibrarySort.artist:
+        result = a.meta.artist.compareTo(b.meta.artist);
+        break;
+      case _LibrarySort.album:
+        result = a.meta.album.compareTo(b.meta.album);
+        break;
+      case _LibrarySort.size:
+        result = b.bytes.compareTo(a.bytes);
+        break;
+    }
+    return _ascending ? -result : result;
+  }
+
+  List<_TrackEntry> _buildFilteredTracks(
+      _LibraryIndex index, String queryLower) {
+    final tracks = index.tracks
+        .where((track) => !_onlyWithCover || track.meta.artUri != null)
+        .where((track) => _matchesQuery(track, queryLower))
+        .toList(growable: false)
+      ..sort(_compareTrack);
+    return tracks;
+  }
+
+  List<_AlbumGroup> _buildFilteredAlbums(
+      _LibraryIndex index, String queryLower) {
+    return index.albums.where((album) {
+      if (_onlyWithCover && album.artUri == null) return false;
+      if (queryLower.isEmpty) return true;
+      return album.title.toLowerCase().contains(queryLower) ||
+          album.subtitle.toLowerCase().contains(queryLower);
+    }).toList(growable: false);
+  }
+
+  List<_ArtistGroup> _buildFilteredArtists(
+      _LibraryIndex index, String queryLower) {
+    return index.artists.where((artist) {
+      if (_onlyWithCover && artist.artUri == null) return false;
+      if (queryLower.isEmpty) return true;
+      return artist.title.toLowerCase().contains(queryLower);
+    }).toList(growable: false);
+  }
+
+  Widget _buildLibraryContentSliver(
+    _AppController controller,
+    _LibraryIndex index,
+    String queryLower,
+  ) {
+    switch (_view) {
+      case _LibraryView.tracks:
+        final tracks = _buildFilteredTracks(index, queryLower);
+        return _TracksSliver(
+          controller: controller,
+          tracks: tracks,
+          bytesFmt: _fmtBytes,
+        );
+      case _LibraryView.albums:
+        final albums = _buildFilteredAlbums(index, queryLower);
+        return _AlbumsSliver(controller: controller, albums: albums);
+      case _LibraryView.artists:
+        final artists = _buildFilteredArtists(index, queryLower);
+        return _ArtistsSliver(controller: controller, artists: artists);
+      case _LibraryView.queue:
+        return _QueueSliver(controller: controller);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
@@ -1932,66 +2007,7 @@ class _LibraryPageState extends State<LibraryPage> {
                   }
 
                   final q = _query.trim().toLowerCase();
-                  final tracks = idx.tracks
-                      .where((t) => (!_onlyWithCover || t.meta.artUri != null))
-                      .where((t) => _matchesQuery(t, q))
-                      .toList(growable: false);
-
-                  int compareTrack(_TrackEntry a, _TrackEntry b) {
-                    int r;
-                    switch (_sort) {
-                      case _LibrarySort.recent:
-                        r = b.modified.compareTo(a.modified);
-                        break;
-                      case _LibrarySort.title:
-                        r = a.displayTitle.compareTo(b.displayTitle);
-                        break;
-                      case _LibrarySort.artist:
-                        r = a.meta.artist.compareTo(b.meta.artist);
-                        break;
-                      case _LibrarySort.album:
-                        r = a.meta.album.compareTo(b.meta.album);
-                        break;
-                      case _LibrarySort.size:
-                        r = b.bytes.compareTo(a.bytes);
-                        break;
-                    }
-                    return _ascending ? -r : r;
-                  }
-
-                  final sortedTracks = tracks.toList()..sort(compareTrack);
-
-                  switch (_view) {
-                    case _LibraryView.tracks:
-                      return _TracksSliver(
-                        controller: controller,
-                        tracks: sortedTracks,
-                        bytesFmt: _fmtBytes,
-                      );
-                    case _LibraryView.albums:
-                      final albums = idx.albums.where((a) {
-                        if (!_onlyWithCover) return true;
-                        return a.artUri != null;
-                      }).where((a) {
-                        if (q.isEmpty) return true;
-                        return a.title.toLowerCase().contains(q) ||
-                            a.subtitle.toLowerCase().contains(q);
-                      }).toList(growable: false);
-                      return _AlbumsSliver(
-                          controller: controller, albums: albums);
-                    case _LibraryView.artists:
-                      final artists = idx.artists.where((a) {
-                        if (!_onlyWithCover) return true;
-                        return a.artUri != null;
-                      }).where((a) {
-                        if (q.isEmpty) return true;
-                        return a.title.toLowerCase().contains(q);
-                      }).toList(growable: false);
-                      return _ArtistsSliver(
-                          controller: controller, artists: artists);
-                    case _LibraryView.queue:
-                      return _QueueSliver(controller: controller);
-                  }
+                  return _buildLibraryContentSliver(controller, idx, q);
                 },
               );
             },
