@@ -1646,6 +1646,65 @@ class _LibraryPageState extends State<LibraryPage> {
     return suggestions;
   }
 
+  Widget _buildSuggestionTile(
+    SearchController searchController,
+    _TrackEntry track, {
+    bool showArrow = false,
+  }) {
+    return ListTile(
+      leading: _CoverThumb(artUri: track.meta.artUri),
+      title: Text(track.displayTitle,
+          maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(
+        track.meta.subtitle.isEmpty ? '本地文件' : track.meta.subtitle,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: showArrow ? const Icon(Icons.north_west_rounded) : null,
+      onTap: () {
+        searchController.closeView(track.displayTitle);
+        _applyQueryImmediately(track.displayTitle);
+      },
+    );
+  }
+
+  Widget _buildSuggestionContent(
+    SearchController searchController,
+    String queryLower,
+    List<_TrackEntry> suggestions,
+  ) {
+    if (queryLower.isEmpty) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const ListTile(
+            leading: Icon(Icons.auto_awesome_rounded),
+            title: Text('建议'),
+            subtitle: Text('试试搜索歌名、专辑或歌手'),
+          ),
+          for (final track in suggestions)
+            _buildSuggestionTile(searchController, track),
+        ],
+      );
+    }
+
+    if (suggestions.isEmpty) {
+      return ListTile(
+        leading: const Icon(Icons.search_off_rounded),
+        title: Text('无结果：${searchController.text}'),
+        subtitle: const Text('试试更短的关键词'),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final track in suggestions)
+          _buildSuggestionTile(searchController, track, showArrow: true),
+      ],
+    );
+  }
+
   bool _matchesQuery(_TrackEntry t, String queryLower) {
     if (queryLower.isEmpty) return true;
     final base = p.basename(t.file.path).toLowerCase();
@@ -1744,68 +1803,10 @@ class _LibraryPageState extends State<LibraryPage> {
                       final sourceHash = _lastFilesHash ?? 0;
                       final suggestions =
                           _buildSuggestions(tracks, q, sourceHash);
-
-                      if (q.isEmpty) {
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const ListTile(
-                              leading: Icon(Icons.auto_awesome_rounded),
-                              title: Text('建议'),
-                              subtitle: Text('试试搜索歌名、专辑或歌手'),
-                            ),
-                            for (final t in suggestions)
-                              ListTile(
-                                leading: _CoverThumb(artUri: t.meta.artUri),
-                                title: Text(t.displayTitle,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis),
-                                subtitle: Text(
-                                  t.meta.subtitle.isEmpty
-                                      ? '本地文件'
-                                      : t.meta.subtitle,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                onTap: () {
-                                  searchController.closeView(t.displayTitle);
-                                  _applyQueryImmediately(t.displayTitle);
-                                },
-                              ),
-                          ],
-                        );
-                      }
-
-                      if (suggestions.isEmpty) {
-                        return ListTile(
-                          leading: const Icon(Icons.search_off_rounded),
-                          title: Text('无结果：${searchController.text}'),
-                          subtitle: const Text('试试更短的关键词'),
-                        );
-                      }
-
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          for (final t in suggestions)
-                            ListTile(
-                              leading: _CoverThumb(artUri: t.meta.artUri),
-                              title: Text(t.displayTitle,
-                                  maxLines: 1, overflow: TextOverflow.ellipsis),
-                              subtitle: Text(
-                                t.meta.subtitle.isEmpty
-                                    ? '本地文件'
-                                    : t.meta.subtitle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              trailing: const Icon(Icons.north_west_rounded),
-                              onTap: () {
-                                searchController.closeView(t.displayTitle);
-                                _applyQueryImmediately(t.displayTitle);
-                              },
-                            ),
-                        ],
+                      return _buildSuggestionContent(
+                        searchController,
+                        q,
+                        suggestions,
                       );
                     },
                   ),
