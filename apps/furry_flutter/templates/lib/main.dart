@@ -2027,13 +2027,11 @@ enum _LibraryView { tracks, albums, artists, queue }
 enum _LibrarySort { recent, title, artist, album, size }
 
 class _LibraryOptions {
-  final _LibraryView view;
   final _LibrarySort sort;
   final bool ascending;
   final bool onlyWithCover;
 
   const _LibraryOptions({
-    required this.view,
     required this.sort,
     required this.ascending,
     required this.onlyWithCover,
@@ -2156,7 +2154,6 @@ class _LibraryPageState extends State<LibraryPage> {
 
   Future<void> _openOptionsSheet() async {
     final current = _LibraryOptions(
-      view: _view,
       sort: _sort,
       ascending: _ascending,
       onlyWithCover: _onlyWithCover,
@@ -2169,7 +2166,6 @@ class _LibraryPageState extends State<LibraryPage> {
     );
     if (!mounted || next == null) return;
     setState(() {
-      _view = next.view;
       _sort = next.sort;
       _ascending = next.ascending;
       _onlyWithCover = next.onlyWithCover;
@@ -2321,58 +2317,12 @@ class _LibraryPageState extends State<LibraryPage> {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: SegmentedButton<_LibraryView>(
-              segments: const [
-                ButtonSegment(
-                    value: _LibraryView.tracks,
-                    label: Text('歌曲'),
-                    icon: Icon(Icons.music_note_rounded)),
-                ButtonSegment(
-                    value: _LibraryView.albums,
-                    label: Text('专辑'),
-                    icon: Icon(Icons.album_rounded)),
-                ButtonSegment(
-                    value: _LibraryView.artists,
-                    label: Text('歌手'),
-                    icon: Icon(Icons.person_rounded)),
-                ButtonSegment(
-                    value: _LibraryView.queue,
-                    label: Text('队列'),
-                    icon: Icon(Icons.queue_music_rounded)),
-              ],
-              showSelectedIcon: false,
-              selected: <_LibraryView>{_view},
-              onSelectionChanged: (s) => setState(() => _view = s.first),
-              style: ButtonStyle(
-                visualDensity: VisualDensity.compact,
-                padding: const WidgetStatePropertyAll(
-                  EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-                shape: WidgetStatePropertyAll(
-                  RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24)),
-                ),
-                side: WidgetStatePropertyAll(
-                  BorderSide(
-                      color: _withOpacityCompat(cs.outlineVariant, 0.35)),
-                ),
-                backgroundColor: WidgetStateProperty.resolveWith<Color?>(
-                  (states) {
-                    if (states.contains(WidgetState.selected)) {
-                      return cs.secondaryContainer;
-                    }
-                    return cs.surfaceContainerLow;
-                  },
-                ),
-                foregroundColor: WidgetStateProperty.resolveWith<Color?>(
-                  (states) {
-                    if (states.contains(WidgetState.selected)) {
-                      return cs.onSecondaryContainer;
-                    }
-                    return cs.onSurface;
-                  },
-                ),
-              ),
+            child: _LibraryModulesCard(
+              value: _view,
+              onChanged: (v) {
+                HapticFeedback.selectionClick();
+                setState(() => _view = v);
+              },
             ),
           ),
         ),
@@ -2592,6 +2542,123 @@ String _nowPlayingHeroTag(String sourcePath) {
   return 'np_${sourcePath.hashCode}';
 }
 
+class _LibraryModulesCard extends StatelessWidget {
+  const _LibraryModulesCard({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final _LibraryView value;
+  final ValueChanged<_LibraryView> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    const outerRadius = BorderRadius.all(Radius.circular(28));
+    final dividerColor = _withOpacityCompat(cs.outlineVariant, 0.28);
+
+    Widget tile({
+      required _LibraryView v,
+      required IconData icon,
+      required String title,
+      required String subtitle,
+      required bool first,
+      required bool last,
+    }) {
+      final selected = value == v;
+      final fg = selected ? cs.onSecondaryContainer : cs.onSurface;
+      final iconColor = selected ? cs.onSecondaryContainer : cs.primary;
+      final subtitleColor = selected
+          ? _withOpacityCompat(cs.onSecondaryContainer, 0.78)
+          : cs.onSurfaceVariant;
+
+      return ListTile(
+        onTap: () => onChanged(v),
+        selected: selected,
+        selectedTileColor: cs.secondaryContainer,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        minVerticalPadding: 14,
+        leading: Icon(icon, color: iconColor),
+        title: Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: fg,
+              ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: subtitleColor,
+              ),
+        ),
+        trailing: Icon(
+          Icons.chevron_right_rounded,
+          color: selected
+              ? _withOpacityCompat(cs.onSecondaryContainer, 0.82)
+              : cs.onSurfaceVariant,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+            topLeft: first ? outerRadius.topLeft : Radius.zero,
+            topRight: first ? outerRadius.topRight : Radius.zero,
+            bottomLeft: last ? outerRadius.bottomLeft : Radius.zero,
+            bottomRight: last ? outerRadius.bottomRight : Radius.zero,
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      elevation: 0,
+      color: cs.surfaceContainer,
+      shape: const RoundedRectangleBorder(borderRadius: outerRadius),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          tile(
+            v: _LibraryView.tracks,
+            icon: Icons.music_note_rounded,
+            title: '歌曲',
+            subtitle: '按单曲浏览与播放',
+            first: true,
+            last: false,
+          ),
+          Divider(height: 1, thickness: 1, color: dividerColor, indent: 72),
+          tile(
+            v: _LibraryView.albums,
+            icon: Icons.album_rounded,
+            title: '专辑',
+            subtitle: '按专辑归类，沉浸式封面网格',
+            first: false,
+            last: false,
+          ),
+          Divider(height: 1, thickness: 1, color: dividerColor, indent: 72),
+          tile(
+            v: _LibraryView.artists,
+            icon: Icons.person_rounded,
+            title: '歌手',
+            subtitle: '按歌手整理，快速定位作品',
+            first: false,
+            last: false,
+          ),
+          Divider(height: 1, thickness: 1, color: dividerColor, indent: 72),
+          tile(
+            v: _LibraryView.queue,
+            icon: Icons.queue_music_rounded,
+            title: '队列',
+            subtitle: '管理接下来要播放的内容',
+            first: false,
+            last: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _LibraryOptionsSheet extends StatefulWidget {
   const _LibraryOptionsSheet({required this.value});
 
@@ -2602,7 +2669,6 @@ class _LibraryOptionsSheet extends StatefulWidget {
 }
 
 class _LibraryOptionsSheetState extends State<_LibraryOptionsSheet> {
-  late _LibraryView _view;
   late _LibrarySort _sort;
   late bool _ascending;
   late bool _onlyWithCover;
@@ -2610,7 +2676,6 @@ class _LibraryOptionsSheetState extends State<_LibraryOptionsSheet> {
   @override
   void initState() {
     super.initState();
-    _view = widget.value.view;
     _sort = widget.value.sort;
     _ascending = widget.value.ascending;
     _onlyWithCover = widget.value.onlyWithCover;
@@ -2633,33 +2698,6 @@ class _LibraryOptionsSheetState extends State<_LibraryOptionsSheet> {
                   ),
             ),
             const SizedBox(height: 12),
-            SegmentedButton<_LibraryView>(
-              segments: const [
-                ButtonSegment(
-                  value: _LibraryView.tracks,
-                  label: Text('歌曲'),
-                  icon: Icon(Icons.music_note_rounded),
-                ),
-                ButtonSegment(
-                  value: _LibraryView.albums,
-                  label: Text('专辑'),
-                  icon: Icon(Icons.album_rounded),
-                ),
-                ButtonSegment(
-                  value: _LibraryView.artists,
-                  label: Text('歌手'),
-                  icon: Icon(Icons.person_rounded),
-                ),
-                ButtonSegment(
-                  value: _LibraryView.queue,
-                  label: Text('队列'),
-                  icon: Icon(Icons.queue_music_rounded),
-                ),
-              ],
-              selected: <_LibraryView>{_view},
-              onSelectionChanged: (s) => setState(() => _view = s.first),
-            ),
-            const SizedBox(height: 16),
             Text('排序', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             Wrap(
@@ -2724,7 +2762,6 @@ class _LibraryOptionsSheetState extends State<_LibraryOptionsSheet> {
                     onPressed: () {
                       Navigator.of(context).pop(
                         _LibraryOptions(
-                          view: _view,
                           sort: _sort,
                           ascending: _ascending,
                           onlyWithCover: _onlyWithCover,
