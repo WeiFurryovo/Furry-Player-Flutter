@@ -159,6 +159,16 @@ class FurryApp extends StatelessWidget {
 /// - 系统媒体中心：通过 `SystemMediaBridge` 同步标题/封面/进度，并绑定上一首/下一首
 /// - 页面协作：用 `requestedTab` 支持跨 tab 跳转（例如从搜索建议“去转换”）
 /// - 数据缓存：封面/标签等元信息通过 `_metaPreviewCache` 做有界缓存
+class _MetaPreviewCacheEntry {
+  final DateTime modified;
+  final Future<_MetaPreview> future;
+
+  const _MetaPreviewCacheEntry({
+    required this.modified,
+    required this.future,
+  });
+}
+
 class _AppController {
   _AppController(this.player);
 
@@ -192,8 +202,8 @@ class _AppController {
   static const Duration _previousDoublePressWindow = Duration(seconds: 2);
 
   // Keep this bounded to avoid unbounded RAM growth (cover bytes can be large).
-  final Map<String, Future<_MetaPreview>> _metaPreviewCache =
-      <String, Future<_MetaPreview>>{};
+  final Map<String, _MetaPreviewCacheEntry> _metaPreviewCache =
+      <String, _MetaPreviewCacheEntry>{};
   static const int _metaPreviewCacheLimit = 64;
 
   int paddingKb = 0;
@@ -296,6 +306,85 @@ class _AppController {
         }
       }
     } catch (_) {}
+  }
+
+  Future<_MetaPreview> getMetaPreviewForFurry(
+    File furryFile, {
+    DateTime? modified,
+  }) async {
+    final effectiveModified = modified ?? (await furryFile.stat()).modified;
+    return _getMetaPreviewForFurryCached(furryFile, effectiveModified);
+  }
+
+  Future<_MetaPreview> _getMetaPreviewForFurryCached(
+    File furryFile,
+    DateTime modified,
+  ) {
+    final key = furryFile.path;
+    final existing = _metaPreviewCache[key];
+    if (existing != null && existing.modified == modified) {
+      return existing.future;
+    }
+
+    final future = () async {
+      final fallbackTitle = p.basename(furryFile.path);
+
+      String title = '';
+      String artist = '';
+      String album = '';
+
+      try {
+        final jsonStr = await api.getTagsJson(filePath: furryFile.path);
+        if (jsonStr.trim().isNotEmpty) {
+          final m = jsonDecode(jsonStr);
+          if (m is Map<String, dynamic>) {
+            title = (m['title'] as String?)?.trim() ?? '';
+            artist = (m['artist'] as String?)?.trim() ?? '';
+            album = (m['album'] as String?)?.trim() ?? '';
+          }
+        }
+      } catch (_) {}
+
+      Uri? artUri;
+      int? coverBytesLen;
+      try {
+        final payload = await api.getCoverArt(filePath: furryFile.path);
+        if (payload != null && payload.isNotEmpty) {
+          final sep = payload.indexOf(0);
+          if (sep > 0 && sep < payload.length - 1) {
+            final coverMime = String.fromCharCodes(payload.sublist(0, sep));
+            final bytes = payload.sublist(sep + 1);
+            coverBytesLen = bytes.length;
+            artUri = await _writeCoverPayloadToTempUri(
+                mime: coverMime, bytes: bytes);
+          }
+        }
+      } catch (_) {}
+
+      final subtitleParts = <String>[
+        if (artist.isNotEmpty) artist,
+        if (album.isNotEmpty) album,
+      ];
+
+      return _MetaPreview(
+        title: title.isNotEmpty ? title : fallbackTitle,
+        artist: artist,
+        album: album,
+        subtitle: subtitleParts.join(' · '),
+        artUri: artUri,
+        coverBytesLen: coverBytesLen,
+      );
+    }();
+
+    _metaPreviewCache[key] = _MetaPreviewCacheEntry(
+      modified: modified,
+      future: future,
+    );
+    if (_metaPreviewCache.length > _metaPreviewCacheLimit) {
+      final firstKey = _metaPreviewCache.keys.first;
+      _metaPreviewCache.remove(firstKey);
+    }
+    return future;
   }
 
   void dispose() {
@@ -425,12 +514,45 @@ class _AppController {
             ? 'webp'
             : 'jpg';
 
-    final out = File(
-        p.join(artDir.path, 'cover_${bytes.length}_${bytes.hashCode}.$ext'));
+    // IMPORTANT: Use a stable name based on *content* so we don't re-write
+    // identical cover arts over and over across sessions. `Uint8List.hashCode`
+    // is identity-based and would explode disk usage.
+    final out = File(p.join(
+      artDir.path,
+      'cover_${bytes.length}_${_fnv1a64Hex(bytes)}.$ext',
+    ));
     if (!await out.exists()) {
       await out.writeAsBytes(bytes, flush: true);
     }
     return out.uri;
+  }
+
+  static String _fnv1a64Hex(Uint8List bytes) {
+    const int fnvOffset = 0xcbf29ce484222325;
+    const int fnvPrime = 0x100000001b3;
+    const int mask64 = 0xFFFFFFFFFFFFFFFF;
+    const int maxSamples = 65536; // ~65k ops, safe on mobile
+
+    final len = bytes.length;
+    if (len == 0) return '0'.padLeft(16, '0');
+
+    final sampleCount = len <= maxSamples ? len : maxSamples;
+    final stride = (len / sampleCount).floor().clamp(1, len);
+
+    var hash = fnvOffset;
+    var idx = 0;
+    for (var i = 0; i < sampleCount; i++) {
+      hash ^= bytes[idx];
+      hash = (hash * fnvPrime) & mask64;
+      idx += stride;
+      if (idx >= len) idx = len - 1;
+    }
+
+    // Mix in length for better collision resistance on short samples.
+    hash ^= len;
+    hash = (hash * fnvPrime) & mask64;
+
+    return hash.toRadixString(16).padLeft(16, '0');
   }
 
   void appendLog(String msg) {
@@ -1104,74 +1226,12 @@ class _AppController {
     _publishQueueState();
   }
 
-  Future<_MetaPreview> getMetaPreviewForFurry(File furryFile) {
-    final key = furryFile.path;
-    final existing = _metaPreviewCache[key];
-    if (existing != null) return existing;
-    final future = () async {
-      final fallbackTitle = p.basename(furryFile.path);
-
-      String title = '';
-      String artist = '';
-      String album = '';
-
-      try {
-        final jsonStr = await api.getTagsJson(filePath: furryFile.path);
-        if (jsonStr.trim().isNotEmpty) {
-          final m = jsonDecode(jsonStr);
-          if (m is Map<String, dynamic>) {
-            title = (m['title'] as String?)?.trim() ?? '';
-            artist = (m['artist'] as String?)?.trim() ?? '';
-            album = (m['album'] as String?)?.trim() ?? '';
-          }
-        }
-      } catch (_) {}
-
-      Uri? artUri;
-      int? coverBytesLen;
-      try {
-        final payload = await api.getCoverArt(filePath: furryFile.path);
-        if (payload != null && payload.isNotEmpty) {
-          final sep = payload.indexOf(0);
-          if (sep > 0 && sep < payload.length - 1) {
-            final coverMime = String.fromCharCodes(payload.sublist(0, sep));
-            final bytes = payload.sublist(sep + 1);
-            coverBytesLen = bytes.length;
-            artUri = await _writeCoverPayloadToTempUri(
-                mime: coverMime, bytes: bytes);
-          }
-        }
-      } catch (_) {}
-
-      final subtitleParts = <String>[
-        if (artist.isNotEmpty) artist,
-        if (album.isNotEmpty) album,
-      ];
-
-      return _MetaPreview(
-        title: title.isNotEmpty ? title : fallbackTitle,
-        artist: artist,
-        album: album,
-        subtitle: subtitleParts.join(' · '),
-        artUri: artUri,
-        coverBytesLen: coverBytesLen,
-      );
-    }();
-
-    _metaPreviewCache[key] = future;
-    if (_metaPreviewCache.length > _metaPreviewCacheLimit) {
-      final firstKey = _metaPreviewCache.keys.first;
-      _metaPreviewCache.remove(firstKey);
-    }
-    return future;
-  }
-
   Future<_LibraryIndex> buildLibraryIndex(List<File> files) async {
     final tracks = <_TrackEntry>[];
     for (final f in files) {
       try {
-        final meta = await getMetaPreviewForFurry(f);
         final stat = await f.stat();
+        final meta = await getMetaPreviewForFurry(f, modified: stat.modified);
         tracks.add(
           _TrackEntry(
             file: f,
