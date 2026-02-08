@@ -19,7 +19,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _tabIndex = 0;
   static const double _wideRailBreakpoint = 700;
   static const double _bottomNavMarginH = 16;
-  static const double _bottomNavMarginBottom = 6;
+  static const double _bottomNavMarginBottom = 4;
 
   void _onRequestedTab() {
     final idx = _controller.requestedTab.value;
@@ -212,7 +212,7 @@ class _ExpressiveBottomNavBar extends StatelessWidget {
     final bottomInset = MediaQuery.of(context).padding.bottom;
     final navTheme = NavigationBarTheme.of(context);
     final indicatorColor = navTheme.indicatorColor ?? cs.secondaryContainer;
-    final labelStyle = Theme.of(context).textTheme.labelMedium?.copyWith(
+    final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
           fontWeight: FontWeight.w700,
           color: cs.onSurfaceVariant,
         );
@@ -230,7 +230,7 @@ class _ExpressiveBottomNavBar extends StatelessWidget {
         surfaceTintColor: cs.surfaceTint,
         shadowColor: _withOpacityCompat(cs.shadow, 0.22),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(26),
           side: BorderSide(color: _withOpacityCompat(cs.outlineVariant, 0.55)),
         ),
         clipBehavior: Clip.antiAlias,
@@ -243,7 +243,7 @@ class _ExpressiveBottomNavBar extends StatelessWidget {
             // keeping icon positions from shifting downward and still showing
             // labels.
             // Keep symmetric vertical padding (top == bottom).
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+            padding: const EdgeInsets.fromLTRB(10, 3, 10, 3),
             child: Row(
               children: [
                 for (var i = 0; i < items.length; i++)
@@ -296,21 +296,25 @@ class _NavItemButton extends StatelessWidget {
       label: item.label,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 5),
           decoration: BoxDecoration(
             color: selected ? indicatorColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(18),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(selected ? item.selectedIcon : item.icon, color: iconColor),
-              const SizedBox(height: 6),
+              Icon(
+                selected ? item.selectedIcon : item.icon,
+                color: iconColor,
+                size: 22,
+              ),
+              const SizedBox(height: 3),
               Text(item.label, style: effectiveLabelStyle),
             ],
           ),

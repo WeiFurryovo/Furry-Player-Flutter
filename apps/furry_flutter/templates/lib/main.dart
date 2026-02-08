@@ -3681,7 +3681,7 @@ class _NowPlayingPanelDeprecated extends StatefulWidget {
 
   // Tuned by eye: close to M3 bottom sheet mini player height.
   // ignore: unused_field
-  static const double miniHeightPx = 88;
+  static const double miniHeightPx = 76;
 
   const _NowPlayingPanelDeprecated({
     required this.controller,
@@ -4266,8 +4266,8 @@ class NowPlayingPanel extends StatefulWidget {
   final double bottomOverlayBaseline;
 
   // Tuned by eye: close to M3 mini player height.
-  static const double miniHeightPx = 88;
-  static const double miniGapPx = 10;
+  static const double miniHeightPx = 76;
+  static const double miniGapPx = 8;
 
   const NowPlayingPanel({
     super.key,
@@ -4439,6 +4439,19 @@ class _NowPlayingMiniBar extends StatelessWidget {
   final _NowPlaying np;
   final VoidCallback onOpen;
 
+  static const double _compactControlSize = 40;
+  static const double _compactPrimaryControlSize = 42;
+
+  ButtonStyle _compactTonalStyle() {
+    return IconButton.styleFrom(
+      minimumSize: const Size.square(_compactControlSize),
+      maximumSize: const Size.square(_compactControlSize),
+      padding: EdgeInsets.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -4451,7 +4464,8 @@ class _NowPlayingMiniBar extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final showMore = constraints.maxWidth >= 420;
+        final showPrevious = constraints.maxWidth >= 470;
+        final showMore = constraints.maxWidth >= 560;
         final heroTag = _nowPlayingHeroTag(np.sourcePath);
         return Semantics(
           button: true,
@@ -4462,28 +4476,29 @@ class _NowPlayingMiniBar extends StatelessWidget {
             surfaceTintColor: cs.surfaceTint,
             shadowColor: _withOpacityCompat(cs.shadow, 0.22),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(24),
               side: BorderSide(
-                  color: _withOpacityCompat(cs.outlineVariant, 0.55)),
+                color: _withOpacityCompat(cs.outlineVariant, 0.55),
+              ),
             ),
             clipBehavior: Clip.antiAlias,
             child: SizedBox(
               height: NowPlayingPanel.miniHeightPx,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                 child: Row(
                   children: [
                     Expanded(
                       child: InkWell(
                         onTap: onOpen,
-                        borderRadius: BorderRadius.circular(22),
+                        borderRadius: BorderRadius.circular(20),
                         child: Row(
                           children: [
                             Hero(
                               tag: heroTag,
                               child: _CoverThumb(artUri: np.artUri),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -4502,7 +4517,7 @@ class _NowPlayingMiniBar extends StatelessWidget {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 6),
                                   _MiniProgress(controller: controller),
                                 ],
                               ),
@@ -4511,21 +4526,31 @@ class _NowPlayingMiniBar extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    IconButton.filledTonal(
-                      tooltip: '上一首',
-                      onPressed: controller.canPlayPreviousTrack
-                          ? () {
-                              HapticFeedback.selectionClick();
-                              controller.playPreviousTrack();
-                            }
-                          : null,
-                      icon: const Icon(Icons.skip_previous_rounded),
+                    const SizedBox(width: 8),
+                    if (showPrevious) ...[
+                      IconButton.filledTonal(
+                        style: _compactTonalStyle(),
+                        tooltip: '上一首',
+                        onPressed: controller.canPlayPreviousTrack
+                            ? () {
+                                HapticFeedback.selectionClick();
+                                controller.playPreviousTrack();
+                              }
+                            : null,
+                        icon: const Icon(
+                          Icons.skip_previous_rounded,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    _MiniPlayPause(
+                      controller: controller,
+                      compact: true,
                     ),
-                    const SizedBox(width: 8),
-                    _MiniPlayPause(controller: controller),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     IconButton.filledTonal(
+                      style: _compactTonalStyle(),
                       tooltip: '下一首',
                       onPressed: controller.canPlayNextTrack
                           ? () {
@@ -4533,20 +4558,23 @@ class _NowPlayingMiniBar extends StatelessWidget {
                               controller.playNextTrack();
                             }
                           : null,
-                      icon: const Icon(Icons.skip_next_rounded),
+                      icon: const Icon(Icons.skip_next_rounded, size: 22),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     IconButton.filledTonal(
+                      style: _compactTonalStyle(),
                       tooltip: '展开',
                       onPressed: () {
                         HapticFeedback.selectionClick();
                         onOpen();
                       },
-                      icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                      icon:
+                          const Icon(Icons.keyboard_arrow_up_rounded, size: 24),
                     ),
                     if (showMore) ...[
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       IconButton.filledTonal(
+                        style: _compactTonalStyle(),
                         tooltip: '更多',
                         onPressed: () {
                           HapticFeedback.selectionClick();
@@ -4556,7 +4584,7 @@ class _NowPlayingMiniBar extends StatelessWidget {
                             np: np,
                           );
                         },
-                        icon: const Icon(Icons.more_horiz_rounded),
+                        icon: const Icon(Icons.more_horiz_rounded, size: 22),
                       ),
                     ],
                   ],
@@ -4571,11 +4599,16 @@ class _NowPlayingMiniBar extends StatelessWidget {
 }
 
 class _MiniPlayPause extends StatelessWidget {
-  const _MiniPlayPause({required this.controller});
+  const _MiniPlayPause({required this.controller, this.compact = false});
   final _AppController controller;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final controlSize =
+        compact ? _NowPlayingMiniBar._compactPrimaryControlSize : 48.0;
+    final iconSize = compact ? 23.0 : 24.0;
+    final indicatorSize = compact ? 16.0 : 18.0;
     return StreamBuilder<PlayerState>(
       stream: controller.playerStateStream,
       builder: (context, snap) {
@@ -4584,6 +4617,13 @@ class _MiniPlayPause extends StatelessWidget {
         final busy = processing == ProcessingState.loading ||
             processing == ProcessingState.buffering;
         return IconButton.filled(
+          style: IconButton.styleFrom(
+            minimumSize: Size.square(controlSize),
+            maximumSize: Size.square(controlSize),
+            padding: EdgeInsets.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+          ),
           tooltip: playing ? '暂停' : '播放',
           onPressed: busy
               ? null
@@ -4602,15 +4642,16 @@ class _MiniPlayPause extends StatelessWidget {
             transitionBuilder: (child, anim) =>
                 ScaleTransition(scale: anim, child: child),
             child: busy
-                ? const SizedBox(
-                    key: ValueKey<String>('busy'),
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                ? SizedBox(
+                    key: const ValueKey<String>('busy'),
+                    width: indicatorSize,
+                    height: indicatorSize,
+                    child: const CircularProgressIndicator(strokeWidth: 2),
                   )
                 : Icon(
                     key: ValueKey<bool>(playing),
                     playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    size: iconSize,
                   ),
           ),
         );
@@ -4899,6 +4940,9 @@ class _NowPlayingControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const sideControlSize = 46.0;
+    const centerControlSize = 58.0;
+
     return Center(
       child: StreamBuilder<PlayerState>(
         stream: controller.playerStateStream,
@@ -4913,44 +4957,74 @@ class _NowPlayingControls extends StatelessWidget {
             children: [
               IconButton.filledTonal(
                 tooltip: '上一首',
+                style: IconButton.styleFrom(
+                  minimumSize: const Size.square(sideControlSize),
+                  maximumSize: const Size.square(sideControlSize),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
                 onPressed: controller.canPlayPreviousTrack
-                    ? controller.playPreviousTrack
+                    ? () {
+                        HapticFeedback.selectionClick();
+                        controller.playPreviousTrack();
+                      }
                     : null,
-                icon: const Icon(Icons.skip_previous_rounded),
+                icon: const Icon(Icons.skip_previous_rounded, size: 24),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
               Semantics(
                 button: true,
                 label: playing ? '暂停' : '播放',
                 child: Tooltip(
                   message: playing ? '暂停' : '播放',
-                  child: FilledButton(
+                  child: IconButton.filled(
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size.square(centerControlSize),
+                      maximumSize: const Size.square(centerControlSize),
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    ),
                     onPressed: busy
                         ? null
                         : () async {
+                            HapticFeedback.selectionClick();
                             if (playing) {
                               await controller.pause();
                             } else {
                               await controller.play();
                             }
                           },
-                    child: busy
+                    icon: busy
                         ? const SizedBox(
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(playing ? '暂停' : '播放'),
+                        : Icon(
+                            playing
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            size: 30,
+                          ),
                   ),
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
               IconButton.filledTonal(
                 tooltip: '下一首',
+                style: IconButton.styleFrom(
+                  minimumSize: const Size.square(sideControlSize),
+                  maximumSize: const Size.square(sideControlSize),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
                 onPressed: controller.canPlayNextTrack
-                    ? controller.playNextTrack
+                    ? () {
+                        HapticFeedback.selectionClick();
+                        controller.playNextTrack();
+                      }
                     : null,
-                icon: const Icon(Icons.skip_next_rounded),
+                icon: const Icon(Icons.skip_next_rounded, size: 24),
               ),
             ],
           );
