@@ -199,10 +199,7 @@ class _AppController {
       List<Future<void>>.generate(workerCount, (_) => worker()),
     );
 
-    return <_FileStatEntry>[
-      for (final slot in slots)
-        if (slot != null) slot,
-    ];
+    return slots.whereType<_FileStatEntry>().toList(growable: false);
   }
 
   Future<void> cleanupTempArtifacts() async {
@@ -1324,10 +1321,8 @@ class _AppController {
       );
     }
 
-    final tracks = <_TrackEntry>[
-      for (final track in tracksByIndex)
-        if (track != null) track,
-    ];
+    final tracks =
+        tracksByIndex.whereType<_TrackEntry>().toList(growable: false);
 
     _trackEntryCache.removeWhere((path, _) => !activePaths.contains(path));
     _metaPreviewCache.removeWhere((path, _) => !activePaths.contains(path));
