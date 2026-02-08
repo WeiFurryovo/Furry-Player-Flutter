@@ -8,6 +8,21 @@ TEMPLATES_DIR="$ROOT/apps/furry_flutter/templates"
 BUILD_ANDROID=1
 BUILD_FFI=1
 
+deps_sync_hash() {
+  local deps_file="$1"
+  python3 - "$deps_file" <<'PY'
+import hashlib
+import sys
+
+path = sys.argv[1]
+h = hashlib.sha256()
+h.update(b"furry-deps-sync-v1\n")
+with open(path, "rb") as f:
+  h.update(f.read())
+print(h.hexdigest())
+PY
+}
+
 patch_android_manifest_for_audio_service() {
   local manifest_file="$OUT_DIR/android/app/src/main/AndroidManifest.xml"
   if [ ! -f "$manifest_file" ]; then
@@ -270,32 +285,51 @@ else
   echo "[INFO] Flutter 工程已存在，跳过 flutter create"
 fi
 
-echo "[INFO] 添加依赖（pub add）"
-# Remove deps that are no longer used by the template (keeps pubspec stable
-# across template upgrades).
-echo "[INFO] 移除已废弃依赖（pub remove）"
-(cd "$OUT_DIR" && flutter pub remove \
-  just_audio_background \
-  just_audio_platform_interface \
-  mpris \
-  > /dev/null 2>&1 || true)
-
 # Pin versions to avoid breaking API changes (e.g. file_picker v10 removed FilePicker.platform).
 DEPS_FILE="$ROOT/apps/furry_flutter/deps_pins.txt"
 if [ ! -f "$DEPS_FILE" ]; then
   echo "[ERROR] 缺少依赖列表文件：$DEPS_FILE" >&2
   exit 1
 fi
-deps=()
-while IFS= read -r line; do
-  line="${line%%$'\r'}"
-  [ -z "$line" ] && continue
-  case "$line" in
-    \#*) continue ;;
-  esac
-  deps+=("$line")
-done <"$DEPS_FILE"
-(cd "$OUT_DIR" && flutter pub add "${deps[@]}")
+
+DEPS_STAMP_FILE="$OUT_DIR/.dart_tool/furry_deps_stamp"
+DEPS_HASH="$(deps_sync_hash "$DEPS_FILE")"
+DEPS_SYNC_NEEDED=1
+if [ -f "$DEPS_STAMP_FILE" ] && [ -f "$OUT_DIR/pubspec.lock" ]; then
+  PREV_DEPS_HASH="$(cat "$DEPS_STAMP_FILE" 2>/dev/null || true)"
+  if [ "$PREV_DEPS_HASH" = "$DEPS_HASH" ]; then
+    DEPS_SYNC_NEEDED=0
+  fi
+fi
+
+if [ "$DEPS_SYNC_NEEDED" -eq 1 ]; then
+  echo "[INFO] 添加依赖（pub add）"
+  # Remove deps that are no longer used by the template (keeps pubspec stable
+  # across template upgrades).
+  echo "[INFO] 移除已废弃依赖（pub remove）"
+  (cd "$OUT_DIR" && flutter pub remove \
+    just_audio_background \
+    just_audio_platform_interface \
+    mpris \
+    > /dev/null 2>&1 || true)
+
+  deps=()
+  while IFS= read -r line; do
+    line="${line%%$'\r'}"
+    [ -z "$line" ] && continue
+    case "$line" in
+      \#*) continue ;;
+    esac
+    deps+=("$line")
+  done <"$DEPS_FILE"
+  (cd "$OUT_DIR" && flutter pub add "${deps[@]}")
+
+  mkdir -p "$OUT_DIR/.dart_tool"
+  printf '%s\n' "$DEPS_HASH" >"$DEPS_STAMP_FILE"
+else
+  echo "[INFO] 依赖列表未变化，跳过 flutter pub add/remove"
+  (cd "$OUT_DIR" && flutter pub get)
+fi
 
 echo "[INFO] 覆盖模板代码"
 cp -a "$TEMPLATES_DIR/lib/." "$OUT_DIR/lib/"

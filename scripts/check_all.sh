@@ -6,6 +6,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 echo "[INFO] Formatting Flutter template..."
 "$ROOT/flutter/bin/dart" format "$ROOT/apps/furry_flutter/templates/lib/main.dart"
 
+echo "[INFO] Checking script syntax..."
+bash -n "$ROOT/apps/furry_flutter/create_flutter_app.sh"
+
 echo "[INFO] Regenerating Flutter app..."
 "$ROOT/apps/furry_flutter/create_flutter_app.sh" --no-android --no-ffi
 
