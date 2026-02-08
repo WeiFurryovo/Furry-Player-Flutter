@@ -41,6 +41,30 @@ class _LibraryIndexCacheEntry {
   });
 }
 
+class _FileStatEntry {
+  final File file;
+  final FileStat stat;
+
+  const _FileStatEntry({
+    required this.file,
+    required this.stat,
+  });
+}
+
+class _PendingTrackEntry {
+  final int index;
+  final File file;
+  final DateTime modified;
+  final int bytes;
+
+  const _PendingTrackEntry({
+    required this.index,
+    required this.file,
+    required this.modified,
+    required this.bytes,
+  });
+}
+
 class _AppController {
   _AppController(this.player);
 
@@ -80,6 +104,8 @@ class _AppController {
       <String, _TrackEntryCacheEntry>{};
   _LibraryIndexCacheEntry? _libraryIndexCache;
   static const int _metaPreviewCacheLimit = 64;
+  static const int _ioWorkerCount = 8;
+  static const int _metaWorkerCount = 6;
 
   int paddingKb = 0;
 
@@ -132,38 +158,93 @@ class _AppController {
     requestedTab.value = index;
   }
 
+  Future<List<File>> _listFiles(Directory dir) async {
+    final files = <File>[];
+    await for (final entity in dir.list(followLinks: false)) {
+      if (entity is File) files.add(entity);
+    }
+    return files;
+  }
+
+  Future<List<_FileStatEntry>> _statFilesInOrder(
+    List<File> files, {
+    required int concurrency,
+    void Function(File file, Object error, StackTrace stackTrace)? onError,
+  }) async {
+    if (files.isEmpty) return const [];
+
+    final slots = List<_FileStatEntry?>.filled(files.length, null);
+    var cursor = 0;
+    final workerCount = files.length < concurrency ? files.length : concurrency;
+
+    Future<void> worker() async {
+      while (true) {
+        final index = cursor;
+        if (index >= files.length) return;
+        cursor = index + 1;
+
+        final file = files[index];
+        try {
+          final stat = await file.stat();
+          if (stat.type == FileSystemEntityType.file) {
+            slots[index] = _FileStatEntry(file: file, stat: stat);
+          }
+        } catch (e, st) {
+          onError?.call(file, e, st);
+        }
+      }
+    }
+
+    await Future.wait(
+      List<Future<void>>.generate(workerCount, (_) => worker()),
+    );
+
+    return <_FileStatEntry>[
+      for (final slot in slots)
+        if (slot != null) slot,
+    ];
+  }
+
   Future<void> cleanupTempArtifacts() async {
     try {
       final tmp = await getTemporaryDirectory();
+      final now = DateTime.now();
 
       // Cleanup unpacked audio files from `.furry` (keep recent ones).
       final unpackDir = Directory(p.join(tmp.path, 'furry_unpacked'));
       if (await unpackDir.exists()) {
-        final files = unpackDir.listSync().whereType<File>().toList()
-          ..sort(
-              (a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+        final unpackFiles = await _listFiles(unpackDir);
+        final unpackStates = await _statFilesInOrder(
+          unpackFiles,
+          concurrency: _ioWorkerCount,
+        )
+          ..sort((a, b) => b.stat.modified.compareTo(a.stat.modified));
         const keep = 12;
-        final cutoff = DateTime.now().subtract(const Duration(days: 2));
-        for (var i = 0; i < files.length; i++) {
-          final f = files[i];
-          final m = f.lastModifiedSync();
-          if (i >= keep || m.isBefore(cutoff)) {
+        final cutoff = now.subtract(const Duration(days: 2));
+        for (var i = 0; i < unpackStates.length; i++) {
+          final entry = unpackStates[i];
+          if (i >= keep || entry.stat.modified.isBefore(cutoff)) {
             try {
-              await f.delete();
+              await entry.file.delete();
             } catch (_) {}
           }
         }
       }
 
       // Cleanup imported temp files created from picker streams/bytes.
-      final rootFiles = tmp.listSync().whereType<File>().toList();
-      final importCutoff = DateTime.now().subtract(const Duration(days: 2));
-      for (final f in rootFiles) {
-        final base = p.basename(f.path);
-        if (!base.startsWith('import_')) continue;
-        if (f.lastModifiedSync().isBefore(importCutoff)) {
+      final rootFiles = await _listFiles(tmp);
+      final importCandidates = rootFiles
+          .where((file) => p.basename(file.path).startsWith('import_'))
+          .toList(growable: false);
+      final importStates = await _statFilesInOrder(
+        importCandidates,
+        concurrency: _ioWorkerCount,
+      );
+      final importCutoff = now.subtract(const Duration(days: 2));
+      for (final entry in importStates) {
+        if (entry.stat.modified.isBefore(importCutoff)) {
           try {
-            await f.delete();
+            await entry.file.delete();
           } catch (_) {}
         }
       }
@@ -171,36 +252,37 @@ class _AppController {
       // Cleanup cover art temp files.
       final artDir = Directory(p.join(tmp.path, 'furry_media_art'));
       if (await artDir.exists()) {
-        final cutoff = DateTime.now().subtract(const Duration(days: 7));
-        final artFiles = artDir.listSync().whereType<File>().toList();
-        for (final f in artFiles) {
-          if (f.lastModifiedSync().isBefore(cutoff)) {
+        final artFiles = await _listFiles(artDir);
+        final artStates = await _statFilesInOrder(
+          artFiles,
+          concurrency: _ioWorkerCount,
+        );
+
+        final cutoff = now.subtract(const Duration(days: 7));
+        final alive = <_FileStatEntry>[];
+        for (final entry in artStates) {
+          if (entry.stat.modified.isBefore(cutoff)) {
             try {
-              await f.delete();
+              await entry.file.delete();
             } catch (_) {}
+            continue;
           }
+          alive.add(entry);
         }
 
         // Cap total cover cache size (LRU by modified time).
         const maxArtCacheBytes = 256 * 1024 * 1024; // 256 MiB
         var totalBytes = 0;
-        final alive = <File>[];
-        for (final file in artFiles) {
-          try {
-            if (!file.existsSync()) continue;
-            totalBytes += file.lengthSync();
-            alive.add(file);
-          } catch (_) {}
+        for (final entry in alive) {
+          totalBytes += entry.stat.size;
         }
         if (totalBytes > maxArtCacheBytes) {
-          alive.sort(
-              (a, b) => a.lastModifiedSync().compareTo(b.lastModifiedSync()));
-          for (final file in alive) {
+          alive.sort((a, b) => a.stat.modified.compareTo(b.stat.modified));
+          for (final entry in alive) {
             if (totalBytes <= maxArtCacheBytes) break;
             try {
-              final size = file.lengthSync();
-              await file.delete();
-              totalBytes -= size;
+              await entry.file.delete();
+              totalBytes -= entry.stat.size;
             } catch (_) {}
           }
         }
@@ -573,13 +655,16 @@ class _AppController {
 
   Future<void> refreshOutputs() async {
     final outDir = await outputsDir();
-    final files = outDir
-        .listSync()
-        .whereType<File>()
+    final files = (await _listFiles(outDir))
         .where((f) => p.extension(f.path).toLowerCase() == '.furry')
-        .toList()
-      ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
-    furryOutputs.value = files;
+        .toList(growable: false);
+    final fileStates = await _statFilesInOrder(
+      files,
+      concurrency: _ioWorkerCount,
+    )
+      ..sort((a, b) => b.stat.modified.compareTo(a.stat.modified));
+    furryOutputs.value =
+        fileStates.map((entry) => entry.file).toList(growable: false);
   }
 
   Future<File?> pickForPlay() async {
@@ -1127,24 +1212,22 @@ class _AppController {
   }
 
   Future<_LibraryIndex> buildLibraryIndex(List<File> files) async {
-    final states = <(File file, DateTime modified, int bytes)>[];
-    for (final file in files) {
-      try {
-        final stat = await file.stat();
-        states.add((file, stat.modified, stat.size));
-      } catch (e, st) {
-        appendLog('Index stat failed: ${file.path}: $e\n$st');
-      }
-    }
+    final states = await _statFilesInOrder(
+      files,
+      concurrency: _ioWorkerCount,
+      onError: (file, error, stackTrace) {
+        appendLog('Index stat failed: ${file.path}: $error\n$stackTrace');
+      },
+    );
 
     final signature = Object.hash(
       states.length,
       Object.hashAll(
         states.map(
           (state) => Object.hash(
-            state.$1.path,
-            state.$2.microsecondsSinceEpoch,
-            state.$3,
+            state.file.path,
+            state.stat.modified.microsecondsSinceEpoch,
+            state.stat.size,
           ),
         ),
       ),
@@ -1155,11 +1238,13 @@ class _AppController {
     }
 
     final activePaths = <String>{};
-    final tracks = <_TrackEntry>[];
-    for (final state in states) {
-      final file = state.$1;
-      final modified = state.$2;
-      final bytes = state.$3;
+    final tracksByIndex = List<_TrackEntry?>.filled(states.length, null);
+    final pending = <_PendingTrackEntry>[];
+    for (var i = 0; i < states.length; i++) {
+      final state = states[i];
+      final file = state.file;
+      final modified = state.stat.modified;
+      final bytes = state.stat.size;
       final path = file.path;
       activePaths.add(path);
 
@@ -1167,47 +1252,82 @@ class _AppController {
       if (trackCached != null &&
           trackCached.modified == modified &&
           trackCached.bytes == bytes) {
-        tracks.add(trackCached.track);
+        tracksByIndex[i] = trackCached.track;
         continue;
       }
 
-      try {
-        final meta = await getMetaPreviewForFurry(file, modified: modified);
-        final track = _TrackEntry(
-          file: file,
-          meta: meta,
-          modified: modified,
-          bytes: bytes,
-        );
-        _trackEntryCache[path] = _TrackEntryCacheEntry(
-          modified: modified,
-          bytes: bytes,
-          track: track,
-        );
-        tracks.add(track);
-      } catch (e, st) {
-        appendLog('Index meta failed: $path: $e\n$st');
-        final track = _TrackEntry(
-          file: file,
-          meta: _MetaPreview(
-            title: p.basename(path),
-            artist: '',
-            album: '',
-            subtitle: '',
-            artUri: null,
-            coverBytesLen: null,
-          ),
-          modified: modified,
-          bytes: bytes,
-        );
-        _trackEntryCache[path] = _TrackEntryCacheEntry(
-          modified: modified,
-          bytes: bytes,
-          track: track,
-        );
-        tracks.add(track);
-      }
+      pending.add(_PendingTrackEntry(
+        index: i,
+        file: file,
+        modified: modified,
+        bytes: bytes,
+      ));
     }
+
+    if (pending.isNotEmpty) {
+      var cursor = 0;
+      final workerCount =
+          pending.length < _metaWorkerCount ? pending.length : _metaWorkerCount;
+
+      Future<void> worker() async {
+        while (true) {
+          final pendingIndex = cursor;
+          if (pendingIndex >= pending.length) return;
+          cursor = pendingIndex + 1;
+
+          final pendingItem = pending[pendingIndex];
+          final path = pendingItem.file.path;
+          try {
+            final meta = await getMetaPreviewForFurry(
+              pendingItem.file,
+              modified: pendingItem.modified,
+            );
+            final track = _TrackEntry(
+              file: pendingItem.file,
+              meta: meta,
+              modified: pendingItem.modified,
+              bytes: pendingItem.bytes,
+            );
+            _trackEntryCache[path] = _TrackEntryCacheEntry(
+              modified: pendingItem.modified,
+              bytes: pendingItem.bytes,
+              track: track,
+            );
+            tracksByIndex[pendingItem.index] = track;
+          } catch (e, st) {
+            appendLog('Index meta failed: $path: $e\n$st');
+            final track = _TrackEntry(
+              file: pendingItem.file,
+              meta: _MetaPreview(
+                title: p.basename(path),
+                artist: '',
+                album: '',
+                subtitle: '',
+                artUri: null,
+                coverBytesLen: null,
+              ),
+              modified: pendingItem.modified,
+              bytes: pendingItem.bytes,
+            );
+            _trackEntryCache[path] = _TrackEntryCacheEntry(
+              modified: pendingItem.modified,
+              bytes: pendingItem.bytes,
+              track: track,
+            );
+            tracksByIndex[pendingItem.index] = track;
+          }
+        }
+      }
+
+      await Future.wait(
+        List<Future<void>>.generate(workerCount, (_) => worker()),
+      );
+    }
+
+    final tracks = <_TrackEntry>[
+      for (final track in tracksByIndex)
+        if (track != null) track,
+    ];
 
     _trackEntryCache.removeWhere((path, _) => !activePaths.contains(path));
     _metaPreviewCache.removeWhere((path, _) => !activePaths.contains(path));
