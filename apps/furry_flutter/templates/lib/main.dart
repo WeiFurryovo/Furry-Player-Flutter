@@ -11,6 +11,7 @@
 // - 播放器逻辑集中在 `_AppController`，页面只消费状态并触发意图。
 // - 跨平台能力通过 `FurryApi`（Android MethodChannel / Desktop FFI）注入。
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' show lerpDouble;
@@ -37,6 +38,7 @@ part 'src/diagnostics_log.dart';
 part 'src/expressive_theme.dart';
 part 'src/app_shell.dart';
 part 'src/library_page.dart';
+part 'src/library_page_widgets.dart';
 part 'src/now_playing_panel.dart';
 part 'src/settings_page.dart';
 part 'src/converter_page.dart';

@@ -91,6 +91,9 @@ class _AppController {
       ValueNotifier<List<File>>(<File>[]);
   final ValueNotifier<String> log = ValueNotifier<String>('');
 
+  final ListQueue<String> _logLines = ListQueue<String>();
+  int _logChars = 0;
+
   List<File>? _queue;
   int _queueIndex = -1;
   bool _androidPlaylistActive = false;
@@ -106,17 +109,58 @@ class _AppController {
   static const int _metaPreviewCacheLimit = 64;
   static const int _ioWorkerCount = 8;
   static const int _metaWorkerCount = 6;
+  static const int _maxInMemoryLogChars = 200000;
+  static const int _maxInMemoryLogLines = 4096;
 
   int paddingKb = 0;
 
   File? pickedForPack;
   String? pickedForPackName;
 
+  void _restoreLogBuffer(String raw) {
+    _logLines.clear();
+    _logChars = 0;
+
+    final normalized = raw.replaceAll('\r\n', '\n');
+    for (final line in normalized.split('\n')) {
+      if (line.isEmpty) continue;
+      _logLines.addLast(line);
+      _logChars += line.length + 1;
+    }
+
+    _trimLogBuffer();
+    _syncLogNotifier();
+  }
+
+  void _trimLogBuffer() {
+    while (_logLines.length > _maxInMemoryLogLines ||
+        _logChars > _maxInMemoryLogChars) {
+      final removed = _logLines.removeLast();
+      _logChars -= removed.length + 1;
+    }
+    if (_logChars < 0) {
+      _logChars = 0;
+    }
+  }
+
+  void _syncLogNotifier() {
+    log.value = _logLines.isEmpty ? '' : '${_logLines.join('\n')}\n';
+  }
+
+  void _appendLogLineToMemory(String line) {
+    _logLines.addFirst(line);
+    _logChars += line.length + 1;
+    _trimLogBuffer();
+    _syncLogNotifier();
+  }
+
   /// 初始化控制器：加载平台能力、绑定系统媒体中心、恢复/刷新数据并写入诊断日志。
   Future<void> init() async {
     final persisted = await _DiagnosticsLog.readAll();
     if (persisted.trim().isNotEmpty) {
-      log.value = persisted;
+      _restoreLogBuffer(persisted);
+    } else {
+      _syncLogNotifier();
     }
     appendLog('Process: pid=$pid');
     try {
@@ -535,17 +579,14 @@ class _AppController {
   }
 
   void appendLog(String msg) {
-    log.value = '${DateTime.now().toIso8601String()}  $msg\n${log.value}';
-    // Keep in-memory log bounded; otherwise the UI string can grow without limit and bloat RSS.
-    const maxChars = 200000; // ~200KB (chars), conservative for mobile
-    if (log.value.length > maxChars) {
-      log.value = log.value.substring(0, maxChars);
-    }
+    _appendLogLineToMemory('${DateTime.now().toIso8601String()}  $msg');
     unawaited(_DiagnosticsLog.appendLine(msg));
   }
 
   Future<void> clearLog() async {
-    log.value = '';
+    _logLines.clear();
+    _logChars = 0;
+    _syncLogNotifier();
     await _DiagnosticsLog.clear();
   }
 
