@@ -91,7 +91,7 @@ class _TrackEntry {
   final DateTime modified;
   final int bytes;
 
-  const _TrackEntry({
+  _TrackEntry({
     required this.file,
     required this.meta,
     required this.modified,
@@ -110,6 +110,18 @@ class _TrackEntry {
   }
 
   String get displayAlbum => meta.album;
+
+  late final String _searchableLower = [
+    p.basename(file.path),
+    displayTitle,
+    meta.artist,
+    meta.album,
+  ].join('\n').toLowerCase();
+
+  bool matchesQuery(String queryLower) {
+    if (queryLower.isEmpty) return true;
+    return _searchableLower.contains(queryLower);
+  }
 }
 
 class _AlbumGroup {

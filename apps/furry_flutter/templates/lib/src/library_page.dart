@@ -95,15 +95,7 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   bool _matchesQuery(_TrackEntry t, String queryLower) {
-    if (queryLower.isEmpty) return true;
-    final base = p.basename(t.file.path).toLowerCase();
-    final title = t.displayTitle.toLowerCase();
-    final artist = t.meta.artist.toLowerCase();
-    final album = t.meta.album.toLowerCase();
-    return base.contains(queryLower) ||
-        title.contains(queryLower) ||
-        artist.contains(queryLower) ||
-        album.contains(queryLower);
+    return t.matchesQuery(queryLower);
   }
 
   Future<void> _openOptionsSheet() async {
