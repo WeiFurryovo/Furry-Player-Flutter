@@ -89,6 +89,7 @@ class _AppController {
       ValueNotifier<_QueueState>(const _QueueState(queue: <File>[], index: -1));
   final ValueNotifier<List<File>> furryOutputs =
       ValueNotifier<List<File>>(<File>[]);
+  final ValueNotifier<int> furryOutputsSignature = ValueNotifier<int>(0);
   final ValueNotifier<String> log = ValueNotifier<String>('');
 
   final ListQueue<String> _logLines = ListQueue<String>();
@@ -208,6 +209,19 @@ class _AppController {
       if (entity is File) files.add(entity);
     }
     return files;
+  }
+
+  int _outputsSignature(List<_FileStatEntry> fileStates) {
+    return Object.hash(
+      fileStates.length,
+      Object.hashAll(fileStates.map((entry) {
+        return Object.hash(
+          entry.file.path,
+          entry.stat.modified.microsecondsSinceEpoch,
+          entry.stat.size,
+        );
+      })),
+    );
   }
 
   Future<List<_FileStatEntry>> _statFilesInOrder(
@@ -421,6 +435,7 @@ class _AppController {
     requestedTab.dispose();
     queueState.dispose();
     furryOutputs.dispose();
+    furryOutputsSignature.dispose();
     log.dispose();
   }
 
@@ -701,8 +716,10 @@ class _AppController {
       concurrency: _ioWorkerCount,
     )
       ..sort((a, b) => b.stat.modified.compareTo(a.stat.modified));
+
     furryOutputs.value =
         fileStates.map((entry) => entry.file).toList(growable: false);
+    furryOutputsSignature.value = _outputsSignature(fileStates);
   }
 
   Future<File?> pickForPlay() async {

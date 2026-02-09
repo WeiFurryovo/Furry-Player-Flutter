@@ -29,7 +29,6 @@ class _LibraryPageState extends State<LibraryPage> {
   bool _onlyWithCover = false;
 
   int? _lastFilesHash;
-  List<File>? _lastIndexedFiles;
   Future<_LibraryIndex>? _indexFuture;
 
   @override
@@ -59,35 +58,17 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   Future<_LibraryIndex> _getIndexFuture(
-      _AppController controller, List<File> files) {
-    if (_indexFuture != null && identical(_lastIndexedFiles, files)) {
+    _AppController controller,
+    List<File> files,
+    int sourceHash,
+  ) {
+    if (_indexFuture != null && _lastFilesHash == sourceHash) {
       return _indexFuture!;
     }
 
-    final hash = _filesStateHash(files);
-    if (_indexFuture == null || _lastFilesHash != hash) {
-      _lastFilesHash = hash;
-      _indexFuture = controller.buildLibraryIndex(files);
-    }
-    _lastIndexedFiles = files;
+    _lastFilesHash = sourceHash;
+    _indexFuture = controller.buildLibraryIndex(files);
     return _indexFuture!;
-  }
-
-  int _filesStateHash(List<File> files) {
-    final fileHashes = <int>[];
-    for (final file in files) {
-      try {
-        final stat = file.statSync();
-        fileHashes.add(Object.hash(
-          file.path,
-          stat.modified.microsecondsSinceEpoch,
-          stat.size,
-        ));
-      } catch (_) {
-        fileHashes.add(Object.hash(file.path, 0, 0));
-      }
-    }
-    return Object.hash(files.length, Object.hashAll(fileHashes));
   }
 
   List<_TrackEntry> _buildSuggestions(
@@ -364,7 +345,11 @@ class _LibraryPageState extends State<LibraryPage> {
                 }
                 return <Widget>[
                   FutureBuilder<_LibraryIndex>(
-                    future: _getIndexFuture(controller, files),
+                    future: _getIndexFuture(
+                      controller,
+                      files,
+                      controller.furryOutputsSignature.value,
+                    ),
                     builder: (context, snap) {
                       final idx = snap.data;
                       if (idx == null) {
@@ -379,7 +364,7 @@ class _LibraryPageState extends State<LibraryPage> {
                       }
 
                       final tracks = idx.tracks;
-                      final sourceHash = _lastFilesHash ?? 0;
+                      final sourceHash = controller.furryOutputsSignature.value;
                       final suggestions =
                           _buildSuggestions(tracks, q, sourceHash);
                       return _buildSuggestionContent(
@@ -496,7 +481,11 @@ class _LibraryPageState extends State<LibraryPage> {
               }
 
               return FutureBuilder<_LibraryIndex>(
-                future: _getIndexFuture(controller, files),
+                future: _getIndexFuture(
+                  controller,
+                  files,
+                  controller.furryOutputsSignature.value,
+                ),
                 builder: (context, snap) {
                   final idx = snap.data;
                   if (idx == null) {
@@ -521,45 +510,4 @@ class _LibraryPageState extends State<LibraryPage> {
       ],
     );
   }
-}
-
-String _fmtBytes(int bytes) {
-  const kb = 1024;
-  const mb = 1024 * 1024;
-  if (bytes >= mb) return '${(bytes / mb).toStringAsFixed(1)} MB';
-  if (bytes >= kb) return '${(bytes / kb).toStringAsFixed(1)} KB';
-  return '$bytes B';
-}
-
-PageRoute<T> _expressivePageRoute<T>(Widget page) {
-  return PageRouteBuilder<T>(
-    pageBuilder: (context, animation, secondaryAnimation) => page,
-    transitionDuration: const Duration(milliseconds: 260),
-    reverseTransitionDuration: const Duration(milliseconds: 220),
-    transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      final curved = CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeOutCubic,
-        reverseCurve: Curves.easeInCubic,
-      );
-      final offset = Tween<Offset>(
-        begin: const Offset(0.06, 0),
-        end: Offset.zero,
-      ).animate(curved);
-      return FadeTransition(
-        opacity: curved,
-        child: SlideTransition(position: offset, child: child),
-      );
-    },
-  );
-}
-
-String _albumHeroTag(_AlbumGroup album) {
-  return 'album_${album.artist.toLowerCase()}|${album.album.toLowerCase()}';
-}
-
-String _nowPlayingHeroTag(String sourcePath) {
-  // Keep it stable and reasonably short; Hero tags can be any object, but we
-  // prefer a string for easier debugging.
-  return 'np_${sourcePath.hashCode}';
 }
