@@ -13,122 +13,29 @@ class LibraryPage extends StatefulWidget {
 }
 
 class _LibraryPageState extends State<LibraryPage> {
-  final SearchController _searchController = SearchController();
-  String _query = '';
-  String _pendingQuery = '';
-  Timer? _queryDebounceTimer;
-  static const Duration _searchDebounceDelay = Duration(milliseconds: 180);
-  int? _suggestionCacheSourceHash;
-  final Map<String, _SuggestionCacheEntry> _suggestionCache =
-      <String, _SuggestionCacheEntry>{};
-  static const int _suggestionCacheLimit = 32;
-  static const int _suggestionMaxStoredMatches = 256;
+  final _LibraryPageSearchState _searchState = _LibraryPageSearchState();
   _LibraryView _view = _LibraryView.tracks;
   _LibrarySort _sort = _LibrarySort.recent;
   bool _ascending = false;
   bool _onlyWithCover = false;
 
-  int? _lastFilesHash;
-  Future<_LibraryIndex>? _indexFuture;
-
   @override
   void dispose() {
-    _queryDebounceTimer?.cancel();
-    _suggestionCache.clear();
-    _searchController.dispose();
+    _searchState.dispose();
     super.dispose();
   }
 
+  void _onSearchStateChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
   void _applyQueryImmediately(String value) {
-    final next = value.trim();
-    _queryDebounceTimer?.cancel();
-    _pendingQuery = next;
-    if (_query == next) return;
-    setState(() => _query = next);
+    _searchState.applyQueryImmediately(value, _onSearchStateChanged);
   }
 
   void _scheduleQueryUpdate(String value) {
-    final next = value.trim();
-    _pendingQuery = next;
-    _queryDebounceTimer?.cancel();
-    _queryDebounceTimer = Timer(_searchDebounceDelay, () {
-      if (!mounted || _query == _pendingQuery) return;
-      setState(() => _query = _pendingQuery);
-    });
-  }
-
-  Future<_LibraryIndex> _getIndexFuture(
-    _AppController controller,
-    List<File> files,
-    int sourceHash,
-  ) {
-    if (_indexFuture != null && _lastFilesHash == sourceHash) {
-      return _indexFuture!;
-    }
-
-    _lastFilesHash = sourceHash;
-    _indexFuture = controller.buildLibraryIndex(files);
-    return _indexFuture!;
-  }
-
-  List<_TrackEntry> _buildSuggestions(
-    List<_TrackEntry> tracks,
-    String queryLower,
-    int sourceHash,
-  ) {
-    if (queryLower.isEmpty) {
-      return tracks.take(6).toList(growable: false);
-    }
-
-    if (_suggestionCacheSourceHash != sourceHash) {
-      _suggestionCacheSourceHash = sourceHash;
-      _suggestionCache.clear();
-    }
-
-    final exactCached = _suggestionCache[queryLower];
-    if (exactCached != null) {
-      return exactCached.matches.take(8).toList(growable: false);
-    }
-
-    List<_TrackEntry>? basePool;
-    if (queryLower.length >= 2) {
-      final prefixes = _suggestionCache.keys
-          .where((key) =>
-              key.isNotEmpty &&
-              queryLower.startsWith(key) &&
-              _suggestionCache[key]!.complete)
-          .toList(growable: false)
-        ..sort((a, b) => b.length.compareTo(a.length));
-      if (prefixes.isNotEmpty) {
-        basePool = _suggestionCache[prefixes.first]!.matches;
-      }
-    }
-
-    final input = basePool ?? tracks;
-    final matches = <_TrackEntry>[];
-    var complete = true;
-    for (final track in input) {
-      if (_matchesQuery(track, queryLower)) {
-        if (matches.length < _suggestionMaxStoredMatches) {
-          matches.add(track);
-        } else {
-          complete = false;
-          break;
-        }
-      }
-    }
-
-    final entry = _SuggestionCacheEntry(
-      matches: List<_TrackEntry>.unmodifiable(matches),
-      complete: complete,
-    );
-    _suggestionCache[queryLower] = entry;
-
-    if (_suggestionCache.length > _suggestionCacheLimit) {
-      _suggestionCache.remove(_suggestionCache.keys.first);
-    }
-
-    return matches.take(8).toList(growable: false);
+    _searchState.scheduleQueryUpdate(value, _onSearchStateChanged);
   }
 
   Widget _buildSuggestionTile(
@@ -319,7 +226,7 @@ class _LibraryPageState extends State<LibraryPage> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             child: SearchAnchor.bar(
-              searchController: _searchController,
+              searchController: _searchState.searchController,
               barHintText: '搜索音乐库',
               barLeading: const Icon(Icons.search_rounded),
               barTrailing: <Widget>[
@@ -333,7 +240,7 @@ class _LibraryPageState extends State<LibraryPage> {
                 ),
               ],
               suggestionsBuilder: (context, searchController) {
-                final q = _pendingQuery.toLowerCase();
+                final q = _searchState.pendingQuery.toLowerCase();
                 final files = controller.furryOutputs.value;
                 if (files.isEmpty) {
                   return <Widget>[
@@ -345,7 +252,7 @@ class _LibraryPageState extends State<LibraryPage> {
                 }
                 return <Widget>[
                   FutureBuilder<_LibraryIndex>(
-                    future: _getIndexFuture(
+                    future: _searchState.getIndexFuture(
                       controller,
                       files,
                       controller.furryOutputsSignature.value,
@@ -365,8 +272,12 @@ class _LibraryPageState extends State<LibraryPage> {
 
                       final tracks = idx.tracks;
                       final sourceHash = controller.furryOutputsSignature.value;
-                      final suggestions =
-                          _buildSuggestions(tracks, q, sourceHash);
+                      final suggestions = _searchState.buildSuggestions(
+                        tracks,
+                        q,
+                        sourceHash,
+                        matchesQuery: _matchesQuery,
+                      );
                       return _buildSuggestionContent(
                         searchController,
                         q,
@@ -481,7 +392,7 @@ class _LibraryPageState extends State<LibraryPage> {
               }
 
               return FutureBuilder<_LibraryIndex>(
-                future: _getIndexFuture(
+                future: _searchState.getIndexFuture(
                   controller,
                   files,
                   controller.furryOutputsSignature.value,
@@ -499,7 +410,7 @@ class _LibraryPageState extends State<LibraryPage> {
                     );
                   }
 
-                  final q = _query.trim().toLowerCase();
+                  final q = _searchState.query.trim().toLowerCase();
                   return _buildLibraryContentSliver(controller, idx, q);
                 },
               );

@@ -38,6 +38,7 @@ part 'src/diagnostics_log.dart';
 part 'src/expressive_theme.dart';
 part 'src/app_shell.dart';
 part 'src/library_page.dart';
+part 'src/library_page_state.dart';
 part 'src/library_page_widgets.dart';
 part 'src/library_page_logic.dart';
 part 'src/now_playing_panel.dart';
