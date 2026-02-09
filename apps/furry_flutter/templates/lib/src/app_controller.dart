@@ -107,6 +107,7 @@ class _AppController {
   final Map<String, _TrackEntryCacheEntry> _trackEntryCache =
       <String, _TrackEntryCacheEntry>{};
   _LibraryIndexCacheEntry? _libraryIndexCache;
+  int _libraryBuildEpoch = 0;
   static const int _metaPreviewCacheLimit = 64;
   static const int _ioWorkerCount = 8;
   static const int _metaWorkerCount = 6;
@@ -1267,6 +1268,20 @@ class _AppController {
   }
 
   Future<_LibraryIndex> buildLibraryIndex(List<File> files) async {
+    final buildEpoch = ++_libraryBuildEpoch;
+
+    bool isStale() => buildEpoch != _libraryBuildEpoch;
+
+    _LibraryIndex cachedOrEmpty() {
+      final cached = _libraryIndexCache;
+      if (cached != null) return cached.index;
+      return const _LibraryIndex(
+        tracks: <_TrackEntry>[],
+        albums: <_AlbumGroup>[],
+        artists: <_ArtistGroup>[],
+      );
+    }
+
     final states = await _statFilesInOrder(
       files,
       concurrency: _ioWorkerCount,
@@ -1274,6 +1289,8 @@ class _AppController {
         appendLog('Index stat failed: ${file.path}: $error\n$stackTrace');
       },
     );
+
+    if (isStale()) return cachedOrEmpty();
 
     final signature = Object.hash(
       states.length,
@@ -1296,6 +1313,8 @@ class _AppController {
     final tracksByIndex = List<_TrackEntry?>.filled(states.length, null);
     final pending = <_PendingTrackEntry>[];
     for (var i = 0; i < states.length; i++) {
+      if (isStale()) return cachedOrEmpty();
+
       final state = states[i];
       final file = state.file;
       final modified = state.stat.modified;
@@ -1326,6 +1345,8 @@ class _AppController {
 
       Future<void> worker() async {
         while (true) {
+          if (isStale()) return;
+
           final pendingIndex = cursor;
           if (pendingIndex >= pending.length) return;
           cursor = pendingIndex + 1;
@@ -1337,6 +1358,8 @@ class _AppController {
               pendingItem.file,
               modified: pendingItem.modified,
             );
+            if (isStale()) return;
+
             final track = _TrackEntry(
               file: pendingItem.file,
               meta: meta,
@@ -1350,6 +1373,8 @@ class _AppController {
             );
             tracksByIndex[pendingItem.index] = track;
           } catch (e, st) {
+            if (isStale()) return;
+
             appendLog('Index meta failed: $path: $e\n$st');
             final track = _TrackEntry(
               file: pendingItem.file,
@@ -1377,10 +1402,12 @@ class _AppController {
       await Future.wait(
         List<Future<void>>.generate(workerCount, (_) => worker()),
       );
+      if (isStale()) return cachedOrEmpty();
     }
 
     final tracks =
         tracksByIndex.whereType<_TrackEntry>().toList(growable: false);
+    if (isStale()) return cachedOrEmpty();
 
     _trackEntryCache.removeWhere((path, _) => !activePaths.contains(path));
     _metaPreviewCache.removeWhere((path, _) => !activePaths.contains(path));
@@ -1389,6 +1416,8 @@ class _AppController {
     final artistsByKey = <String, _ArtistGroup>{};
 
     for (final t in tracks) {
+      if (isStale()) return cachedOrEmpty();
+
       final albumName = t.meta.album.trim();
       final artistName = t.meta.artist.trim();
       final albumKey = '${artistName.toLowerCase()}|${albumName.toLowerCase()}';
@@ -1420,9 +1449,11 @@ class _AppController {
       ..sort((a, b) => a.title.compareTo(b.title));
 
     for (final a in albums) {
+      if (isStale()) return cachedOrEmpty();
       a.tracks.sort((x, y) => x.displayTitle.compareTo(y.displayTitle));
     }
     for (final ar in artists) {
+      if (isStale()) return cachedOrEmpty();
       for (final alb in ar.albumsByKey.values) {
         alb.tracks.sort((x, y) => x.displayTitle.compareTo(y.displayTitle));
       }
@@ -1430,6 +1461,8 @@ class _AppController {
 
     final result =
         _LibraryIndex(tracks: tracks, albums: albums, artists: artists);
+    if (isStale()) return cachedOrEmpty();
+
     _libraryIndexCache = _LibraryIndexCacheEntry(
       signature: signature,
       index: result,
