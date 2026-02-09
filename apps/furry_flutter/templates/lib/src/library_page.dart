@@ -14,10 +14,7 @@ class LibraryPage extends StatefulWidget {
 
 class _LibraryPageState extends State<LibraryPage> {
   final _LibraryPageSearchState _searchState = _LibraryPageSearchState();
-  _LibraryView _view = _LibraryView.tracks;
-  _LibrarySort _sort = _LibrarySort.recent;
-  bool _ascending = false;
-  bool _onlyWithCover = false;
+  final _LibraryPageFilterState _filterState = _LibraryPageFilterState();
 
   @override
   void dispose() {
@@ -110,74 +107,15 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   Future<void> _openOptionsSheet() async {
-    final current = _LibraryOptions(
-      sort: _sort,
-      ascending: _ascending,
-      onlyWithCover: _onlyWithCover,
-    );
     final next = await showModalBottomSheet<_LibraryOptions>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (context) => _LibraryOptionsSheet(value: current),
+      builder: (context) =>
+          _LibraryOptionsSheet(value: _filterState.toOptions()),
     );
     if (!mounted || next == null) return;
-    setState(() {
-      _sort = next.sort;
-      _ascending = next.ascending;
-      _onlyWithCover = next.onlyWithCover;
-    });
-  }
-
-  int _compareTrack(_TrackEntry a, _TrackEntry b) {
-    int result;
-    switch (_sort) {
-      case _LibrarySort.recent:
-        result = b.modified.compareTo(a.modified);
-        break;
-      case _LibrarySort.title:
-        result = a.displayTitle.compareTo(b.displayTitle);
-        break;
-      case _LibrarySort.artist:
-        result = a.meta.artist.compareTo(b.meta.artist);
-        break;
-      case _LibrarySort.album:
-        result = a.meta.album.compareTo(b.meta.album);
-        break;
-      case _LibrarySort.size:
-        result = b.bytes.compareTo(a.bytes);
-        break;
-    }
-    return _ascending ? -result : result;
-  }
-
-  List<_TrackEntry> _buildFilteredTracks(
-      _LibraryIndex index, String queryLower) {
-    final tracks = index.tracks
-        .where((track) => !_onlyWithCover || track.meta.artUri != null)
-        .where((track) => _matchesQuery(track, queryLower))
-        .toList(growable: false)
-      ..sort(_compareTrack);
-    return tracks;
-  }
-
-  List<_AlbumGroup> _buildFilteredAlbums(
-      _LibraryIndex index, String queryLower) {
-    return index.albums.where((album) {
-      if (_onlyWithCover && album.artUri == null) return false;
-      if (queryLower.isEmpty) return true;
-      return album.title.toLowerCase().contains(queryLower) ||
-          album.subtitle.toLowerCase().contains(queryLower);
-    }).toList(growable: false);
-  }
-
-  List<_ArtistGroup> _buildFilteredArtists(
-      _LibraryIndex index, String queryLower) {
-    return index.artists.where((artist) {
-      if (_onlyWithCover && artist.artUri == null) return false;
-      if (queryLower.isEmpty) return true;
-      return artist.title.toLowerCase().contains(queryLower);
-    }).toList(growable: false);
+    setState(() => _filterState.applyOptions(next));
   }
 
   Widget _buildLibraryContentSliver(
@@ -185,19 +123,23 @@ class _LibraryPageState extends State<LibraryPage> {
     _LibraryIndex index,
     String queryLower,
   ) {
-    switch (_view) {
+    switch (_filterState.view) {
       case _LibraryView.tracks:
-        final tracks = _buildFilteredTracks(index, queryLower);
+        final tracks = _filterState.buildFilteredTracks(
+          index,
+          queryLower,
+          matchesQuery: _matchesQuery,
+        );
         return _TracksSliver(
           controller: controller,
           tracks: tracks,
           bytesFmt: _fmtBytes,
         );
       case _LibraryView.albums:
-        final albums = _buildFilteredAlbums(index, queryLower);
+        final albums = _filterState.buildFilteredAlbums(index, queryLower);
         return _AlbumsSliver(controller: controller, albums: albums);
       case _LibraryView.artists:
-        final artists = _buildFilteredArtists(index, queryLower);
+        final artists = _filterState.buildFilteredArtists(index, queryLower);
         return _ArtistsSliver(controller: controller, artists: artists);
       case _LibraryView.queue:
         return _QueueSliver(controller: controller);
@@ -295,10 +237,10 @@ class _LibraryPageState extends State<LibraryPage> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: _LibraryModulesCard(
-              value: _view,
+              value: _filterState.view,
               onChanged: (v) {
                 HapticFeedback.selectionClick();
-                setState(() => _view = v);
+                setState(() => _filterState.view = v);
               },
             ),
           ),
