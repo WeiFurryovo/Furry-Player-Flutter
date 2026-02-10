@@ -124,6 +124,35 @@ class _TrackEntry {
   }
 }
 
+@visibleForTesting
+bool trackMatchesQueryForTest({
+  required String filePath,
+  required String query,
+  String title = '',
+  String artist = '',
+  String album = '',
+}) {
+  final subtitle = [
+    if (artist.trim().isNotEmpty) artist.trim(),
+    if (album.trim().isNotEmpty) album.trim(),
+  ].join(' · ');
+
+  final track = _TrackEntry(
+    file: File(filePath),
+    meta: _MetaPreview(
+      title: title,
+      artist: artist,
+      album: album,
+      subtitle: subtitle,
+      artUri: null,
+      coverBytesLen: null,
+    ),
+    modified: DateTime.fromMillisecondsSinceEpoch(0),
+    bytes: 0,
+  );
+  return track.matchesQuery(query.toLowerCase());
+}
+
 class _AlbumGroup {
   final String album;
   final String artist;

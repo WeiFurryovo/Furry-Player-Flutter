@@ -122,3 +122,21 @@ class _LibraryPageSearchState {
     return matches.take(8).toList(growable: false);
   }
 }
+
+@visibleForTesting
+class LibraryPageSearchStateHarness {
+  final _LibraryPageSearchState _inner = _LibraryPageSearchState();
+
+  String get query => _inner.query;
+  String get pendingQuery => _inner.pendingQuery;
+
+  void applyQueryImmediately(String value, {VoidCallback? onChanged}) {
+    _inner.applyQueryImmediately(value, onChanged ?? () {});
+  }
+
+  void scheduleQueryUpdate(String value, {VoidCallback? onChanged}) {
+    _inner.scheduleQueryUpdate(value, onChanged ?? () {});
+  }
+
+  void dispose() => _inner.dispose();
+}

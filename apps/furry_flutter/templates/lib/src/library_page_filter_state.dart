@@ -77,3 +77,31 @@ class _LibraryPageFilterState {
     }).toList(growable: false);
   }
 }
+
+@visibleForTesting
+class LibraryPageFilterStateHarness {
+  final _LibraryPageFilterState _inner = _LibraryPageFilterState();
+
+  int get viewIndex => _inner.view.index;
+  int get sortIndex => _inner.sort.index;
+  bool get ascending => _inner.ascending;
+  bool get onlyWithCover => _inner.onlyWithCover;
+
+  void setViewIndex(int index) {
+    _inner.view = _LibraryView.values[index];
+  }
+
+  void applyOptions({
+    required int sortIndex,
+    required bool ascending,
+    required bool onlyWithCover,
+  }) {
+    _inner.applyOptions(
+      _LibraryOptions(
+        sort: _LibrarySort.values[sortIndex],
+        ascending: ascending,
+        onlyWithCover: onlyWithCover,
+      ),
+    );
+  }
+}
