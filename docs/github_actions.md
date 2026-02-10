@@ -15,6 +15,7 @@
 工作流复用脚本位于 `apps/furry_flutter/scripts/`：
 - `flutter_quality_gate.sh`：统一执行 `create_flutter_app + analyze + test`
 - `setup_android_ndk.sh`：统一安装 cmdline-tools、accept licenses、安装 NDK
+- `build_linux_desktop_bundle.sh`：统一构建 Linux Flutter 桌面包并拷贝 `libfurry_ffi.so`
 
 ## 1) 配置 Secrets（Android 签名必需）
 在 GitHub 仓库设置里：Settings → Secrets and variables → Actions → New repository secret

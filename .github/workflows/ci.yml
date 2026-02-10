@@ -122,17 +122,7 @@ jobs:
           set -euxo pipefail
           mkdir -p dist/desktop/flutter/linux
           (
-            ./apps/furry_flutter/create_flutter_app.sh --no-android
-            cargo --version
-            rustc --version
-            cargo build --release -p furry_ffi -v
-            cd apps/furry_flutter/furry_flutter_app
-            flutter config --enable-linux-desktop
-            flutter analyze
-            flutter build linux --release --verbose
-            cp -f ../../../target/release/libfurry_ffi.so build/linux/x64/release/bundle/
-            test -f build/linux/x64/release/bundle/libfurry_ffi.so
-            tar -C build/linux/x64/release -czf ../../../dist/desktop/flutter/linux/furry_flutter_linux.tar.gz bundle
+            ./apps/furry_flutter/scripts/build_linux_desktop_bundle.sh dist/desktop/flutter/linux
           ) 2>&1 | tee dist/desktop/flutter/linux/linux_desktop_build.log
 
       - name: Checksums
