@@ -16,6 +16,7 @@
 - `flutter_quality_gate.sh`：统一执行 `create_flutter_app + analyze + test`
 - `setup_android_ndk.sh`：统一安装 cmdline-tools、accept licenses、安装 NDK
 - `build_linux_desktop_bundle.sh`：统一构建 Linux Flutter 桌面包并拷贝 `libfurry_ffi.so`
+- `build_windows_desktop_bundle.ps1`：统一构建 Windows Flutter 桌面包并打包 `furry_flutter_windows.zip`
 
 ## 1) 配置 Secrets（Android 签名必需）
 在 GitHub 仓库设置里：Settings → Secrets and variables → Actions → New repository secret
