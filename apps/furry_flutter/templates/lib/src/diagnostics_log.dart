@@ -1,5 +1,15 @@
 part of '../main.dart';
 
+({int start, int length}) diagnosticsLogTailWindowForTest({
+  required int fileLength,
+  required int keepBytes,
+}) {
+  final safeLength = fileLength < 0 ? 0 : fileLength;
+  final safeKeep = keepBytes < 0 ? 0 : keepBytes;
+  final length = safeLength < safeKeep ? safeLength : safeKeep;
+  return (start: safeLength - length, length: length);
+}
+
 class _DiagnosticsLog {
   static File? _file;
   static Future<void> _writeChain = Future<void>.value();
@@ -23,10 +33,7 @@ class _DiagnosticsLog {
       await init();
       final f = _file!;
       if (!await f.exists()) return '';
-      final bytes = await f.readAsBytes();
-      if (bytes.isEmpty) return '';
-      final start = bytes.length > _keepBytes ? bytes.length - _keepBytes : 0;
-      return utf8.decode(bytes.sublist(start), allowMalformed: true);
+      return _readTailText(f, keepBytes: _keepBytes);
     } catch (_) {
       return '';
     }
@@ -41,9 +48,7 @@ class _DiagnosticsLog {
         await f.writeAsString(line, mode: FileMode.append, flush: true);
         final len = await f.length();
         if (len <= _maxBytes) return;
-        final bytes = await f.readAsBytes();
-        final start = bytes.length > _keepBytes ? bytes.length - _keepBytes : 0;
-        await f.writeAsBytes(bytes.sublist(start), flush: true);
+        await _trimFileToTail(f, keepBytes: _keepBytes);
       });
       await _writeChain;
     } catch (_) {}
@@ -74,5 +79,49 @@ class _DiagnosticsLog {
     } catch (_) {
       return null;
     }
+  }
+
+  static ({int start, int length}) _tailWindow(
+    int fileLength, {
+    required int keepBytes,
+  }) {
+    return diagnosticsLogTailWindowForTest(
+      fileLength: fileLength,
+      keepBytes: keepBytes,
+    );
+  }
+
+  static Future<List<int>> _readTailBytes(
+    File file, {
+    required int keepBytes,
+  }) async {
+    final fileLength = await file.length();
+    final window = _tailWindow(fileLength, keepBytes: keepBytes);
+    if (window.length <= 0) return const <int>[];
+
+    final reader = await file.open(mode: FileMode.read);
+    try {
+      await reader.setPosition(window.start);
+      return await reader.read(window.length);
+    } finally {
+      await reader.close();
+    }
+  }
+
+  static Future<String> _readTailText(
+    File file, {
+    required int keepBytes,
+  }) async {
+    final bytes = await _readTailBytes(file, keepBytes: keepBytes);
+    if (bytes.isEmpty) return '';
+    return utf8.decode(bytes, allowMalformed: true);
+  }
+
+  static Future<void> _trimFileToTail(
+    File file, {
+    required int keepBytes,
+  }) async {
+    final bytes = await _readTailBytes(file, keepBytes: keepBytes);
+    await file.writeAsBytes(bytes, flush: true);
   }
 }

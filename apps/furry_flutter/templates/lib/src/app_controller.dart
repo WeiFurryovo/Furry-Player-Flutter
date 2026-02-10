@@ -467,7 +467,7 @@ class _AppController {
     unawaited(
       future.then<void>(
         (_) {},
-        onError: (Object _, StackTrace __) {
+        onError: (Object error, StackTrace stackTrace) {
           _evictMetaPreviewEntryIfSameFuture(key, future);
         },
       ),

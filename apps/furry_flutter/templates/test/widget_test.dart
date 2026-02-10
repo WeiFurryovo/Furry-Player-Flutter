@@ -150,4 +150,36 @@ void main() {
       );
     });
   });
+
+  group('diagnosticsLogTailWindowForTest', () {
+    test('handles empty and negative values safely', () {
+      expect(
+        diagnosticsLogTailWindowForTest(fileLength: 0, keepBytes: 256),
+        (start: 0, length: 0),
+      );
+      expect(
+        diagnosticsLogTailWindowForTest(fileLength: -20, keepBytes: 256),
+        (start: 0, length: 0),
+      );
+      expect(
+        diagnosticsLogTailWindowForTest(fileLength: 20, keepBytes: -1),
+        (start: 20, length: 0),
+      );
+    });
+
+    test('returns whole file when smaller than keepBytes', () {
+      expect(
+        diagnosticsLogTailWindowForTest(fileLength: 123, keepBytes: 256),
+        (start: 0, length: 123),
+      );
+    });
+
+    test('returns tail window when file is larger than keepBytes', () {
+      expect(
+        diagnosticsLogTailWindowForTest(fileLength: 2048, keepBytes: 512),
+        (start: 1536, length: 512),
+      );
+    });
+  });
+
 }

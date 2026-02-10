@@ -80,16 +80,25 @@ PY
 }
 
 patch_android_gradle_for_release_shrink() {
-  local gradle_file="$OUT_DIR/android/app/build.gradle"
-  if [ ! -f "$gradle_file" ]; then
-    echo "[WARN] 未找到 android/app/build.gradle，跳过 R8/资源压缩配置：$gradle_file" >&2
+  local gradle_file_groovy="$OUT_DIR/android/app/build.gradle"
+  local gradle_file_kts="$OUT_DIR/android/app/build.gradle.kts"
+  local gradle_file=""
+  local gradle_is_kts=0
+
+  if [ -f "$gradle_file_groovy" ]; then
+    gradle_file="$gradle_file_groovy"
+  elif [ -f "$gradle_file_kts" ]; then
+    gradle_file="$gradle_file_kts"
+    gradle_is_kts=1
+  else
+    echo "[WARN] 未找到 android/app/build.gradle 或 build.gradle.kts，跳过 R8/资源压缩配置" >&2
     return 0
   fi
 
   # Ensure a proguard rules file exists (required when enabling minify).
   local proguard_file="$OUT_DIR/android/app/proguard-rules.pro"
   if [ ! -f "$proguard_file" ]; then
-    cat >"$proguard_file" <<'EOF'
+    cat >"$proguard_file" <<'EOF_PROGUARD'
 # Keep Flutter classes referenced via reflection.
 -keep class io.flutter.app.** { *; }
 -keep class io.flutter.plugin.** { *; }
@@ -97,19 +106,17 @@ patch_android_gradle_for_release_shrink() {
 -keep class io.flutter.view.** { *; }
 -keep class io.flutter.** { *; }
 -keep class io.flutter.plugins.** { *; }
-EOF
+EOF_PROGUARD
   fi
 
-  python3 - "$gradle_file" <<'PY'
+  python3 - "$gradle_file" "$gradle_is_kts" <<'PY'
 import sys
 
 path = sys.argv[1]
+is_kts = sys.argv[2] == "1"
 text = open(path, "r", encoding="utf-8").read()
 original = text
 
-def find_block_start(needle: str, start: int = 0) -> int:
-  idx = text.find(needle, start)
-  return idx
 
 def find_matching_brace(open_brace_idx: int) -> int:
   depth = 0
@@ -125,7 +132,8 @@ def find_matching_brace(open_brace_idx: int) -> int:
     i += 1
   return -1
 
-bt_idx = find_block_start("buildTypes")
+
+bt_idx = text.find("buildTypes")
 if bt_idx == -1:
   sys.exit(0)
 
@@ -151,26 +159,32 @@ if rel_end == -1:
 
 release_block = text[rel_brace:rel_end + 1]
 
-def has_line(substr: str) -> bool:
-  return substr in release_block
+if is_kts:
+  lines_to_ensure = [
+    "isMinifyEnabled = true",
+    "isShrinkResources = true",
+    'proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")',
+  ]
+else:
+  lines_to_ensure = [
+    "minifyEnabled true",
+    "shrinkResources true",
+    "proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'",
+  ]
 
-lines_to_ensure = [
-  "minifyEnabled true",
-  "shrinkResources true",
-  "proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'",
-]
-
-missing = [l for l in lines_to_ensure if not has_line(l)]
+missing = [line for line in lines_to_ensure if line not in release_block]
 if not missing:
   sys.exit(0)
 
-# Indent: take indentation of the release line and add 4 spaces.
 line_start = text.rfind("\n", 0, rel_idx) + 1
 line_prefix = text[line_start:rel_idx]
 base_indent = line_prefix + "    "
 
 insert_at = text.find("\n", rel_brace) + 1
-to_insert = "".join(f"{base_indent}{l}\n" for l in missing)
+if insert_at <= 0:
+  insert_at = rel_brace + 1
+
+to_insert = "".join(f"{base_indent}{line}\n" for line in missing)
 text = text[:insert_at] + to_insert + text[insert_at:]
 
 if text != original:
