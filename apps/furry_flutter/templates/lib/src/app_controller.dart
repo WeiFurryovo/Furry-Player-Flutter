@@ -172,10 +172,7 @@ class _AppController {
         onNext: playNextTrack,
         onPrevious: playPreviousTrack,
       );
-      unawaited(systemMedia.setQueueAvailability(
-        canGoNext: canPlayNextTrack,
-        canGoPrevious: canPlayPreviousTrack,
-      ));
+      _syncQueueAvailability();
       _wirePlayerDiagnostics();
       for (final line in _takeStartupDiagnostics()) {
         appendLog(line);
@@ -204,6 +201,13 @@ class _AppController {
     requestedTab.value = index;
   }
 
+  void _syncQueueAvailability() {
+    unawaited(systemMedia.setQueueAvailability(
+      canGoNext: canPlayNextTrack,
+      canGoPrevious: canPlayPreviousTrack,
+    ));
+  }
+
   Future<List<File>> _listFiles(Directory dir) async {
     final files = <File>[];
     await for (final entity in dir.list(followLinks: false)) {
@@ -212,7 +216,7 @@ class _AppController {
     return files;
   }
 
-  int _outputsSignature(List<_FileStatEntry> fileStates) {
+  int _fileStatesSignature(List<_FileStatEntry> fileStates) {
     return Object.hash(
       fileStates.length,
       Object.hashAll(fileStates.map((entry) {
@@ -354,6 +358,24 @@ class _AppController {
     return _getMetaPreviewForFurryCached(furryFile, effectiveModified);
   }
 
+  void _cacheMetaPreviewEntry(String key, _MetaPreviewCacheEntry entry) {
+    _metaPreviewCache.remove(key);
+    _metaPreviewCache[key] = entry;
+    if (_metaPreviewCache.length > _metaPreviewCacheLimit) {
+      _metaPreviewCache.remove(_metaPreviewCache.keys.first);
+    }
+  }
+
+  void _evictMetaPreviewEntryIfSameFuture(
+    String key,
+    Future<_MetaPreview> future,
+  ) {
+    final current = _metaPreviewCache[key];
+    if (current != null && identical(current.future, future)) {
+      _metaPreviewCache.remove(key);
+    }
+  }
+
   Future<_MetaPreview> _getMetaPreviewForFurryCached(
     File furryFile,
     DateTime modified,
@@ -361,6 +383,7 @@ class _AppController {
     final key = furryFile.path;
     final existing = _metaPreviewCache[key];
     if (existing != null && existing.modified == modified) {
+      _cacheMetaPreviewEntry(key, existing);
       return existing.future;
     }
 
@@ -414,14 +437,23 @@ class _AppController {
       );
     }();
 
-    _metaPreviewCache[key] = _MetaPreviewCacheEntry(
-      modified: modified,
-      future: future,
+    _cacheMetaPreviewEntry(
+      key,
+      _MetaPreviewCacheEntry(
+        modified: modified,
+        future: future,
+      ),
     );
-    if (_metaPreviewCache.length > _metaPreviewCacheLimit) {
-      final firstKey = _metaPreviewCache.keys.first;
-      _metaPreviewCache.remove(firstKey);
-    }
+
+    unawaited(
+      future.then<void>(
+        (_) {},
+        onError: (Object _, StackTrace __) {
+          _evictMetaPreviewEntryIfSameFuture(key, future);
+        },
+      ),
+    );
+
     return future;
   }
 
@@ -496,10 +528,7 @@ class _AppController {
       _queueIndex = idx;
       _publishQueueState();
       unawaited(_syncNowPlayingFromQueueIndex(idx));
-      unawaited(systemMedia.setQueueAvailability(
-        canGoNext: canPlayNextTrack,
-        canGoPrevious: canPlayPreviousTrack,
-      ));
+      _syncQueueAvailability();
     });
   }
 
@@ -720,7 +749,7 @@ class _AppController {
 
     furryOutputs.value =
         fileStates.map((entry) => entry.file).toList(growable: false);
-    furryOutputsSignature.value = _outputsSignature(fileStates);
+    furryOutputsSignature.value = _fileStatesSignature(fileStates);
   }
 
   Future<File?> pickForPlay() async {
@@ -765,10 +794,7 @@ class _AppController {
       _androidPlaylistActive = false;
     }
     _publishQueueState();
-    unawaited(systemMedia.setQueueAvailability(
-      canGoNext: canPlayNextTrack,
-      canGoPrevious: canPlayPreviousTrack,
-    ));
+    _syncQueueAvailability();
 
     nowPlaying.value = _NowPlaying(
       title: name,
@@ -940,10 +966,7 @@ class _AppController {
       _queueIndex = index;
       _androidPlaylistActive = true;
       _publishQueueState();
-      unawaited(systemMedia.setQueueAvailability(
-        canGoNext: canPlayNextTrack,
-        canGoPrevious: canPlayPreviousTrack,
-      ));
+      _syncQueueAvailability();
 
       final name = displayName ?? p.basename(queue[index].path);
       nowPlaying.value = _NowPlaying(
@@ -1038,10 +1061,7 @@ class _AppController {
     _queue = List<File>.from(queue);
     _queueIndex = index;
     _publishQueueState();
-    unawaited(systemMedia.setQueueAvailability(
-      canGoNext: canPlayNextTrack,
-      canGoPrevious: canPlayPreviousTrack,
-    ));
+    _syncQueueAvailability();
     await playFile(
       file: queue[index],
       displayName: displayName ?? p.basename(queue[index].path),
@@ -1070,10 +1090,7 @@ class _AppController {
     if (_androidPlaylistActive && !kIsWeb && Platform.isAndroid) {
       _queueIndex = nextIdx;
       _publishQueueState();
-      unawaited(systemMedia.setQueueAvailability(
-        canGoNext: canPlayNextTrack,
-        canGoPrevious: canPlayPreviousTrack,
-      ));
+      _syncQueueAvailability();
       await player.seek(Duration.zero, index: nextIdx);
       await play();
       await _syncNowPlayingFromQueueIndex(nextIdx);
@@ -1090,10 +1107,7 @@ class _AppController {
     if (_androidPlaylistActive && !kIsWeb && Platform.isAndroid) {
       _queueIndex = nextIdx;
       _publishQueueState();
-      unawaited(systemMedia.setQueueAvailability(
-        canGoNext: canPlayNextTrack,
-        canGoPrevious: canPlayPreviousTrack,
-      ));
+      _syncQueueAvailability();
       await player.seek(Duration.zero, index: nextIdx);
       await play();
       await _syncNowPlayingFromQueueIndex(nextIdx);
@@ -1164,10 +1178,7 @@ class _AppController {
     if (_androidPlaylistActive && !kIsWeb && Platform.isAndroid) {
       _queueIndex = index;
       _publishQueueState();
-      unawaited(systemMedia.setQueueAvailability(
-        canGoNext: canPlayNextTrack,
-        canGoPrevious: canPlayPreviousTrack,
-      ));
+      _syncQueueAvailability();
       await player.seek(Duration.zero, index: index);
       await play();
       await _syncNowPlayingFromQueueIndex(index);
@@ -1182,10 +1193,7 @@ class _AppController {
     _queueIndex = -1;
     _androidPlaylistActive = false;
     _publishQueueState();
-    unawaited(systemMedia.setQueueAvailability(
-      canGoNext: canPlayNextTrack,
-      canGoPrevious: canPlayPreviousTrack,
-    ));
+    _syncQueueAvailability();
     if (!keepPlaying) {
       unawaited(stop());
       nowPlaying.value = null;
@@ -1214,10 +1222,7 @@ class _AppController {
       _queueIndex = _queueIndex.clamp(0, queue.length - 1);
     }
     _publishQueueState();
-    unawaited(systemMedia.setQueueAvailability(
-      canGoNext: canPlayNextTrack,
-      canGoPrevious: canPlayPreviousTrack,
-    ));
+    _syncQueueAvailability();
   }
 
   Future<void> enqueueFile(File file, {bool playNext = false}) async {
@@ -1241,10 +1246,7 @@ class _AppController {
 
     _queue = q;
     _publishQueueState();
-    unawaited(systemMedia.setQueueAvailability(
-      canGoNext: canPlayNextTrack,
-      canGoPrevious: canPlayPreviousTrack,
-    ));
+    _syncQueueAvailability();
   }
 
   void moveQueueItem(int oldIndex, int newIndex) {
@@ -1292,18 +1294,7 @@ class _AppController {
 
     if (isStale()) return cachedOrEmpty();
 
-    final signature = Object.hash(
-      states.length,
-      Object.hashAll(
-        states.map(
-          (state) => Object.hash(
-            state.file.path,
-            state.stat.modified.microsecondsSinceEpoch,
-            state.stat.size,
-          ),
-        ),
-      ),
-    );
+    final signature = _fileStatesSignature(states);
     final cached = _libraryIndexCache;
     if (cached != null && cached.signature == signature) {
       return cached.index;
