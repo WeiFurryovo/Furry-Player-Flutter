@@ -1,8 +1,49 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 // ignore: avoid_relative_lib_imports
 import '../lib/main.dart';
 
 void main() {
+  group('EpochTokenGateHarness', () {
+    test('tracks latest token and invalidation', () {
+      final gate = EpochTokenGateHarness();
+      final first = gate.begin();
+      expect(gate.isCurrent(first), isTrue);
+
+      final second = gate.begin();
+      expect(gate.isCurrent(first), isFalse);
+      expect(gate.isCurrent(second), isTrue);
+
+      gate.invalidate();
+      expect(gate.isCurrent(second), isFalse);
+    });
+  });
+
+  group('QueueSnapshotBuilderHarness', () {
+    test('builds empty snapshot for null queue', () {
+      final snapshot = QueueSnapshotBuilderHarness().build(null, 9);
+      expect(snapshot.hasQueue, isFalse);
+      expect(snapshot.index, -1);
+      expect(snapshot.currentFile, isNull);
+    });
+
+    test('builds immutable queue snapshot with current item', () {
+      final snapshot = QueueSnapshotBuilderHarness().build(
+        <File>[File('/music/a.furry'), File('/music/b.furry')],
+        1,
+      );
+
+      expect(snapshot.hasQueue, isTrue);
+      expect(snapshot.index, 1);
+      expect(snapshot.currentFile?.path, '/music/b.furry');
+      expect(
+        () => snapshot.queue.add(File('/music/c.furry')),
+        throwsUnsupportedError,
+      );
+    });
+  });
+
   group('LibraryPageSearchStateHarness', () {
     testWidgets('applyQueryImmediately trims and updates instantly',
         (tester) async {

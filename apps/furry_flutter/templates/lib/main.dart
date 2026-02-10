@@ -46,6 +46,7 @@ part 'src/now_playing_panel.dart';
 part 'src/settings_page.dart';
 part 'src/converter_page.dart';
 part 'src/media_models.dart';
+part 'src/app_controller_services.dart';
 part 'src/app_controller.dart';
 
 /// 启动阶段日志（用于诊断启动失败/权限问题等）。

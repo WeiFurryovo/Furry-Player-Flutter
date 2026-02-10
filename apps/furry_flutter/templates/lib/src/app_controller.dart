@@ -107,8 +107,11 @@ class _AppController {
   final Map<String, _TrackEntryCacheEntry> _trackEntryCache =
       <String, _TrackEntryCacheEntry>{};
   _LibraryIndexCacheEntry? _libraryIndexCache;
-  int _libraryBuildEpoch = 0;
-  int _outputsRefreshEpoch = 0;
+  final _EpochTokenGate _libraryBuildGate = _EpochTokenGate();
+  final _EpochTokenGate _outputsRefreshGate = _EpochTokenGate();
+  final _EpochTokenGate _playRequestGate = _EpochTokenGate();
+  final _QueueSnapshotBuilder _queueSnapshotBuilder =
+      const _QueueSnapshotBuilder();
   static const _LibraryIndex _emptyLibraryIndex = _LibraryIndex(
     tracks: <_TrackEntry>[],
     albums: <_AlbumGroup>[],
@@ -192,15 +195,7 @@ class _AppController {
   }
 
   void _publishQueueState() {
-    final q = _queue;
-    if (q == null || q.isEmpty) {
-      queueState.value = const _QueueState(queue: <File>[], index: -1);
-      return;
-    }
-    queueState.value = _QueueState(
-      queue: List<File>.unmodifiable(q),
-      index: _queueIndex,
-    );
+    queueState.value = _queueSnapshotBuilder.build(_queue, _queueIndex);
   }
 
   void requestTabIndex(int index) {
@@ -222,6 +217,14 @@ class _AppController {
   void _publishQueueStateAndAvailability() {
     _publishQueueState();
     _syncQueueAvailability();
+  }
+
+  int _beginPlayRequest() => _playRequestGate.begin();
+
+  bool _isPlayRequestCurrent(int token) => _playRequestGate.isCurrent(token);
+
+  void _invalidatePlayRequests() {
+    _playRequestGate.invalidate();
   }
 
   Future<List<File>> _listFiles(Directory dir) async {
@@ -753,9 +756,9 @@ class _AppController {
   }
 
   Future<void> refreshOutputs() async {
-    final refreshEpoch = ++_outputsRefreshEpoch;
+    final refreshToken = _outputsRefreshGate.begin();
 
-    bool isStale() => refreshEpoch != _outputsRefreshEpoch;
+    bool isStale() => !_outputsRefreshGate.isCurrent(refreshToken);
 
     final outDir = await outputsDir();
     if (isStale()) return;
@@ -799,7 +802,12 @@ class _AppController {
   Future<void> playFile({
     required File file,
     String? displayName,
+    int? requestToken,
   }) async {
+    final playToken = requestToken ?? _beginPlayRequest();
+
+    bool isStalePlayRequest() => !_isPlayRequestCurrent(playToken);
+
     final name = displayName ?? p.basename(file.path);
 
     // If this file belongs to the current queue, keep queue navigation working.
@@ -819,6 +827,8 @@ class _AppController {
     }
     _publishQueueStateAndAvailability();
 
+    if (isStalePlayRequest()) return;
+
     nowPlaying.value = _NowPlaying(
       title: name,
       subtitle: '正在加载…',
@@ -831,13 +841,24 @@ class _AppController {
       final ext = p.extension(name).toLowerCase();
       final isFurry =
           ext == '.furry' || await api.isValidFurryFile(filePath: file.path);
+      if (isStalePlayRequest()) return;
 
       if (isFurry) {
         await cleanupTempArtifacts();
+        if (isStalePlayRequest()) return;
+
         final originalExt = await api.getOriginalFormat(filePath: file.path);
+        if (isStalePlayRequest()) return;
+
         final tmp = await getTemporaryDirectory();
+        if (isStalePlayRequest()) return;
+
         final outDir = Directory(p.join(tmp.path, 'furry_unpacked'));
-        if (!await outDir.exists()) await outDir.create(recursive: true);
+        if (!await outDir.exists()) {
+          await outDir.create(recursive: true);
+        }
+        if (isStalePlayRequest()) return;
+
         final outExt = originalExt.trim().isEmpty ? 'bin' : originalExt.trim();
         final outPath = p.join(
           outDir.path,
@@ -846,6 +867,8 @@ class _AppController {
         appendLog('Unpacking .furry → $outExt…');
         final rc =
             await api.unpackToFile(inputPath: file.path, outputPath: outPath);
+        if (isStalePlayRequest()) return;
+
         File? unpacked;
         if (rc == 0) {
           final f = File(outPath);
@@ -857,8 +880,11 @@ class _AppController {
         } else {
           appendLog('Unpack-to-file failed: rc=$rc (fallback to bytes)');
         }
+        if (isStalePlayRequest()) return;
 
         final meta = await getMetaPreviewForFurry(file);
+        if (isStalePlayRequest()) return;
+
         final artUriUi = meta.artUri;
         final artUriSystem = artUriUi;
         nowPlaying.value = _NowPlaying(
@@ -876,11 +902,14 @@ class _AppController {
           artUri: artUriSystem,
         );
         if (unpacked != null) {
+          if (isStalePlayRequest()) return;
           await player.setAudioSource(
             AudioSource.uri(unpacked.uri, tag: mediaItem),
           );
         } else {
           final bytes = await api.unpackFromFurryToBytes(inputPath: file.path);
+          if (isStalePlayRequest()) return;
+
           if (bytes == null) {
             appendLog('Unpack-to-bytes failed: null');
             return;
@@ -893,6 +922,8 @@ class _AppController {
           try {
             final f = File(fallbackPath);
             await f.writeAsBytes(bytes, flush: true);
+            if (isStalePlayRequest()) return;
+
             unpacked = f;
             await player.setAudioSource(
               AudioSource.uri(unpacked.uri, tag: mediaItem),
@@ -923,7 +954,11 @@ class _AppController {
             );
           }
         }
+        if (isStalePlayRequest()) return;
+
         await play();
+        if (isStalePlayRequest()) return;
+
         final title = meta.title.isEmpty ? name : meta.title;
         nowPlaying.value = _NowPlaying(
           title: title,
@@ -941,6 +976,8 @@ class _AppController {
             duration: player.duration,
           ),
         );
+        if (isStalePlayRequest()) return;
+
         if (unpacked != null) {
           appendLog(
               'Playing (.furry → $originalExt): ${p.basename(unpacked.path)}');
@@ -954,8 +991,14 @@ class _AppController {
           artist: '',
           artUri: null,
         );
+        if (isStalePlayRequest()) return;
+
         await player.setAudioSource(AudioSource.uri(file.uri, tag: mediaItem));
+        if (isStalePlayRequest()) return;
+
         await play();
+        if (isStalePlayRequest()) return;
+
         nowPlaying.value = _NowPlaying(
             title: name, subtitle: '本地文件', sourcePath: file.path, artUri: null);
         await systemMedia.setMetadata(
@@ -967,9 +1010,12 @@ class _AppController {
             duration: player.duration,
           ),
         );
+        if (isStalePlayRequest()) return;
+
         appendLog('Playing (raw): $name');
       }
     } catch (e, st) {
+      if (isStalePlayRequest()) return;
       appendLog('Play failed: $e\n$st');
     }
   }
@@ -978,9 +1024,14 @@ class _AppController {
     required List<File> queue,
     required int index,
     String? displayName,
+    int? requestToken,
   }) async {
     if (queue.isEmpty) return;
     if (index < 0 || index >= queue.length) return;
+
+    final playToken = requestToken ?? _beginPlayRequest();
+
+    bool isStalePlayRequest() => !_isPlayRequestCurrent(playToken);
 
     // On Android, use a playlist so audio_service can expose next/previous in the
     // system notification/lockscreen controls.
@@ -989,6 +1040,8 @@ class _AppController {
       _queueIndex = index;
       _androidPlaylistActive = true;
       _publishQueueStateAndAvailability();
+
+      if (isStalePlayRequest()) return;
 
       final name = displayName ?? p.basename(queue[index].path);
       nowPlaying.value = _NowPlaying(
@@ -1002,9 +1055,14 @@ class _AppController {
       unawaited(_syncNowPlayingFromQueueIndex(index));
 
       await cleanupTempArtifacts();
+      if (isStalePlayRequest()) return;
+
       final tmp = await getTemporaryDirectory();
+      if (isStalePlayRequest()) return;
+
       final outDir = Directory(p.join(tmp.path, 'furry_unpacked'));
       if (!await outDir.exists()) await outDir.create(recursive: true);
+      if (isStalePlayRequest()) return;
 
       Future<File> ensurePlayableFileForFurry(File furryFile) async {
         final originalExt =
@@ -1030,10 +1088,13 @@ class _AppController {
 
       final sources = <AudioSource>[];
       for (final f in queue) {
+        if (isStalePlayRequest()) return;
+
         final base = p.basename(f.path);
         final ext = p.extension(base).toLowerCase();
         final isFurry =
             ext == '.furry' || await api.isValidFurryFile(filePath: f.path);
+        if (isStalePlayRequest()) return;
 
         Uri uri;
         String title;
@@ -1042,8 +1103,12 @@ class _AppController {
 
         if (isFurry) {
           final playable = await ensurePlayableFileForFurry(f);
+          if (isStalePlayRequest()) return;
+
           uri = playable.uri;
           final meta = await getMetaPreviewForFurry(f);
+          if (isStalePlayRequest()) return;
+
           title = meta.title.isEmpty ? base : meta.title;
           artist = meta.artist.isNotEmpty ? meta.artist : meta.subtitle;
           artUri = meta.artUri;
@@ -1067,12 +1132,17 @@ class _AppController {
         );
       }
 
+      if (isStalePlayRequest()) return;
+
       await player.setAudioSource(
         ConcatenatingAudioSource(children: sources),
         initialIndex: index,
         initialPosition: Duration.zero,
       );
+      if (isStalePlayRequest()) return;
+
       await play();
+      if (isStalePlayRequest()) return;
 
       // Update UI immediately (system controls update via MediaItem tags).
       await _syncNowPlayingFromQueueIndex(index);
@@ -1083,9 +1153,12 @@ class _AppController {
     _queue = List<File>.from(queue);
     _queueIndex = index;
     _publishQueueStateAndAvailability();
+    if (isStalePlayRequest()) return;
+
     await playFile(
       file: queue[index],
       displayName: displayName ?? p.basename(queue[index].path),
+      requestToken: playToken,
     );
   }
 
@@ -1095,6 +1168,9 @@ class _AppController {
   Future<void> playPreviousTrack() async {
     final queue = _queue;
     if (queue == null) return;
+
+    final playToken = _beginPlayRequest();
+
     final now = DateTime.now();
     final withinWindow = _lastPreviousPressedAt != null &&
         now.difference(_lastPreviousPressedAt!) <= _previousDoublePressWindow;
@@ -1102,6 +1178,8 @@ class _AppController {
 
     if (!withinWindow) {
       await player.seek(Duration.zero);
+      if (!_isPlayRequestCurrent(playToken)) return;
+
       await play();
       return;
     }
@@ -1113,29 +1191,45 @@ class _AppController {
       _publishQueueStateAndAvailability();
       await player.seek(Duration.zero, index: nextIdx);
       await play();
+      if (!_isPlayRequestCurrent(playToken)) return;
+
       await _syncNowPlayingFromQueueIndex(nextIdx);
       return;
     }
-    await playFromQueue(queue: queue, index: nextIdx);
+    await playFromQueue(
+      queue: queue,
+      index: nextIdx,
+      requestToken: playToken,
+    );
   }
 
   Future<void> playNextTrack() async {
     final queue = _queue;
     if (queue == null) return;
     if (queue.length <= 1) return;
+
+    final playToken = _beginPlayRequest();
+
     final nextIdx = (_queueIndex + 1) % queue.length;
     if (_useAndroidPlaylistControls) {
       _queueIndex = nextIdx;
       _publishQueueStateAndAvailability();
       await player.seek(Duration.zero, index: nextIdx);
       await play();
+      if (!_isPlayRequestCurrent(playToken)) return;
+
       await _syncNowPlayingFromQueueIndex(nextIdx);
       return;
     }
-    await playFromQueue(queue: queue, index: nextIdx);
+    await playFromQueue(
+      queue: queue,
+      index: nextIdx,
+      requestToken: playToken,
+    );
   }
 
   Future<void> stop() async {
+    _invalidatePlayRequests();
     await player.stop();
     appendLog('Stopped');
   }
@@ -1194,16 +1288,24 @@ class _AppController {
     if (queue == null || queue.isEmpty) return;
     if (index < 0 || index >= queue.length) return;
 
+    final playToken = _beginPlayRequest();
+
     if (_useAndroidPlaylistControls) {
       _queueIndex = index;
       _publishQueueStateAndAvailability();
       await player.seek(Duration.zero, index: index);
       await play();
+      if (!_isPlayRequestCurrent(playToken)) return;
+
       await _syncNowPlayingFromQueueIndex(index);
       return;
     }
 
-    await playFromQueue(queue: queue, index: index);
+    await playFromQueue(
+      queue: queue,
+      index: index,
+      requestToken: playToken,
+    );
   }
 
   void clearQueue({bool keepPlaying = true}) {
@@ -1285,9 +1387,9 @@ class _AppController {
   }
 
   Future<_LibraryIndex> buildLibraryIndex(List<File> files) async {
-    final buildEpoch = ++_libraryBuildEpoch;
+    final buildToken = _libraryBuildGate.begin();
 
-    bool isStale() => buildEpoch != _libraryBuildEpoch;
+    bool isStale() => !_libraryBuildGate.isCurrent(buildToken);
 
     _LibraryIndex cachedOrEmpty() {
       final cached = _libraryIndexCache;
