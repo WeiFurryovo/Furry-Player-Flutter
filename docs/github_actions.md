@@ -12,6 +12,10 @@
   - Android：`app-debug.apk`（不需要签名 secrets）
   - Linux/Windows：桌面包（同样以 artifacts 形式提供）
 
+工作流复用脚本位于 `apps/furry_flutter/scripts/`：
+- `flutter_quality_gate.sh`：统一执行 `create_flutter_app + analyze + test`
+- `setup_android_ndk.sh`：统一安装 cmdline-tools、accept licenses、安装 NDK
+
 ## 1) 配置 Secrets（Android 签名必需）
 在 GitHub 仓库设置里：Settings → Secrets and variables → Actions → New repository secret
 

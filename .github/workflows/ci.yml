@@ -25,12 +25,7 @@ jobs:
         run: flutter doctor -v || true
 
       - name: Verify Flutter quality gate
-        run: |
-          set -euxo pipefail
-          ./apps/furry_flutter/create_flutter_app.sh --no-android --no-ffi
-          cd apps/furry_flutter/furry_flutter_app
-          flutter analyze
-          flutter test
+        run: ./apps/furry_flutter/scripts/flutter_quality_gate.sh
 
   android-debug:
     name: Android Debug APK (artifact)
@@ -61,22 +56,7 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install Android NDK (sdkmanager)
-        run: |
-          set -euxo pipefail
-          mkdir -p ~/.android
-          touch ~/.android/repositories.cfg
-          export ANDROID_SDK_ROOT="${ANDROID_HOME}"
-          sdkmanager --version
-          # Ensure cmdline-tools present on runner
-          sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --install "cmdline-tools;latest"
-          # `yes | sdkmanager --licenses` may end with `yes: Broken pipe` under pipefail; only enforce sdkmanager's exit code.
-          set +o pipefail
-          yes | sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --licenses >/dev/null
-          status="${PIPESTATUS[1]}"
-          set -o pipefail
-          test "$status" -eq 0
-          sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --install "ndk;26.1.10909125"
-          sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --list | sed -n '1,120p'
+        run: ./apps/furry_flutter/scripts/setup_android_ndk.sh
 
       - name: Build debug APK (no signing secrets needed)
         env:
