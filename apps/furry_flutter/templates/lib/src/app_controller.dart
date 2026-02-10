@@ -108,6 +108,12 @@ class _AppController {
       <String, _TrackEntryCacheEntry>{};
   _LibraryIndexCacheEntry? _libraryIndexCache;
   int _libraryBuildEpoch = 0;
+  int _outputsRefreshEpoch = 0;
+  static const _LibraryIndex _emptyLibraryIndex = _LibraryIndex(
+    tracks: <_TrackEntry>[],
+    albums: <_AlbumGroup>[],
+    artists: <_ArtistGroup>[],
+  );
   static const int _metaPreviewCacheLimit = 64;
   static const int _ioWorkerCount = 8;
   static const int _metaWorkerCount = 6;
@@ -201,11 +207,21 @@ class _AppController {
     requestedTab.value = index;
   }
 
+  bool get _supportsAndroidPlaylist => !kIsWeb && Platform.isAndroid;
+
+  bool get _useAndroidPlaylistControls =>
+      _androidPlaylistActive && _supportsAndroidPlaylist;
+
   void _syncQueueAvailability() {
     unawaited(systemMedia.setQueueAvailability(
       canGoNext: canPlayNextTrack,
       canGoPrevious: canPlayPreviousTrack,
     ));
+  }
+
+  void _publishQueueStateAndAvailability() {
+    _publishQueueState();
+    _syncQueueAvailability();
   }
 
   Future<List<File>> _listFiles(Directory dir) async {
@@ -737,7 +753,13 @@ class _AppController {
   }
 
   Future<void> refreshOutputs() async {
+    final refreshEpoch = ++_outputsRefreshEpoch;
+
+    bool isStale() => refreshEpoch != _outputsRefreshEpoch;
+
     final outDir = await outputsDir();
+    if (isStale()) return;
+
     final files = (await _listFiles(outDir))
         .where((f) => p.extension(f.path).toLowerCase() == '.furry')
         .toList(growable: false);
@@ -746,6 +768,8 @@ class _AppController {
       concurrency: _ioWorkerCount,
     )
       ..sort((a, b) => b.stat.modified.compareTo(a.stat.modified));
+
+    if (isStale()) return;
 
     furryOutputs.value =
         fileStates.map((entry) => entry.file).toList(growable: false);
@@ -793,8 +817,7 @@ class _AppController {
       _queueIndex = -1;
       _androidPlaylistActive = false;
     }
-    _publishQueueState();
-    _syncQueueAvailability();
+    _publishQueueStateAndAvailability();
 
     nowPlaying.value = _NowPlaying(
       title: name,
@@ -961,12 +984,11 @@ class _AppController {
 
     // On Android, use a playlist so audio_service can expose next/previous in the
     // system notification/lockscreen controls.
-    if (!kIsWeb && Platform.isAndroid && queue.length > 1) {
+    if (_supportsAndroidPlaylist && queue.length > 1) {
       _queue = List<File>.from(queue);
       _queueIndex = index;
       _androidPlaylistActive = true;
-      _publishQueueState();
-      _syncQueueAvailability();
+      _publishQueueStateAndAvailability();
 
       final name = displayName ?? p.basename(queue[index].path);
       nowPlaying.value = _NowPlaying(
@@ -1060,8 +1082,7 @@ class _AppController {
     _androidPlaylistActive = false;
     _queue = List<File>.from(queue);
     _queueIndex = index;
-    _publishQueueState();
-    _syncQueueAvailability();
+    _publishQueueStateAndAvailability();
     await playFile(
       file: queue[index],
       displayName: displayName ?? p.basename(queue[index].path),
@@ -1087,10 +1108,9 @@ class _AppController {
 
     if (queue.length <= 1) return;
     final nextIdx = (_queueIndex - 1 + queue.length) % queue.length;
-    if (_androidPlaylistActive && !kIsWeb && Platform.isAndroid) {
+    if (_useAndroidPlaylistControls) {
       _queueIndex = nextIdx;
-      _publishQueueState();
-      _syncQueueAvailability();
+      _publishQueueStateAndAvailability();
       await player.seek(Duration.zero, index: nextIdx);
       await play();
       await _syncNowPlayingFromQueueIndex(nextIdx);
@@ -1104,10 +1124,9 @@ class _AppController {
     if (queue == null) return;
     if (queue.length <= 1) return;
     final nextIdx = (_queueIndex + 1) % queue.length;
-    if (_androidPlaylistActive && !kIsWeb && Platform.isAndroid) {
+    if (_useAndroidPlaylistControls) {
       _queueIndex = nextIdx;
-      _publishQueueState();
-      _syncQueueAvailability();
+      _publishQueueStateAndAvailability();
       await player.seek(Duration.zero, index: nextIdx);
       await play();
       await _syncNowPlayingFromQueueIndex(nextIdx);
@@ -1175,10 +1194,9 @@ class _AppController {
     if (queue == null || queue.isEmpty) return;
     if (index < 0 || index >= queue.length) return;
 
-    if (_androidPlaylistActive && !kIsWeb && Platform.isAndroid) {
+    if (_useAndroidPlaylistControls) {
       _queueIndex = index;
-      _publishQueueState();
-      _syncQueueAvailability();
+      _publishQueueStateAndAvailability();
       await player.seek(Duration.zero, index: index);
       await play();
       await _syncNowPlayingFromQueueIndex(index);
@@ -1192,8 +1210,7 @@ class _AppController {
     _queue = null;
     _queueIndex = -1;
     _androidPlaylistActive = false;
-    _publishQueueState();
-    _syncQueueAvailability();
+    _publishQueueStateAndAvailability();
     if (!keepPlaying) {
       unawaited(stop());
       nowPlaying.value = null;
@@ -1221,8 +1238,7 @@ class _AppController {
     } else {
       _queueIndex = _queueIndex.clamp(0, queue.length - 1);
     }
-    _publishQueueState();
-    _syncQueueAvailability();
+    _publishQueueStateAndAvailability();
   }
 
   Future<void> enqueueFile(File file, {bool playNext = false}) async {
@@ -1245,8 +1261,7 @@ class _AppController {
     }
 
     _queue = q;
-    _publishQueueState();
-    _syncQueueAvailability();
+    _publishQueueStateAndAvailability();
   }
 
   void moveQueueItem(int oldIndex, int newIndex) {
@@ -1277,11 +1292,7 @@ class _AppController {
     _LibraryIndex cachedOrEmpty() {
       final cached = _libraryIndexCache;
       if (cached != null) return cached.index;
-      return const _LibraryIndex(
-        tracks: <_TrackEntry>[],
-        albums: <_AlbumGroup>[],
-        artists: <_ArtistGroup>[],
-      );
+      return _emptyLibraryIndex;
     }
 
     final states = await _statFilesInOrder(
