@@ -182,4 +182,86 @@ void main() {
     });
   });
 
+  group('QueueMutationPlannerHarness', () {
+    test('removeByPath keeps current track when still present', () {
+      final planner = QueueMutationPlannerHarness();
+      final result = planner.removeByPath(
+        queue: <String>['/music/a.furry', '/music/b.furry', '/music/c.furry'],
+        path: '/music/c.furry',
+        currentPath: '/music/b.furry',
+        currentIndex: 1,
+      );
+
+      expect(result.removed, isTrue);
+      expect(result.cleared, isFalse);
+      expect(result.queue, <String>['/music/a.furry', '/music/b.furry']);
+      expect(result.index, 1);
+    });
+
+    test('removeByPath clears when queue becomes empty', () {
+      final planner = QueueMutationPlannerHarness();
+      final result = planner.removeByPath(
+        queue: <String>['/music/only.furry'],
+        path: '/music/only.furry',
+        currentPath: '/music/only.furry',
+        currentIndex: 0,
+      );
+
+      expect(result.removed, isTrue);
+      expect(result.cleared, isTrue);
+      expect(result.queue, isNull);
+      expect(result.index, -1);
+    });
+
+    test('enqueue inserts next to current index when playNext', () {
+      final planner = QueueMutationPlannerHarness();
+      final result = planner.enqueue(
+        queue: <String>['/music/a.furry', '/music/b.furry'],
+        filePath: '/music/c.furry',
+        currentPath: '/music/a.furry',
+        currentIndex: 0,
+        playNext: true,
+      );
+
+      expect(result.inserted, isTrue);
+      expect(
+        result.queue,
+        <String>['/music/a.furry', '/music/c.furry', '/music/b.furry'],
+      );
+      expect(result.index, 0);
+    });
+
+    test('enqueue de-duplicates by path', () {
+      final planner = QueueMutationPlannerHarness();
+      final result = planner.enqueue(
+        queue: <String>['/music/a.furry'],
+        filePath: '/music/a.furry',
+        currentPath: '/music/a.furry',
+        currentIndex: 0,
+        playNext: false,
+      );
+
+      expect(result.inserted, isFalse);
+      expect(result.queue, <String>['/music/a.furry']);
+      expect(result.index, 0);
+    });
+
+    test('move tracks current item position after reorder', () {
+      final planner = QueueMutationPlannerHarness();
+      final result = planner.move(
+        queue: <String>['/music/a.furry', '/music/b.furry', '/music/c.furry'],
+        oldIndex: 0,
+        newIndex: 2,
+        currentPath: '/music/b.furry',
+        currentIndex: 1,
+      );
+
+      expect(result.moved, isTrue);
+      expect(
+        result.queue,
+        <String>['/music/b.furry', '/music/c.furry', '/music/a.furry'],
+      );
+      expect(result.index, 0);
+    });
+  });
 }
