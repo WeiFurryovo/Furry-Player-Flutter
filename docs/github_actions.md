@@ -19,6 +19,7 @@
 - `build_android_flutter.sh`：统一构建 Android debug/release 包并处理签名注入
 - `build_linux_desktop_bundle.sh`：统一构建 Linux Flutter 桌面包并拷贝 `libfurry_ffi.so`
 - `build_windows_desktop_bundle.ps1`：统一构建 Windows Flutter 桌面包并打包 `furry_flutter_windows.zip`
+- `prepare_flutter_app_windows.ps1`：Windows 下增量同步模板与依赖（基于 deps hash）
 
 ## 1) 配置 Secrets（Android 签名必需）
 在 GitHub 仓库设置里：Settings → Secrets and variables → Actions → New repository secret
