@@ -22,7 +22,7 @@ jobs:
           cache: true
 
       - name: Flutter doctor
-        run: flutter doctor -v || true
+        run: ./apps/furry_flutter/scripts/flutter_doctor.sh
 
       - name: Verify Flutter quality gate
         run: ./apps/furry_flutter/scripts/flutter_quality_gate.sh
@@ -47,7 +47,7 @@ jobs:
           cache: true
 
       - name: Flutter doctor
-        run: flutter doctor -v || true
+        run: ./apps/furry_flutter/scripts/flutter_doctor.sh
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -98,7 +98,7 @@ jobs:
           cache: true
 
       - name: Flutter doctor
-        run: flutter doctor -v || true
+        run: ./apps/furry_flutter/scripts/flutter_doctor.sh
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -135,7 +135,8 @@ jobs:
       - name: Flutter doctor
         shell: pwsh
         run: |
-          flutter doctor -v
+          $ErrorActionPreference = "Stop"
+          & .\apps\furry_flutter\scripts\flutter_doctor.ps1
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
