@@ -64,13 +64,7 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p dist/android/flutter
-          (
-            ./apps/furry_flutter/create_flutter_app.sh --no-ffi
-            cd apps/furry_flutter/furry_flutter_app
-            flutter analyze
-            flutter build apk --debug --verbose
-          ) 2>&1 | tee dist/android/flutter/android_debug_build.log
-          cp -f apps/furry_flutter/furry_flutter_app/build/app/outputs/flutter-apk/app-debug.apk dist/android/flutter/
+          ./apps/furry_flutter/scripts/build_android_flutter.sh debug dist/android/flutter 2>&1 | tee dist/android/flutter/android_debug_build.log
 
       - name: Checksums
         if: success()

@@ -67,30 +67,7 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euxo pipefail
-          ./apps/furry_flutter/create_flutter_app.sh --no-ffi
-          cd apps/furry_flutter/furry_flutter_app
-
-          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ]; then
-            echo "[ERROR] Missing secrets for signing. See docs/github_actions.md" >&2
-            exit 2
-          fi
-
-          mkdir -p android/app
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
-          cat > android/key.properties <<EOF
-          storePassword=$ANDROID_KEYSTORE_PASSWORD
-          keyPassword=$ANDROID_KEY_PASSWORD
-          keyAlias=$ANDROID_KEY_ALIAS
-          storeFile=upload-keystore.jks
-          EOF
-
-          flutter analyze
-          flutter build apk --release --split-per-abi --verbose
-          flutter build appbundle --release --verbose
-
-          mkdir -p ../../../dist/android/flutter
-          cp -f build/app/outputs/flutter-apk/app-*-release.apk ../../../dist/android/flutter/ || true
-          cp -f build/app/outputs/bundle/release/app-release.aab ../../../dist/android/flutter/
+          ./apps/furry_flutter/scripts/build_android_flutter.sh release dist/android/flutter
 
       - name: Checksums
         run: |
