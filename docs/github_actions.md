@@ -15,6 +15,7 @@
 工作流复用脚本位于 `apps/furry_flutter/scripts/`：
 - `flutter_quality_gate.sh`：统一执行 `create_flutter_app + analyze + test`
 - `setup_android_ndk.sh`：统一安装 cmdline-tools、accept licenses、安装 NDK
+- `install_linux_desktop_deps.sh`：统一安装 Linux Flutter 桌面构建依赖
 - `build_android_flutter.sh`：统一构建 Android debug/release 包并处理签名注入
 - `build_linux_desktop_bundle.sh`：统一构建 Linux Flutter 桌面包并拷贝 `libfurry_ffi.so`
 - `build_windows_desktop_bundle.ps1`：统一构建 Windows Flutter 桌面包并打包 `furry_flutter_windows.zip`
