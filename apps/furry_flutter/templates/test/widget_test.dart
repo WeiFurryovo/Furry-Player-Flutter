@@ -81,6 +81,71 @@ void main() {
     });
   });
 
+  group('LibraryPageSuggestionHarness', () {
+    test('buildSuggestions returns top 6 when query is empty', () {
+      final state = LibraryPageSearchStateHarness();
+      final result = state.buildSuggestions(
+        tracks: List.generate(
+          10,
+          (index) => (
+            title: 'Song $index',
+            artist: 'Artist',
+            album: 'Album',
+            hasCover: index.isEven,
+          ),
+        ),
+        query: '',
+        sourceHash: 1,
+      );
+
+      expect(result.length, 6);
+      expect(result.first, 'Song 0');
+      expect(result.last, 'Song 5');
+      state.dispose();
+    });
+
+    test('buildSuggestions caps at 8 and resets cache on source hash change',
+        () {
+      final state = LibraryPageSearchStateHarness();
+      final first = state.buildSuggestions(
+        tracks: List.generate(
+          20,
+          (index) => (
+            title: 'Alpha $index',
+            artist: 'Artist',
+            album: 'Album',
+            hasCover: true,
+          ),
+        ),
+        query: 'alpha',
+        sourceHash: 1,
+      );
+      expect(first.length, 8);
+      expect(state.suggestionCacheSize, 1);
+
+      final second = state.buildSuggestions(
+        tracks: const <({
+          String title,
+          String artist,
+          String album,
+          bool hasCover,
+        })>[
+          (
+            title: 'Beta One',
+            artist: 'Another',
+            album: 'New',
+            hasCover: false,
+          ),
+        ],
+        query: 'alpha',
+        sourceHash: 2,
+      );
+
+      expect(second, isEmpty);
+      expect(state.suggestionCacheSize, 1);
+      state.dispose();
+    });
+  });
   group('LibraryPageFilterStateHarness', () {
     test('applyOptions updates sorting and filter flags', () {
       final state = LibraryPageFilterStateHarness();
@@ -100,6 +165,143 @@ void main() {
       final state = LibraryPageFilterStateHarness();
       state.setViewIndex(3);
       expect(state.viewIndex, 3);
+    });
+
+    test('buildFilteredTrackTitles sorts by size and supports ascending toggle',
+        () {
+      final state = LibraryPageFilterStateHarness();
+      state.applyOptions(
+        sortIndex: 4,
+        ascending: false,
+        onlyWithCover: false,
+      );
+
+      final descending = state.buildFilteredTrackTitles(
+        tracks: const <({
+          String title,
+          String artist,
+          String album,
+          int bytes,
+          int modifiedMs,
+          bool hasCover,
+        })>[
+          (
+            title: 'Tiny',
+            artist: 'A',
+            album: 'X',
+            bytes: 1,
+            modifiedMs: 1,
+            hasCover: false,
+          ),
+          (
+            title: 'Huge',
+            artist: 'B',
+            album: 'X',
+            bytes: 9,
+            modifiedMs: 2,
+            hasCover: true,
+          ),
+          (
+            title: 'Medium',
+            artist: 'C',
+            album: 'X',
+            bytes: 5,
+            modifiedMs: 3,
+            hasCover: true,
+          ),
+        ],
+      );
+      expect(descending, <String>['Huge', 'Medium', 'Tiny']);
+
+      state.applyOptions(
+        sortIndex: 4,
+        ascending: true,
+        onlyWithCover: false,
+      );
+      final ascending = state.buildFilteredTrackTitles(
+        tracks: const <({
+          String title,
+          String artist,
+          String album,
+          int bytes,
+          int modifiedMs,
+          bool hasCover,
+        })>[
+          (
+            title: 'Tiny',
+            artist: 'A',
+            album: 'X',
+            bytes: 1,
+            modifiedMs: 1,
+            hasCover: false,
+          ),
+          (
+            title: 'Huge',
+            artist: 'B',
+            album: 'X',
+            bytes: 9,
+            modifiedMs: 2,
+            hasCover: true,
+          ),
+          (
+            title: 'Medium',
+            artist: 'C',
+            album: 'X',
+            bytes: 5,
+            modifiedMs: 3,
+            hasCover: true,
+          ),
+        ],
+      );
+      expect(ascending, <String>['Tiny', 'Medium', 'Huge']);
+    });
+
+    test('buildFilteredTrackTitles applies cover and query filtering', () {
+      final state = LibraryPageFilterStateHarness();
+      state.applyOptions(
+        sortIndex: 1,
+        ascending: false,
+        onlyWithCover: true,
+      );
+
+      final filtered = state.buildFilteredTrackTitles(
+        tracks: const <({
+          String title,
+          String artist,
+          String album,
+          int bytes,
+          int modifiedMs,
+          bool hasCover,
+        })>[
+          (
+            title: 'Night Drive',
+            artist: 'A',
+            album: 'M1',
+            bytes: 3,
+            modifiedMs: 1,
+            hasCover: true,
+          ),
+          (
+            title: 'Night Walk',
+            artist: 'B',
+            album: 'M2',
+            bytes: 4,
+            modifiedMs: 2,
+            hasCover: false,
+          ),
+          (
+            title: 'Sunny Day',
+            artist: 'C',
+            album: 'M3',
+            bytes: 5,
+            modifiedMs: 3,
+            hasCover: true,
+          ),
+        ],
+        query: 'night',
+      );
+
+      expect(filtered, <String>['Night Drive']);
     });
   });
 
@@ -261,6 +463,51 @@ void main() {
         result.queue,
         <String>['/music/b.furry', '/music/c.furry', '/music/a.furry'],
       );
+      expect(result.index, 0);
+    });
+
+    test('removeByPath keeps queue unchanged for missing path', () {
+      final planner = QueueMutationPlannerHarness();
+      final result = planner.removeByPath(
+        queue: <String>['/music/a.furry', '/music/b.furry'],
+        path: '/music/missing.furry',
+        currentPath: '/music/a.furry',
+        currentIndex: 0,
+      );
+
+      expect(result.removed, isFalse);
+      expect(result.cleared, isFalse);
+      expect(result.queue, <String>['/music/a.furry', '/music/b.furry']);
+      expect(result.index, 0);
+    });
+
+    test('enqueue bootstraps queue when currently empty', () {
+      final planner = QueueMutationPlannerHarness();
+      final result = planner.enqueue(
+        queue: null,
+        filePath: '/music/new.furry',
+        currentPath: null,
+        currentIndex: -1,
+        playNext: true,
+      );
+
+      expect(result.inserted, isTrue);
+      expect(result.queue, <String>['/music/new.furry']);
+      expect(result.index, -1);
+    });
+
+    test('move ignores invalid indexes', () {
+      final planner = QueueMutationPlannerHarness();
+      final result = planner.move(
+        queue: <String>['/music/a.furry', '/music/b.furry'],
+        oldIndex: -1,
+        newIndex: 1,
+        currentPath: '/music/a.furry',
+        currentIndex: 0,
+      );
+
+      expect(result.moved, isFalse);
+      expect(result.queue, <String>['/music/a.furry', '/music/b.furry']);
       expect(result.index, 0);
     });
   });

@@ -41,12 +41,15 @@ part 'src/library_page.dart';
 part 'src/library_page_state.dart';
 part 'src/library_page_filter_state.dart';
 part 'src/library_page_widgets.dart';
+part 'src/library_page_content_slivers.dart';
+part 'src/library_page_detail_pages.dart';
 part 'src/library_page_logic.dart';
 part 'src/now_playing_panel.dart';
 part 'src/settings_page.dart';
 part 'src/converter_page.dart';
 part 'src/media_models.dart';
 part 'src/app_controller_services.dart';
+part 'src/app_controller_library.dart';
 part 'src/app_controller_queue.dart';
 part 'src/app_controller.dart';
 

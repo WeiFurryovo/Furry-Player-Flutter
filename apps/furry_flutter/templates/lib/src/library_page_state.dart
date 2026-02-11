@@ -138,5 +138,54 @@ class LibraryPageSearchStateHarness {
     _inner.scheduleQueryUpdate(value, onChanged ?? () {});
   }
 
+  int get suggestionCacheSize => _inner._suggestionCache.length;
+
+  List<String> buildSuggestions({
+    required List<
+            ({
+              String title,
+              String artist,
+              String album,
+              bool hasCover,
+            })>
+        tracks,
+    required String query,
+    required int sourceHash,
+  }) {
+    final q = query.trim().toLowerCase();
+    final entries = <_TrackEntry>[];
+    for (var index = 0; index < tracks.length; index++) {
+      final item = tracks[index];
+      entries.add(
+        _TrackEntry(
+          file: File('/music/t_$index.furry'),
+          meta: _MetaPreview(
+            title: item.title,
+            artist: item.artist,
+            album: item.album,
+            subtitle: [
+              if (item.artist.trim().isNotEmpty) item.artist.trim(),
+              if (item.album.trim().isNotEmpty) item.album.trim(),
+            ].join(' · '),
+            artUri: item.hasCover ? Uri.file('/cover/$index.jpg') : null,
+            coverBytesLen: null,
+          ),
+          modified: DateTime.fromMillisecondsSinceEpoch(index),
+          bytes: index,
+        ),
+      );
+    }
+
+    final suggestions = _inner.buildSuggestions(
+      entries,
+      q,
+      sourceHash,
+      matchesQuery: (track, queryLower) => track.matchesQuery(queryLower),
+    );
+    return suggestions
+        .map((track) => track.displayTitle)
+        .toList(growable: false);
+  }
+
   void dispose() => _inner.dispose();
 }

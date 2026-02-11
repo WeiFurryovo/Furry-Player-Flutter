@@ -13,6 +13,7 @@ else
 fi
 
 "$ROOT/apps/furry_flutter/create_flutter_app.sh" --no-android --no-ffi
+"$ROOT/apps/furry_flutter/scripts/verify_template_sync.sh"
 
 cd "$ROOT/apps/furry_flutter/furry_flutter_app"
 "${FLUTTER[@]}" analyze

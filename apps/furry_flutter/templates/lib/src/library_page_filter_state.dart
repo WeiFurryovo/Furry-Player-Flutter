@@ -104,4 +104,53 @@ class LibraryPageFilterStateHarness {
       ),
     );
   }
+
+  List<String> buildFilteredTrackTitles({
+    required List<
+            ({
+              String title,
+              String artist,
+              String album,
+              int bytes,
+              int modifiedMs,
+              bool hasCover,
+            })>
+        tracks,
+    String query = '',
+  }) {
+    final entries = <_TrackEntry>[];
+    for (var i = 0; i < tracks.length; i++) {
+      final item = tracks[i];
+      entries.add(
+        _TrackEntry(
+          file: File('/library/$i.furry'),
+          meta: _MetaPreview(
+            title: item.title,
+            artist: item.artist,
+            album: item.album,
+            subtitle: [
+              if (item.artist.trim().isNotEmpty) item.artist.trim(),
+              if (item.album.trim().isNotEmpty) item.album.trim(),
+            ].join(' · '),
+            artUri: item.hasCover ? Uri.file('/cover/$i.jpg') : null,
+            coverBytesLen: null,
+          ),
+          modified: DateTime.fromMillisecondsSinceEpoch(item.modifiedMs),
+          bytes: item.bytes,
+        ),
+      );
+    }
+
+    final filtered = _inner.buildFilteredTracks(
+      _LibraryIndex(
+        tracks: entries,
+        albums: <_AlbumGroup>[],
+        artists: <_ArtistGroup>[],
+      ),
+      query.trim().toLowerCase(),
+      matchesQuery: (track, queryLower) => track.matchesQuery(queryLower),
+    );
+
+    return filtered.map((track) => track.displayTitle).toList(growable: false);
+  }
 }
