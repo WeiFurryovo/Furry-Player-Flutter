@@ -68,10 +68,7 @@ jobs:
 
       - name: Checksums
         if: success()
-        run: |
-          set -euxo pipefail
-          cd dist/android/flutter
-          sha256sum app-debug.apk > SHA256SUMS.txt
+        run: ./apps/furry_flutter/scripts/write_sha256_sums.sh dist/android/flutter/SHA256SUMS.txt dist/android/flutter/app-debug.apk
 
       - name: Upload artifact (android-debug)
         if: always()
@@ -115,10 +112,7 @@ jobs:
 
       - name: Checksums
         if: success()
-        run: |
-          set -euxo pipefail
-          cd dist/desktop/flutter/linux
-          sha256sum furry_flutter_linux.tar.gz > SHA256SUMS.txt
+        run: ./apps/furry_flutter/scripts/write_sha256_sums.sh dist/desktop/flutter/linux/SHA256SUMS.txt dist/desktop/flutter/linux/furry_flutter_linux.tar.gz
 
       - name: Upload artifact (linux-desktop)
         if: always()
@@ -171,9 +165,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          cd dist\desktop\flutter\windows
-          $hash = (Get-FileHash furry_flutter_windows.zip -Algorithm SHA256).Hash.ToLower()
-          "$hash  furry_flutter_windows.zip" | Out-File -Encoding ascii SHA256SUMS.txt
+          & .\apps\furry_flutter\scripts\write_sha256_sums.ps1 -OutputFile "dist\desktop\flutter\windows\SHA256SUMS.txt" -Files "dist\desktop\flutter\windows\furry_flutter_windows.zip"
 
       - name: Upload artifact (windows-desktop)
         if: always()
