@@ -564,7 +564,7 @@ class _QueueSliver extends StatelessWidget {
   }
 }
 
-class _QueueRow extends StatelessWidget {
+class _QueueRow extends StatefulWidget {
   const _QueueRow({
     super.key,
     required this.controller,
@@ -578,6 +578,39 @@ class _QueueRow extends StatelessWidget {
   final int index;
   final bool isCurrent;
 
+  @override
+  State<_QueueRow> createState() => _QueueRowState();
+}
+
+class _QueueRowState extends State<_QueueRow> {
+  Future<_MetaPreview>? _previewFuture;
+
+  bool get _isFurry =>
+      p.extension(p.basename(widget.file.path)).toLowerCase() == '.furry';
+
+  @override
+  void initState() {
+    super.initState();
+    _primePreviewFuture();
+  }
+
+  @override
+  void didUpdateWidget(covariant _QueueRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.file.path != widget.file.path ||
+        oldWidget.controller != widget.controller) {
+      _primePreviewFuture();
+    }
+  }
+
+  void _primePreviewFuture() {
+    if (_isFurry) {
+      _previewFuture = widget.controller.getMetaPreviewForFurry(widget.file);
+    } else {
+      _previewFuture = null;
+    }
+  }
+
   Widget _buildNowPlayingBadge(ColorScheme cs) {
     return Positioned(
       right: -6,
@@ -585,10 +618,10 @@ class _QueueRow extends StatelessWidget {
       child: AnimatedScale(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutBack,
-        scale: isCurrent ? 1 : 0.8,
+        scale: widget.isCurrent ? 1 : 0.8,
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 180),
-          opacity: isCurrent ? 1 : 0,
+          opacity: widget.isCurrent ? 1 : 0,
           child: Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
@@ -609,17 +642,13 @@ class _QueueRow extends StatelessWidget {
     );
   }
 
-  Widget _buildQueueLeading({
-    required ColorScheme cs,
-    required bool isFurry,
-    required Uri? artUri,
-  }) {
-    if (isFurry) {
+  Widget _buildQueueLeading({required ColorScheme cs, required Uri? artUri}) {
+    if (_isFurry) {
       return Stack(
         clipBehavior: Clip.none,
         children: [
           _CoverThumb(artUri: artUri),
-          if (isCurrent) _buildNowPlayingBadge(cs),
+          if (widget.isCurrent) _buildNowPlayingBadge(cs),
         ],
       );
     }
@@ -630,9 +659,9 @@ class _QueueRow extends StatelessWidget {
         CircleAvatar(
           backgroundColor: cs.surfaceContainerHigh,
           foregroundColor: cs.onSurfaceVariant,
-          child: Text('${index + 1}'),
+          child: Text('${widget.index + 1}'),
         ),
-        if (isCurrent) _buildNowPlayingBadge(cs),
+        if (widget.isCurrent) _buildNowPlayingBadge(cs),
       ],
     );
   }
@@ -640,9 +669,7 @@ class _QueueRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final base = p.basename(file.path);
-    final ext = p.extension(base).toLowerCase();
-    final isFurry = ext == '.furry';
+    final base = p.basename(widget.file.path);
 
     Widget buildTile(_MetaPreview? meta) {
       final subtitleParts = <String>[
@@ -653,19 +680,17 @@ class _QueueRow extends StatelessWidget {
           ? subtitleParts.join(' · ')
           : (meta?.subtitle ?? '');
 
+      final fallbackSubtitle = _isFurry && meta == null ? '读取标签中…' : '本地文件';
+
       return ListTile(
-        leading: _buildQueueLeading(
-          cs: cs,
-          isFurry: isFurry,
-          artUri: meta?.artUri,
-        ),
+        leading: _buildQueueLeading(cs: cs, artUri: meta?.artUri),
         title: Text(
           meta?.title ?? base,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
-          subtitleText.isEmpty ? '本地文件' : subtitleText,
+          subtitleText.isEmpty ? fallbackSubtitle : subtitleText,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -674,29 +699,27 @@ class _QueueRow extends StatelessWidget {
           children: [
             IconButton(
               tooltip: '移除',
-              onPressed: () => controller.removeFromQueueByPath(file.path),
+              onPressed: () =>
+                  widget.controller.removeFromQueueByPath(widget.file.path),
               icon: const Icon(Icons.close_rounded),
             ),
             ReorderableDragStartListener(
-              index: index,
+              index: widget.index,
               child: const Icon(Icons.drag_handle_rounded),
             ),
           ],
         ),
-        onTap: () => controller.playAtQueueIndex(index),
+        onTap: () => widget.controller.playAtQueueIndex(widget.index),
       );
     }
 
-    final previewFuture =
-        isFurry ? controller.getMetaPreviewForFurry(file) : null;
-
     return RepaintBoundary(
       child: Card(
-        key: key,
+        key: widget.key,
         margin: const EdgeInsets.only(bottom: 10),
-        child: isFurry
+        child: _isFurry
             ? FutureBuilder<_MetaPreview>(
-                future: previewFuture,
+                future: _previewFuture,
                 builder: (context, snap) {
                   return buildTile(snap.data);
                 },

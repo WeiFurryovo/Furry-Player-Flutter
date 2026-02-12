@@ -279,3 +279,85 @@ class _SortChip extends StatelessWidget {
 }
 
 typedef _BytesFmt = String Function(int bytes);
+
+class _LibrarySuggestionLoadingList extends StatelessWidget {
+  const _LibrarySuggestionLoadingList();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ListTile(
+          leading: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          title: Text('正在加载搜索建议…'),
+          subtitle: Text('首次加载可能需要几秒'),
+        ),
+      ],
+    );
+  }
+}
+
+class _LibraryLoadingSliver extends StatelessWidget {
+  const _LibraryLoadingSliver({required this.rows});
+
+  final int rows;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return SliverList.separated(
+      itemCount: rows,
+      separatorBuilder: (context, index) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        return RepaintBoundary(
+          child: Card(
+            margin: EdgeInsets.zero,
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+              leading: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              title: Container(
+                height: 14,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: _withOpacityCompat(cs.surfaceContainerHighest, 0.9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    height: 12,
+                    width: 140,
+                    decoration: BoxDecoration(
+                      color:
+                          _withOpacityCompat(cs.surfaceContainerHighest, 0.75),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+              trailing: Icon(
+                Icons.more_horiz_rounded,
+                color: _withOpacityCompat(cs.onSurfaceVariant, 0.6),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}

@@ -35,6 +35,24 @@ String _albumHeroTag(_AlbumGroup album) {
   return 'album_${album.artist.toLowerCase()}|${album.album.toLowerCase()}';
 }
 
+int _libraryLoadingPlaceholderCount(_LibraryView view) {
+  switch (view) {
+    case _LibraryView.tracks:
+      return 6;
+    case _LibraryView.albums:
+      return 4;
+    case _LibraryView.artists:
+      return 5;
+    case _LibraryView.queue:
+      return 5;
+  }
+}
+
+@visibleForTesting
+int libraryLoadingPlaceholderCountForTest(int viewIndex) {
+  return _libraryLoadingPlaceholderCount(_LibraryView.values[viewIndex]);
+}
+
 String _nowPlayingHeroTag(String sourcePath) {
   // Keep it stable and reasonably short; Hero tags can be any object, but we
   // prefer a string for easier debugging.

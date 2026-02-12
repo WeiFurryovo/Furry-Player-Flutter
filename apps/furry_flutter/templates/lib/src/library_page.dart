@@ -194,14 +194,7 @@ class _LibraryPageState extends State<LibraryPage> {
                     builder: (context, snap) {
                       final idx = snap.data;
                       if (idx == null) {
-                        return const ListTile(
-                          leading: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                          title: Text('正在加载…'),
-                        );
+                        return const _LibrarySuggestionLoadingList();
                       }
 
                       final tracks = idx.tracks;
@@ -334,13 +327,8 @@ class _LibraryPageState extends State<LibraryPage> {
                 builder: (context, snap) {
                   final idx = snap.data;
                   if (idx == null) {
-                    return const SliverToBoxAdapter(
-                      child: Padding(
-                        padding: EdgeInsets.only(top: 12),
-                        child: Center(
-                          child: CircularProgressIndicator(),
-                        ),
-                      ),
+                    return _LibraryLoadingSliver(
+                      rows: _libraryLoadingPlaceholderCount(_filterState.view),
                     );
                   }
 

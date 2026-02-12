@@ -173,6 +173,15 @@ void main() {
       state.dispose();
     });
   });
+
+  group('libraryLoadingPlaceholderCountForTest', () {
+    test('returns stable placeholder counts per library view', () {
+      expect(libraryLoadingPlaceholderCountForTest(0), 6);
+      expect(libraryLoadingPlaceholderCountForTest(1), 4);
+      expect(libraryLoadingPlaceholderCountForTest(2), 5);
+      expect(libraryLoadingPlaceholderCountForTest(3), 5);
+    });
+  });
   group('LibraryPageFilterStateHarness', () {
     test('applyOptions updates sorting and filter flags', () {
       final state = LibraryPageFilterStateHarness();
