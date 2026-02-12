@@ -121,7 +121,9 @@ extension _AppControllerLibraryExtension on _AppController {
   }
 
   Future<_LibraryIndex> buildLibraryIndex(List<File> files) async {
+    final stopwatch = Stopwatch()..start();
     final buildToken = _libraryBuildGate.begin();
+    var pendingCount = 0;
 
     bool isStale() => !_libraryBuildGate.isCurrent(buildToken);
 
@@ -144,6 +146,12 @@ extension _AppControllerLibraryExtension on _AppController {
     final signature = _fileStatesSignature(states);
     final cached = _libraryIndexCache;
     if (cached != null && cached.signature == signature) {
+      stopwatch.stop();
+      final elapsedMs = stopwatch.elapsedMilliseconds;
+      if (elapsedMs >= 400) {
+        appendLog(
+            'Library index cache hit: files=${states.length}, ${elapsedMs}ms');
+      }
       return cached.index;
     }
 
@@ -175,6 +183,8 @@ extension _AppControllerLibraryExtension on _AppController {
         bytes: bytes,
       ));
     }
+
+    pendingCount = pending.length;
 
     if (pending.isNotEmpty) {
       var cursor = 0;
@@ -306,6 +316,16 @@ extension _AppControllerLibraryExtension on _AppController {
       signature: signature,
       index: result,
     );
+
+    stopwatch.stop();
+    final elapsedMs = stopwatch.elapsedMilliseconds;
+    if (elapsedMs >= 700 || pendingCount >= 32) {
+      appendLog(
+        'Library index rebuilt: files=${states.length}, refreshed=$pendingCount, '
+        'tracks=${tracks.length}, ${elapsedMs}ms',
+      );
+    }
+
     return result;
   }
 }

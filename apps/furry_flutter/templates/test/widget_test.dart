@@ -145,6 +145,33 @@ void main() {
       expect(state.suggestionCacheSize, 1);
       state.dispose();
     });
+
+    test('buildSuggestions keeps cache bounded to avoid memory growth', () {
+      final state = LibraryPageSearchStateHarness();
+
+      for (var i = 0; i < 64; i++) {
+        state.buildSuggestions(
+          tracks: const <({
+            String title,
+            String artist,
+            String album,
+            bool hasCover,
+          })>[
+            (
+              title: 'Song',
+              artist: 'Artist',
+              album: 'Album',
+              hasCover: false,
+            ),
+          ],
+          query: 'q$i',
+          sourceHash: 1,
+        );
+      }
+
+      expect(state.suggestionCacheSize, lessThanOrEqualTo(32));
+      state.dispose();
+    });
   });
   group('LibraryPageFilterStateHarness', () {
     test('applyOptions updates sorting and filter flags', () {

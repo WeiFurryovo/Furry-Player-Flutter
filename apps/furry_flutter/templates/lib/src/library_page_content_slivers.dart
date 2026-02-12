@@ -52,82 +52,84 @@ class _TracksSliver extends StatelessWidget {
                 ? meta.subtitle
                 : '${bytesFmt(t.bytes)} · ${t.modified.toLocal()}');
 
-        return Card(
-          margin: EdgeInsets.zero,
-          color: isCurrent
-              ? _withOpacityCompat(cs.secondaryContainer, 0.55)
-              : null,
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-            leading: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                _CoverThumb(artUri: t.meta.artUri),
-                if (isCurrent)
-                  Positioned(
-                    right: -6,
-                    bottom: -6,
-                    child: AnimatedScale(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOutBack,
-                      scale: 1,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: cs.primary,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: _withOpacityCompat(cs.surface, 0.85),
+        return RepaintBoundary(
+          child: Card(
+            margin: EdgeInsets.zero,
+            color: isCurrent
+                ? _withOpacityCompat(cs.secondaryContainer, 0.55)
+                : null,
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+              leading: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  _CoverThumb(artUri: t.meta.artUri),
+                  if (isCurrent)
+                    Positioned(
+                      right: -6,
+                      bottom: -6,
+                      child: AnimatedScale(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOutBack,
+                        scale: 1,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: cs.primary,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: _withOpacityCompat(cs.surface, 0.85),
+                            ),
                           ),
-                        ),
-                        child: Icon(
-                          Icons.equalizer_rounded,
-                          size: 14,
-                          color: cs.onPrimary,
+                          child: Icon(
+                            Icons.equalizer_rounded,
+                            size: 14,
+                            color: cs.onPrimary,
+                          ),
                         ),
                       ),
                     ),
+                ],
+              ),
+              title: Text(
+                t.displayTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: '加入队列',
+                    onPressed: () async {
+                      HapticFeedback.selectionClick();
+                      await controller.enqueueFile(t.file, playNext: false);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('已加入队列')),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.queue_music_rounded),
                   ),
-              ],
-            ),
-            title: Text(
-              t.displayTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  tooltip: '加入队列',
-                  onPressed: () async {
-                    HapticFeedback.selectionClick();
-                    await controller.enqueueFile(t.file, playNext: false);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('已加入队列')),
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.queue_music_rounded),
-                ),
-                _TrackOverflowMenu(
-                  controller: controller,
-                  track: t,
-                  queueFiles: queueFiles,
-                  indexInQueue: i,
-                ),
-              ],
-            ),
-            onTap: () => controller.playFromQueue(
-              queue: queueFiles,
-              index: i,
-              displayName: p.basename(t.file.path),
+                  _TrackOverflowMenu(
+                    controller: controller,
+                    track: t,
+                    queueFiles: queueFiles,
+                    indexInQueue: i,
+                  ),
+                ],
+              ),
+              onTap: () => controller.playFromQueue(
+                queue: queueFiles,
+                index: i,
+                displayName: p.basename(t.file.path),
+              ),
             ),
           ),
         );
@@ -576,6 +578,65 @@ class _QueueRow extends StatelessWidget {
   final int index;
   final bool isCurrent;
 
+  Widget _buildNowPlayingBadge(ColorScheme cs) {
+    return Positioned(
+      right: -6,
+      bottom: -6,
+      child: AnimatedScale(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutBack,
+        scale: isCurrent ? 1 : 0.8,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 180),
+          opacity: isCurrent ? 1 : 0,
+          child: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: cs.primary,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: _withOpacityCompat(cs.surface, 0.85),
+              ),
+            ),
+            child: Icon(
+              Icons.equalizer_rounded,
+              size: 14,
+              color: cs.onPrimary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQueueLeading({
+    required ColorScheme cs,
+    required bool isFurry,
+    required Uri? artUri,
+  }) {
+    if (isFurry) {
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          _CoverThumb(artUri: artUri),
+          if (isCurrent) _buildNowPlayingBadge(cs),
+        ],
+      );
+    }
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        CircleAvatar(
+          backgroundColor: cs.surfaceContainerHigh,
+          foregroundColor: cs.onSurfaceVariant,
+          child: Text('${index + 1}'),
+        ),
+        if (isCurrent) _buildNowPlayingBadge(cs),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -583,125 +644,31 @@ class _QueueRow extends StatelessWidget {
     final ext = p.extension(base).toLowerCase();
     final isFurry = ext == '.furry';
 
-    return Card(
-      key: key,
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        leading: isFurry
-            ? FutureBuilder<_MetaPreview>(
-                future: controller.getMetaPreviewForFurry(file),
-                builder: (context, snap) {
-                  final meta = snap.data;
-                  final art = meta?.artUri;
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      _CoverThumb(artUri: art),
-                      if (isCurrent)
-                        Positioned(
-                          right: -6,
-                          bottom: -6,
-                          child: AnimatedScale(
-                            duration: const Duration(milliseconds: 220),
-                            curve: Curves.easeOutBack,
-                            scale: isCurrent ? 1 : 0.8,
-                            child: AnimatedOpacity(
-                              duration: const Duration(milliseconds: 180),
-                              opacity: isCurrent ? 1 : 0,
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: cs.primary,
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(
-                                    color: _withOpacityCompat(cs.surface, 0.85),
-                                  ),
-                                ),
-                                child: Icon(
-                                  Icons.equalizer_rounded,
-                                  size: 14,
-                                  color: cs.onPrimary,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  );
-                },
-              )
-            : Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  CircleAvatar(
-                    backgroundColor: cs.surfaceContainerHigh,
-                    foregroundColor: cs.onSurfaceVariant,
-                    child: Text('${index + 1}'),
-                  ),
-                  if (isCurrent)
-                    Positioned(
-                      right: -6,
-                      bottom: -6,
-                      child: AnimatedScale(
-                        duration: const Duration(milliseconds: 220),
-                        curve: Curves.easeOutBack,
-                        scale: isCurrent ? 1 : 0.8,
-                        child: AnimatedOpacity(
-                          duration: const Duration(milliseconds: 180),
-                          opacity: isCurrent ? 1 : 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: cs.primary,
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: _withOpacityCompat(cs.surface, 0.85),
-                              ),
-                            ),
-                            child: Icon(
-                              Icons.equalizer_rounded,
-                              size: 14,
-                              color: cs.onPrimary,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-        title: isFurry
-            ? FutureBuilder<_MetaPreview>(
-                future: controller.getMetaPreviewForFurry(file),
-                builder: (context, snap) {
-                  final meta = snap.data;
-                  return Text(
-                    meta?.title ?? base,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  );
-                },
-              )
-            : Text(base, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: isFurry
-            ? FutureBuilder<_MetaPreview>(
-                future: controller.getMetaPreviewForFurry(file),
-                builder: (context, snap) {
-                  final meta = snap.data;
-                  final subtitleParts = <String>[
-                    if ((meta?.artist ?? '').isNotEmpty) meta!.artist,
-                    if ((meta?.album ?? '').isNotEmpty) meta!.album,
-                  ];
-                  final subtitle = subtitleParts.isNotEmpty
-                      ? subtitleParts.join(' · ')
-                      : (meta?.subtitle ?? '');
-                  return Text(
-                    subtitle.isEmpty ? '本地文件' : subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  );
-                },
-              )
-            : const Text('本地文件'),
+    Widget buildTile(_MetaPreview? meta) {
+      final subtitleParts = <String>[
+        if ((meta?.artist ?? '').isNotEmpty) meta!.artist,
+        if ((meta?.album ?? '').isNotEmpty) meta!.album,
+      ];
+      final subtitleText = subtitleParts.isNotEmpty
+          ? subtitleParts.join(' · ')
+          : (meta?.subtitle ?? '');
+
+      return ListTile(
+        leading: _buildQueueLeading(
+          cs: cs,
+          isFurry: isFurry,
+          artUri: meta?.artUri,
+        ),
+        title: Text(
+          meta?.title ?? base,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          subtitleText.isEmpty ? '本地文件' : subtitleText,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -717,6 +684,24 @@ class _QueueRow extends StatelessWidget {
           ],
         ),
         onTap: () => controller.playAtQueueIndex(index),
+      );
+    }
+
+    final previewFuture =
+        isFurry ? controller.getMetaPreviewForFurry(file) : null;
+
+    return RepaintBoundary(
+      child: Card(
+        key: key,
+        margin: const EdgeInsets.only(bottom: 10),
+        child: isFurry
+            ? FutureBuilder<_MetaPreview>(
+                future: previewFuture,
+                builder: (context, snap) {
+                  return buildTile(snap.data);
+                },
+              )
+            : buildTile(null),
       ),
     );
   }

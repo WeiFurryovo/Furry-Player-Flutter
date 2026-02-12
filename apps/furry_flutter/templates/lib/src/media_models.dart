@@ -200,21 +200,23 @@ class _CoverThumb extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final uri = artUri;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: 48,
-        height: 48,
-        color: cs.surfaceContainerHigh,
-        child: uri == null
-            ? Icon(Icons.music_note, color: cs.primary)
-            : Image.file(
-                File.fromUri(uri),
-                fit: BoxFit.cover,
-                // Hint decoder to avoid full-res bitmap allocations on Android.
-                cacheWidth: 96,
-                cacheHeight: 96,
-              ),
+    return RepaintBoundary(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: 48,
+          height: 48,
+          color: cs.surfaceContainerHigh,
+          child: uri == null
+              ? Icon(Icons.music_note, color: cs.primary)
+              : Image.file(
+                  File.fromUri(uri),
+                  fit: BoxFit.cover,
+                  // Hint decoder to avoid full-res bitmap allocations on Android.
+                  cacheWidth: 96,
+                  cacheHeight: 96,
+                ),
+        ),
       ),
     );
   }
