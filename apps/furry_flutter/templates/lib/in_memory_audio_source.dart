@@ -1,8 +1,8 @@
 // ignore_for_file: experimental_member_use
 
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
 /// 将一段内存字节作为音频源提供给 `just_audio`。
@@ -26,9 +26,13 @@ class InMemoryAudioSource extends StreamAudioSource {
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
-    final int effectiveStart = start ?? 0;
-    final int effectiveEnd =
-        end == null ? bytes.length : end.clamp(0, bytes.length);
+    final range = inMemoryAudioRangeForTest(
+      sourceLength: bytes.length,
+      start: start,
+      end: end,
+    );
+    final int effectiveStart = range.start;
+    final int effectiveEnd = range.end;
     final view = Uint8List.sublistView(bytes, effectiveStart, effectiveEnd);
 
     return StreamAudioResponse(
@@ -39,4 +43,16 @@ class InMemoryAudioSource extends StreamAudioSource {
       stream: Stream<Uint8List>.value(view),
     );
   }
+}
+
+@visibleForTesting
+({int start, int end}) inMemoryAudioRangeForTest({
+  required int sourceLength,
+  int? start,
+  int? end,
+}) {
+  final safeLength = sourceLength < 0 ? 0 : sourceLength;
+  final safeStart = (start ?? 0).clamp(0, safeLength);
+  final safeEnd = (end ?? safeLength).clamp(safeStart, safeLength);
+  return (start: safeStart, end: safeEnd);
 }

@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 // ignore: avoid_relative_lib_imports
 import '../lib/main.dart';
+// ignore: avoid_relative_lib_imports
+import '../lib/in_memory_audio_source.dart';
 
 void main() {
   group('EpochTokenGateHarness', () {
@@ -477,6 +479,37 @@ void main() {
         diagnosticsLogTailWindowForTest(fileLength: 2048, keepBytes: 512),
         (start: 1536, length: 512),
       );
+    });
+  });
+
+  group('inMemoryAudioRangeForTest', () {
+    test('returns full range when start/end are omitted', () {
+      final range = inMemoryAudioRangeForTest(sourceLength: 100);
+      expect(range, (start: 0, end: 100));
+    });
+
+    test('clamps start and end into valid range', () {
+      final negativeStart = inMemoryAudioRangeForTest(
+        sourceLength: 100,
+        start: -10,
+        end: 120,
+      );
+      expect(negativeStart, (start: 0, end: 100));
+
+      final overshotStart = inMemoryAudioRangeForTest(
+        sourceLength: 100,
+        start: 999,
+      );
+      expect(overshotStart, (start: 100, end: 100));
+    });
+
+    test('normalizes end smaller than start', () {
+      final range = inMemoryAudioRangeForTest(
+        sourceLength: 100,
+        start: 80,
+        end: 20,
+      );
+      expect(range, (start: 80, end: 80));
     });
   });
 
