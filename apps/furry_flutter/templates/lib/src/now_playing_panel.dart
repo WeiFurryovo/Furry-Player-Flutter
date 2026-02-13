@@ -3,6 +3,7 @@ part of '../main.dart';
 class NowPlayingPanel extends StatefulWidget {
   final _AppController controller;
   final double bottomOverlayBaseline;
+  final bool hideDuringTextInput;
 
   // Tuned by eye: close to M3 mini player height.
   static const double miniHeightPx = 76;
@@ -12,6 +13,7 @@ class NowPlayingPanel extends StatefulWidget {
     super.key,
     required this.controller,
     required this.bottomOverlayBaseline,
+    required this.hideDuringTextInput,
   });
 
   @override
@@ -40,22 +42,39 @@ class _NowPlayingPanelState extends State<NowPlayingPanel> {
     return ValueListenableBuilder<_NowPlaying?>(
       valueListenable: widget.controller.nowPlaying,
       builder: (context, np, _) {
-        if (np == null) return const SizedBox.shrink();
-
+        final current = np;
         return Align(
           alignment: Alignment.bottomCenter,
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              0,
-              16,
-              widget.bottomOverlayBaseline + NowPlayingPanel.miniGapPx,
-            ),
-            child: _NowPlayingMiniBar(
-              controller: widget.controller,
-              np: np,
-              onOpen: () => _openSheet(np),
-            ),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) {
+              final offset = Tween<Offset>(
+                begin: const Offset(0, 0.12),
+                end: Offset.zero,
+              ).animate(animation);
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(position: offset, child: child),
+              );
+            },
+            child: current == null || widget.hideDuringTextInput
+                ? const SizedBox(key: ValueKey<String>('hidden'))
+                : Padding(
+                    key: ValueKey<String>('visible_${current.sourcePath}'),
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      0,
+                      16,
+                      widget.bottomOverlayBaseline + NowPlayingPanel.miniGapPx,
+                    ),
+                    child: _NowPlayingMiniBar(
+                      controller: widget.controller,
+                      np: current,
+                      onOpen: () => _openSheet(current),
+                    ),
+                  ),
           ),
         );
       },
@@ -230,6 +249,14 @@ class _NowPlayingMiniBar extends StatelessWidget {
                     Expanded(
                       child: InkWell(
                         onTap: onOpen,
+                        onLongPress: () {
+                          HapticFeedback.selectionClick();
+                          _showNowPlayingActionsSheet(
+                            context: context,
+                            controller: controller,
+                            np: np,
+                          );
+                        },
                         borderRadius: BorderRadius.circular(20),
                         child: Row(
                           children: [
@@ -733,18 +760,27 @@ class _NowPlayingControls extends StatelessWidget {
                               await controller.play();
                             }
                           },
-                    icon: busy
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(
-                            playing
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                            size: 30,
-                          ),
+                    icon: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 180),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, anim) =>
+                          ScaleTransition(scale: anim, child: child),
+                      child: busy
+                          ? const SizedBox(
+                              key: ValueKey<String>('busy'),
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              key: ValueKey<bool>(playing),
+                              playing
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
+                              size: 30,
+                            ),
+                    ),
                   ),
                 ),
               ),

@@ -71,8 +71,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       ),
     ];
 
+    final mediaQuery = MediaQuery.of(context);
     final navBarHeight = NavigationBarTheme.of(context).height ?? 80.0;
-    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final bottomInset = mediaQuery.padding.bottom;
+    final keyboardInset = mediaQuery.viewInsets.bottom;
+    final keyboardVisible = keyboardInset > 0;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -86,9 +89,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         // Base distance from the bottom edge that the mini-player should sit above.
         // On phones, this is the bottom NavigationBar + system gesture inset.
         // On wide layouts (rail), it's just the system bottom inset.
+        final showBottomNav = !useRail && !keyboardVisible;
         final bottomOverlayBaseline = useRail
             ? bottomInset
-            : (navBarHeight + bottomInset + _bottomNavMarginBottom);
+            : (showBottomNav
+                ? (navBarHeight + bottomInset + _bottomNavMarginBottom)
+                : keyboardInset);
 
         Widget contentStack() {
           return Stack(
@@ -110,6 +116,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 child: NowPlayingPanel(
                   controller: _controller,
                   bottomOverlayBaseline: bottomOverlayBaseline,
+                  hideDuringTextInput: keyboardVisible,
                 ),
               ),
             ],
@@ -155,12 +162,26 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: _ExpressiveBottomNavBar(
-                  selectedIndex: _tabIndex,
-                  items: navItems,
-                  onDestinationSelected: (i) => setState(() => _tabIndex = i),
-                  marginH: _bottomNavMarginH,
-                  marginBottom: _bottomNavMarginBottom,
+                child: IgnorePointer(
+                  ignoring: !showBottomNav,
+                  child: AnimatedSlide(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    offset: showBottomNav ? Offset.zero : const Offset(0, 1.12),
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutCubic,
+                      opacity: showBottomNav ? 1 : 0,
+                      child: _ExpressiveBottomNavBar(
+                        selectedIndex: _tabIndex,
+                        items: navItems,
+                        onDestinationSelected: (i) =>
+                            setState(() => _tabIndex = i),
+                        marginH: _bottomNavMarginH,
+                        marginBottom: _bottomNavMarginBottom,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -342,21 +363,23 @@ class _BottomOverlaySpacer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final navBarHeight = NavigationBarTheme.of(context).height ?? 80.0;
-    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final mediaQuery = MediaQuery.of(context);
+    final bottomInset = mediaQuery.padding.bottom;
+    final keyboardInset = mediaQuery.viewInsets.bottom;
+    final keyboardVisible = keyboardInset > 0;
 
     return ValueListenableBuilder<_NowPlaying?>(
       valueListenable: controller.nowPlaying,
       builder: (context, np, _) {
-        final useRail =
-            MediaQuery.of(context).size.width >= _wideRailBreakpoint;
-        final bottomBaseline = useRail
-            ? bottomInset
-            : (navBarHeight + bottomInset + _bottomNavMarginBottom);
-        // Keep content scrollable above the overlays:
-        // - bottom navigation bar (plus system inset)
-        // - mini player (only when active)
-        final mini = (np == null) ? 0.0 : _miniHeight;
-        return SizedBox(height: bottomBaseline + mini + _miniGap + _extra);
+        final useRail = mediaQuery.size.width >= _wideRailBreakpoint;
+        final bottomBaseline = keyboardVisible
+            ? keyboardInset
+            : (useRail
+                ? bottomInset
+                : (navBarHeight + bottomInset + _bottomNavMarginBottom));
+        final mini = (keyboardVisible || np == null) ? 0.0 : _miniHeight;
+        final gap = keyboardVisible ? 12.0 : (_miniGap + _extra);
+        return SizedBox(height: bottomBaseline + mini + gap);
       },
     );
   }
