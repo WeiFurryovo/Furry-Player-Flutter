@@ -1,5 +1,80 @@
 part of '../main.dart';
 
+class _BottomOverlayLayout {
+  final bool showBottomNav;
+  final double bottomOverlayBaseline;
+  final double spacerHeight;
+
+  const _BottomOverlayLayout({
+    required this.showBottomNav,
+    required this.bottomOverlayBaseline,
+    required this.spacerHeight,
+  });
+}
+
+_BottomOverlayLayout _computeBottomOverlayLayout({
+  required bool useRail,
+  required bool keyboardVisible,
+  required bool hasNowPlaying,
+  required double navBarHeight,
+  required double bottomInset,
+  required double keyboardInset,
+  required double bottomNavMarginBottom,
+  required double miniHeight,
+  required double miniGap,
+  required double extraGap,
+}) {
+  final showBottomNav = !useRail && !keyboardVisible;
+  final bottomOverlayBaseline = keyboardVisible
+      ? keyboardInset
+      : (useRail
+          ? bottomInset
+          : navBarHeight + bottomInset + bottomNavMarginBottom);
+
+  final mini = (keyboardVisible || !hasNowPlaying) ? 0.0 : miniHeight;
+  final gap = keyboardVisible ? 12.0 : (miniGap + extraGap);
+
+  return _BottomOverlayLayout(
+    showBottomNav: showBottomNav,
+    bottomOverlayBaseline: bottomOverlayBaseline,
+    spacerHeight: bottomOverlayBaseline + mini + gap,
+  );
+}
+
+@visibleForTesting
+class BottomOverlayLayoutHarness {
+  static ({bool showBottomNav, double baseline, double spacerHeight}) compute({
+    required bool useRail,
+    required bool keyboardVisible,
+    required bool hasNowPlaying,
+    required double navBarHeight,
+    required double bottomInset,
+    required double keyboardInset,
+    required double bottomNavMarginBottom,
+    required double miniHeight,
+    required double miniGap,
+    required double extraGap,
+  }) {
+    final layout = _computeBottomOverlayLayout(
+      useRail: useRail,
+      keyboardVisible: keyboardVisible,
+      hasNowPlaying: hasNowPlaying,
+      navBarHeight: navBarHeight,
+      bottomInset: bottomInset,
+      keyboardInset: keyboardInset,
+      bottomNavMarginBottom: bottomNavMarginBottom,
+      miniHeight: miniHeight,
+      miniGap: miniGap,
+      extraGap: extraGap,
+    );
+    return (
+      showBottomNav: layout.showBottomNav,
+      baseline: layout.bottomOverlayBaseline,
+      spacerHeight: layout.spacerHeight,
+    );
+  }
+}
+
 /// 应用主壳（3 个主 tab + 自定义底部导航 + 迷你播放器浮层）。
 ///
 /// - 窄屏：底部导航（自定义 Expressive 样式，减少无效留白）
@@ -86,15 +161,20 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           SettingsPage(controller: _controller),
         ];
 
-        // Base distance from the bottom edge that the mini-player should sit above.
-        // On phones, this is the bottom NavigationBar + system gesture inset.
-        // On wide layouts (rail), it's just the system bottom inset.
-        final showBottomNav = !useRail && !keyboardVisible;
-        final bottomOverlayBaseline = useRail
-            ? bottomInset
-            : (showBottomNav
-                ? (navBarHeight + bottomInset + _bottomNavMarginBottom)
-                : keyboardInset);
+        final layout = _computeBottomOverlayLayout(
+          useRail: useRail,
+          keyboardVisible: keyboardVisible,
+          hasNowPlaying: false,
+          navBarHeight: navBarHeight,
+          bottomInset: bottomInset,
+          keyboardInset: keyboardInset,
+          bottomNavMarginBottom: _bottomNavMarginBottom,
+          miniHeight: NowPlayingPanel.miniHeightPx,
+          miniGap: NowPlayingPanel.miniGapPx,
+          extraGap: _BottomOverlaySpacer.extraGap,
+        );
+        final showBottomNav = layout.showBottomNav;
+        final bottomOverlayBaseline = layout.bottomOverlayBaseline;
 
         Widget contentStack() {
           return Stack(
@@ -353,7 +433,7 @@ class _BottomOverlaySpacer extends StatelessWidget {
   const _BottomOverlaySpacer({required this.controller});
 
   final _AppController controller;
-  static const double _extra = 16;
+  static const double extraGap = 16;
   static const double _wideRailBreakpoint = 700;
   static const double _miniHeight = NowPlayingPanel.miniHeightPx;
   static const double _miniGap = NowPlayingPanel.miniGapPx;
@@ -372,14 +452,19 @@ class _BottomOverlaySpacer extends StatelessWidget {
       valueListenable: controller.nowPlaying,
       builder: (context, np, _) {
         final useRail = mediaQuery.size.width >= _wideRailBreakpoint;
-        final bottomBaseline = keyboardVisible
-            ? keyboardInset
-            : (useRail
-                ? bottomInset
-                : (navBarHeight + bottomInset + _bottomNavMarginBottom));
-        final mini = (keyboardVisible || np == null) ? 0.0 : _miniHeight;
-        final gap = keyboardVisible ? 12.0 : (_miniGap + _extra);
-        return SizedBox(height: bottomBaseline + mini + gap);
+        final layout = _computeBottomOverlayLayout(
+          useRail: useRail,
+          keyboardVisible: keyboardVisible,
+          hasNowPlaying: np != null,
+          navBarHeight: navBarHeight,
+          bottomInset: bottomInset,
+          keyboardInset: keyboardInset,
+          bottomNavMarginBottom: _bottomNavMarginBottom,
+          miniHeight: _miniHeight,
+          miniGap: _miniGap,
+          extraGap: extraGap,
+        );
+        return SizedBox(height: layout.spacerHeight);
       },
     );
   }

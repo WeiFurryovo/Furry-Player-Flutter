@@ -95,6 +95,9 @@ Future<void> _showNowPlayingActionsSheet({
     context: context,
     showDragHandle: true,
     builder: (context) {
+      final subtitle =
+          np.subtitle.trim().isEmpty ? p.basename(np.sourcePath) : np.subtitle;
+      final queueLabel = qs.hasQueue ? '队列 ${qs.queue.length} 首' : '未启用队列';
       return SafeArea(
         top: false,
         child: Padding(
@@ -102,6 +105,17 @@ Future<void> _showNowPlayingActionsSheet({
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Card(
+                margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                child: ListTile(
+                  leading: _CoverThumb(artUri: np.artUri),
+                  title: Text(np.title,
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: Text(subtitle,
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  trailing: Text(queueLabel),
+                ),
+              ),
               ListTile(
                 leading: const Icon(Icons.queue_music_rounded),
                 title: const Text('加入队列'),

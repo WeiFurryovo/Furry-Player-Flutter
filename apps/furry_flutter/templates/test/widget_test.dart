@@ -182,6 +182,66 @@ void main() {
       expect(libraryLoadingPlaceholderCountForTest(3), 5);
     });
   });
+
+  group('BottomOverlayLayoutHarness', () {
+    test('keeps bottom nav on phone when keyboard is hidden', () {
+      final layout = BottomOverlayLayoutHarness.compute(
+        useRail: false,
+        keyboardVisible: false,
+        hasNowPlaying: true,
+        navBarHeight: 66,
+        bottomInset: 20,
+        keyboardInset: 0,
+        bottomNavMarginBottom: 4,
+        miniHeight: 76,
+        miniGap: 8,
+        extraGap: 16,
+      );
+
+      expect(layout.showBottomNav, isTrue);
+      expect(layout.baseline, 90);
+      expect(layout.spacerHeight, 190);
+    });
+
+    test('hides overlays and uses keyboard inset during text input', () {
+      final layout = BottomOverlayLayoutHarness.compute(
+        useRail: false,
+        keyboardVisible: true,
+        hasNowPlaying: true,
+        navBarHeight: 66,
+        bottomInset: 20,
+        keyboardInset: 280,
+        bottomNavMarginBottom: 4,
+        miniHeight: 76,
+        miniGap: 8,
+        extraGap: 16,
+      );
+
+      expect(layout.showBottomNav, isFalse);
+      expect(layout.baseline, 280);
+      expect(layout.spacerHeight, 292);
+    });
+
+    test('uses system bottom inset on rail layout', () {
+      final layout = BottomOverlayLayoutHarness.compute(
+        useRail: true,
+        keyboardVisible: false,
+        hasNowPlaying: false,
+        navBarHeight: 66,
+        bottomInset: 24,
+        keyboardInset: 0,
+        bottomNavMarginBottom: 4,
+        miniHeight: 76,
+        miniGap: 8,
+        extraGap: 16,
+      );
+
+      expect(layout.showBottomNav, isFalse);
+      expect(layout.baseline, 24);
+      expect(layout.spacerHeight, 48);
+    });
+  });
+
   group('LibraryPageFilterStateHarness', () {
     test('applyOptions updates sorting and filter flags', () {
       final state = LibraryPageFilterStateHarness();
