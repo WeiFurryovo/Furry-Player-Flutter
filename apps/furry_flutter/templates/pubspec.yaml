@@ -19,7 +19,6 @@ dependencies:
   audio_service: ^0.18.17
   smtc_windows: ^1.0.0
   dbus: ^0.7.11
-  google_fonts: ^6.3.0
   dynamic_color: ">=1.7.0 <1.8.0"
 
 dev_dependencies:

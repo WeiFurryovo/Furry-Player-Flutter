@@ -324,6 +324,7 @@ if [ "$DEPS_SYNC_NEEDED" -eq 1 ]; then
   (cd "$OUT_DIR" && flutter pub remove \
     just_audio_background \
     just_audio_platform_interface \
+    google_fonts \
     mpris \
     > /dev/null 2>&1 || true)
 

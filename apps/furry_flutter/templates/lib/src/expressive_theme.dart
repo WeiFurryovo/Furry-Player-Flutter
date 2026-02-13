@@ -48,12 +48,12 @@ class _ExpressiveTheme {
       useMaterial3: true,
       colorScheme: scheme,
       // Prefer system Google Sans when available; otherwise fall back to
-      // a bundled Google Fonts alternative for consistent rendering.
+      // broadly available sans-serif families.
       fontFamily: 'Google Sans',
     );
 
     final tt = _fontFamilyWithFallback(
-      GoogleFonts.interTextTheme(base.textTheme),
+      base.textTheme,
       fontFamily: 'Google Sans',
       fallback: const <String>['Inter', 'Roboto'],
     );
@@ -83,7 +83,7 @@ class _ExpressiveTheme {
     return base.copyWith(
       textTheme: textTheme,
       primaryTextTheme: _fontFamilyWithFallback(
-        GoogleFonts.interTextTheme(base.primaryTextTheme),
+        base.primaryTextTheme,
         fontFamily: 'Google Sans',
         fallback: const <String>['Inter', 'Roboto'],
       ),
