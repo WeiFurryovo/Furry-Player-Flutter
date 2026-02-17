@@ -38,7 +38,6 @@ $buildAction = {
   Push-Location (Join-Path $RepositoryRootPath "apps\furry_flutter\furry_flutter_app")
   try {
     flutter config --enable-windows-desktop
-    flutter analyze
     flutter build windows --release --verbose
   }
   finally {

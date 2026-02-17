@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FLUTTER_VERSION: "3.38.8"
+
 jobs:
   flutter-quality:
     name: Flutter Analyze & Test
@@ -18,7 +21,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
       - name: Flutter doctor
@@ -43,7 +46,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
       - name: Flutter doctor
@@ -93,7 +96,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
       - name: Flutter doctor
@@ -134,7 +137,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
       - name: Flutter doctor
@@ -146,6 +149,12 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+
       - name: Setup MSVC dev cmd
         uses: ilammy/msvc-dev-cmd@v1
 
@@ -154,6 +163,16 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           & .\apps\furry_flutter\scripts\prepare_flutter_app_windows.ps1
+
+      - name: Cache Windows Pub/Cargokit
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\Pub\Cache
+            apps/furry_flutter/furry_flutter_app/build/windows/x64/plugins/smtc_windows/cargokit_build/target
+          key: ${{ runner.os }}-pub-cargokit-${{ hashFiles('apps/furry_flutter/deps_pins.txt', 'apps/furry_flutter/templates/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-cargokit-
 
       - name: Build Windows desktop bundle
         shell: pwsh

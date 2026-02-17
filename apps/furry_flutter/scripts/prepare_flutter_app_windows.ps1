@@ -70,7 +70,7 @@ try {
     Write-Host "[INFO] 添加依赖（pub add）"
     Write-Host "[INFO] 移除已废弃依赖（pub remove）"
     try {
-      flutter pub remove just_audio_background just_audio_platform_interface mpris *> $null
+      flutter pub remove just_audio_background just_audio_platform_interface google_fonts mpris *> $null
     }
     catch {
       Write-Host "[INFO] 已废弃依赖不存在，跳过移除"
