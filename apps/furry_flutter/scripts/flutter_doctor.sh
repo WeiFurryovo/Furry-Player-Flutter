@@ -30,6 +30,24 @@ else
   exit 1
 fi
 
+version_text="$("${FLUTTER[@]}" --version)"
+printf '%s\n' "$version_text"
+
+if [ -n "${EXPECTED_FLUTTER_VERSION:-}" ]; then
+  version_line="$(printf '%s\n' "$version_text" | head -n 1)"
+  if [[ "$version_line" != *"Flutter $EXPECTED_FLUTTER_VERSION"* ]]; then
+    echo "[ERROR] Flutter version mismatch. expected=$EXPECTED_FLUTTER_VERSION actual='$version_line'" >&2
+    exit 1
+  fi
+fi
+
+if [ -n "${EXPECTED_DART_VERSION:-}" ]; then
+  if ! printf '%s\n' "$version_text" | grep -Fq "Dart $EXPECTED_DART_VERSION"; then
+    echo "[ERROR] Dart version mismatch. expected=$EXPECTED_DART_VERSION" >&2
+    exit 1
+  fi
+fi
+
 if [ "$STRICT" -eq 1 ]; then
   "${FLUTTER[@]}" doctor -v
   exit $?

@@ -10,6 +10,7 @@ permissions:
 
 env:
   FLUTTER_VERSION: "3.38.8"
+  EXPECTED_DART_VERSION: "3.10.7"
 
 jobs:
   flutter-quality:
@@ -54,6 +55,12 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -104,6 +111,12 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
 
       - name: Build Linux desktop bundle
         run: |

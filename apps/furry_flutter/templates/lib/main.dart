@@ -50,6 +50,7 @@ part 'src/media_models.dart';
 part 'src/app_controller_services.dart';
 part 'src/app_controller_library.dart';
 part 'src/app_controller_queue.dart';
+part 'src/app_controller_playback.dart';
 part 'src/app_controller.dart';
 
 /// 启动阶段日志（用于诊断启动失败/权限问题等）。
