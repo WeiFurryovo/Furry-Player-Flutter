@@ -216,6 +216,7 @@ impl EngineState {
     fn stop(&mut self) {
         if let Some(track) = self.current_track.take() {
             track.output.set_playing(false);
+            track.output.clear_buffer();
         }
         self.position_base = Duration::ZERO;
         self.set_state(PlaybackState::Stopped);
@@ -228,6 +229,7 @@ impl EngineState {
                     .evt_tx
                     .send(PlayerEvent::Error(format!("Seek error: {}", e)));
             } else {
+                track.output.clear_buffer();
                 track.output.reset_position();
                 self.position_base = pos;
                 let _ = self.evt_tx.send(PlayerEvent::Position(pos));

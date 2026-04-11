@@ -2,9 +2,8 @@
 
 use std::ffi::{CStr, CString};
 use std::fs::File;
-use std::io::Read;
 use std::os::raw::{c_char, c_int, c_uchar};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use furry_converter::{detect_format, pack_to_furry, unpack_from_furry, PackOptions};
 use furry_crypto::MasterKey;
@@ -19,6 +18,16 @@ fn cstr_to_path(ptr: *const c_char) -> Result<PathBuf, c_int> {
         return Err(-2);
     }
     Ok(PathBuf::from(s))
+}
+
+fn is_valid_furry_path(path: &Path) -> bool {
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(_) => return false,
+    };
+
+    let master_key = MasterKey::default_key();
+    FurryReader::open(file, &master_key).is_ok()
 }
 
 #[no_mangle]
@@ -72,17 +81,7 @@ pub extern "C" fn furry_is_valid_furry_file(file_path: *const c_char) -> bool {
         Err(_) => return false,
     };
 
-    let file = match File::open(&path) {
-        Ok(f) => f,
-        Err(_) => return false,
-    };
-
-    let mut reader = std::io::BufReader::new(file);
-    let mut magic = [0u8; 8];
-    if reader.read_exact(&mut magic).is_err() {
-        return false;
-    }
-    &magic == b"FURRYFMT"
+    is_valid_furry_path(&path)
 }
 
 fn original_ext(path: &PathBuf, master_key: &MasterKey) -> Result<&'static str, ()> {
@@ -335,5 +334,59 @@ pub unsafe extern "C" fn furry_free_bytes(ptr: *mut c_uchar, len: usize) {
     }
     unsafe {
         drop(Vec::from_raw_parts(ptr, len, len));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_path(prefix: &str, ext: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or(0);
+        std::env::temp_dir().join(format!("{prefix}_{}_{}.{}", std::process::id(), nanos, ext))
+    }
+
+    #[test]
+    fn detects_valid_furry_file_by_full_parse() {
+        let input_path = unique_temp_path("furry_valid_input", "mp3");
+        let output_path = unique_temp_path("furry_valid_output", "furry");
+
+        std::fs::write(&input_path, b"fake audio payload").unwrap();
+
+        let master_key = MasterKey::default_key();
+        let mut input = File::open(&input_path).unwrap();
+        let mut output = File::create(&output_path).unwrap();
+
+        pack_to_furry(
+            &mut input,
+            &mut output,
+            Some(&input_path),
+            detect_format(&input_path),
+            &master_key,
+            &PackOptions::default(),
+        )
+        .unwrap();
+
+        assert!(is_valid_furry_path(&output_path));
+
+        let _ = std::fs::remove_file(input_path);
+        let _ = std::fs::remove_file(output_path);
+    }
+
+    #[test]
+    fn rejects_magic_only_truncated_file() {
+        let path = unique_temp_path("furry_invalid_magic_only", "furry");
+        let mut file = File::create(&path).unwrap();
+        file.write_all(b"FURRYFMT").unwrap();
+        file.flush().unwrap();
+
+        assert!(!is_valid_furry_path(&path));
+
+        let _ = std::fs::remove_file(path);
     }
 }

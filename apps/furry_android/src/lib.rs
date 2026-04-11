@@ -26,6 +26,16 @@ fn init_logging() {
 #[cfg(not(target_os = "android"))]
 fn init_logging() {}
 
+fn is_valid_furry_path(path: &PathBuf) -> bool {
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(_) => return false,
+    };
+
+    let master_key = MasterKey::default_key();
+    FurryReader::open(file, &master_key).is_ok()
+}
+
 /// JNI: 初始化库
 #[no_mangle]
 pub extern "system" fn Java_com_furry_player_NativeLib_init(_env: JNIEnv, _class: JClass) {
@@ -279,20 +289,7 @@ fn is_valid_furry_file_impl(env: &mut JNIEnv<'_>, file_path: JString<'_>) -> jbo
 
     let path = PathBuf::from(path_str);
 
-    let file = match File::open(&path) {
-        Ok(f) => f,
-        Err(_) => return JNI_FALSE,
-    };
-
-    use std::io::Read;
-    let mut reader = std::io::BufReader::new(file);
-    let mut magic = [0u8; 8];
-
-    if reader.read_exact(&mut magic).is_err() {
-        return JNI_FALSE;
-    }
-
-    if &magic == b"FURRYFMT" {
+    if is_valid_furry_path(&path) {
         JNI_TRUE
     } else {
         JNI_FALSE

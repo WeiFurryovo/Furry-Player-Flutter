@@ -8,7 +8,6 @@ use std::sync::Arc;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, SampleFormat, Stream, StreamConfig};
-use crossbeam_channel::{bounded, Sender};
 
 /// 音频输出错误
 #[derive(thiserror::Error, Debug)]
@@ -42,7 +41,7 @@ impl Default for OutputConfig {
 /// 音频输出流
 pub struct AudioOutput {
     _stream: Stream,
-    sample_tx: Sender<Vec<f32>>,
+    ring_buffer: Arc<RingBuffer>,
     is_playing: Arc<AtomicBool>,
     position_samples: Arc<AtomicU64>,
     sample_rate: u32,
@@ -75,31 +74,21 @@ impl AudioOutput {
             .with_sample_rate(cpal::SampleRate(config.sample_rate))
             .into();
 
-        let (sample_tx, sample_rx) = bounded::<Vec<f32>>(32);
         let is_playing = Arc::new(AtomicBool::new(false));
         let position_samples = Arc::new(AtomicU64::new(0));
+        let ring_buffer = Arc::new(RingBuffer::new(config.buffer_size * 4));
 
         let is_playing_clone = is_playing.clone();
         let position_clone = position_samples.clone();
+        let ring_buffer_for_stream = ring_buffer.clone();
         let channels = config.channels as usize;
-
-        // 创建环形缓冲区
-        let ring_buffer = Arc::new(RingBuffer::new(config.buffer_size * 4));
-        let ring_clone = ring_buffer.clone();
-
-        // 启动填充线程
-        std::thread::spawn(move || {
-            while let Ok(samples) = sample_rx.recv() {
-                ring_clone.write(&samples);
-            }
-        });
 
         let stream = device
             .build_output_stream(
                 &stream_config,
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                     if is_playing_clone.load(Ordering::Relaxed) {
-                        let read = ring_buffer.read(data);
+                        let read = ring_buffer_for_stream.read(data);
                         // 填充未读取部分为静音
                         for sample in &mut data[read..] {
                             *sample = 0.0;
@@ -126,7 +115,7 @@ impl AudioOutput {
 
         Ok(Self {
             _stream: stream,
-            sample_tx,
+            ring_buffer,
             is_playing,
             position_samples,
             sample_rate: config.sample_rate,
@@ -136,7 +125,8 @@ impl AudioOutput {
 
     /// 写入采样数据
     pub fn write(&self, samples: Vec<f32>) -> bool {
-        self.sample_tx.try_send(samples).is_ok()
+        self.ring_buffer.write(&samples);
+        true
     }
 
     /// 设置播放状态
@@ -153,6 +143,11 @@ impl AudioOutput {
     /// 重置位置
     pub fn reset_position(&self) {
         self.position_samples.store(0, Ordering::Relaxed);
+    }
+
+    /// 清空待播放缓冲，避免 seek/stop 后残留旧音频继续输出。
+    pub fn clear_buffer(&self) {
+        self.ring_buffer.clear();
     }
 
     /// 获取采样率
@@ -212,5 +207,28 @@ impl RingBuffer {
 
         buf.drain(..to_read);
         to_read
+    }
+
+    fn clear(&self) {
+        let mut buf = self.buffer.lock().unwrap_or_else(|e| e.into_inner());
+        buf.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RingBuffer;
+
+    #[test]
+    fn clear_discards_pending_samples() {
+        let ring = RingBuffer::new(16);
+        ring.write(&[0.1, 0.2, 0.3, 0.4]);
+        ring.clear();
+
+        let mut out = [1.0f32; 4];
+        let read = ring.read(&mut out);
+
+        assert_eq!(read, 0);
+        assert_eq!(out, [1.0, 1.0, 1.0, 1.0]);
     }
 }
