@@ -35,6 +35,8 @@ pub enum PlayerEvent {
     TrackInfo(TrackInfo),
     /// 曲目播放结束
     TrackEnded,
+    /// 非致命告警
+    Warning(String),
     /// 错误
     Error(String),
 }

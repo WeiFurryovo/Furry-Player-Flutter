@@ -9,6 +9,12 @@ use std::sync::Arc;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, SampleFormat, Stream, StreamConfig};
 
+/// 单次写入输出缓冲后的结果。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OutputWriteReport {
+    pub dropped_samples: usize,
+}
+
 /// 音频输出错误
 #[derive(thiserror::Error, Debug)]
 pub enum OutputError {
@@ -124,9 +130,10 @@ impl AudioOutput {
     }
 
     /// 写入采样数据
-    pub fn write(&self, samples: Vec<f32>) -> bool {
-        self.ring_buffer.write(&samples);
-        true
+    pub fn write(&self, samples: Vec<f32>) -> OutputWriteReport {
+        OutputWriteReport {
+            dropped_samples: self.ring_buffer.write(&samples),
+        }
     }
 
     /// 设置播放状态
@@ -175,22 +182,25 @@ impl RingBuffer {
         }
     }
 
-    fn write(&self, data: &[f32]) {
+    fn write(&self, data: &[f32]) -> usize {
         let mut buf = self.buffer.lock().unwrap_or_else(|e| e.into_inner());
         if data.len() >= self.capacity {
+            let dropped = buf.len().saturating_add(data.len() - self.capacity);
             buf.clear();
             buf.extend(data[data.len() - self.capacity..].iter().copied());
-            return;
+            return dropped;
         }
 
         // 如果缓冲区满了，丢弃旧数据
         let needed = buf.len() + data.len();
+        let mut dropped = 0;
         if needed > self.capacity {
-            let drain_count = needed - self.capacity;
-            buf.drain(..drain_count);
+            dropped = needed - self.capacity;
+            buf.drain(..dropped);
         }
 
         buf.extend(data.iter().copied());
+        dropped
     }
 
     fn read(&self, output: &mut [f32]) -> usize {
@@ -230,5 +240,33 @@ mod tests {
 
         assert_eq!(read, 0);
         assert_eq!(out, [1.0, 1.0, 1.0, 1.0]);
+    }
+
+    #[test]
+    fn write_reports_dropped_samples_when_buffer_overflows() {
+        let ring = RingBuffer::new(4);
+
+        assert_eq!(ring.write(&[0.1, 0.2, 0.3]), 0);
+        assert_eq!(ring.write(&[0.4, 0.5]), 1);
+
+        let mut out = [0.0f32; 4];
+        let read = ring.read(&mut out);
+
+        assert_eq!(read, 4);
+        assert_eq!(out, [0.2, 0.3, 0.4, 0.5]);
+    }
+
+    #[test]
+    fn write_reports_full_replacement_when_chunk_exceeds_capacity() {
+        let ring = RingBuffer::new(4);
+
+        assert_eq!(ring.write(&[0.1, 0.2]), 0);
+        assert_eq!(ring.write(&[0.3, 0.4, 0.5, 0.6, 0.7]), 3);
+
+        let mut out = [0.0f32; 4];
+        let read = ring.read(&mut out);
+
+        assert_eq!(read, 4);
+        assert_eq!(out, [0.4, 0.5, 0.6, 0.7]);
     }
 }

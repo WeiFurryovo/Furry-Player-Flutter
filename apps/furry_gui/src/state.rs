@@ -130,6 +130,9 @@ impl AppState {
                 PlayerEvent::TrackEnded => {
                     should_next = true;
                 }
+                PlayerEvent::Warning(w) => {
+                    eprintln!("Player warning: {}", w);
+                }
                 PlayerEvent::Error(e) => {
                     eprintln!("Player error: {}", e);
                 }

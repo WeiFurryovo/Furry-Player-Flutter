@@ -68,6 +68,7 @@ struct EngineState {
     volume: f32,
     position_base: Duration,
     last_position_update: std::time::Instant,
+    output_overflow_reported: bool,
 }
 
 struct LoadedTrack {
@@ -85,6 +86,7 @@ impl EngineState {
             volume: 1.0,
             position_base: Duration::ZERO,
             last_position_update: std::time::Instant::now(),
+            output_overflow_reported: false,
         }
     }
 
@@ -118,6 +120,7 @@ impl EngineState {
     fn load_track(&mut self, path: PathBuf) {
         self.set_state(PlaybackState::Loading);
         self.position_base = Duration::ZERO;
+        self.output_overflow_reported = false;
 
         // 停止当前播放
         if let Some(track) = self.current_track.take() {
@@ -219,6 +222,7 @@ impl EngineState {
             track.output.clear_buffer();
         }
         self.position_base = Duration::ZERO;
+        self.output_overflow_reported = false;
         self.set_state(PlaybackState::Stopped);
     }
 
@@ -232,6 +236,7 @@ impl EngineState {
                 track.output.clear_buffer();
                 track.output.reset_position();
                 self.position_base = pos;
+                self.output_overflow_reported = false;
                 let _ = self.evt_tx.send(PlayerEvent::Position(pos));
             }
         }
@@ -248,7 +253,18 @@ impl EngineState {
                         *sample *= self.volume;
                     }
 
-                    track.output.write(samples);
+                    let write_report = track.output.write(samples);
+                    if write_report.dropped_samples > 0 {
+                        if !self.output_overflow_reported {
+                            let _ = self.evt_tx.send(PlayerEvent::Warning(format!(
+                                "Audio output overflow: dropped {} queued samples because playback could not keep up",
+                                write_report.dropped_samples
+                            )));
+                            self.output_overflow_reported = true;
+                        }
+                    } else {
+                        self.output_overflow_reported = false;
+                    }
                 }
                 Ok(None) => {
                     // 播放结束
