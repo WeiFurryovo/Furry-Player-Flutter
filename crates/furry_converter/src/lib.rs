@@ -56,6 +56,19 @@ impl Default for PackOptions {
     }
 }
 
+fn write_optional_meta_chunk<W: Write + Seek>(
+    writer: &mut FurryWriter<W>,
+    kind: MetaKind,
+    data: &[u8],
+    chunk_flags: u8,
+) -> Result<(), ConverterError> {
+    match writer.write_meta_chunk(kind, data, chunk_flags) {
+        Ok(()) => Ok(()),
+        Err(furry_format::FormatError::ChunkDataTooLarge(_)) => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
 fn validate_pack_options(options: &PackOptions) -> Result<(), ConverterError> {
     let max_plain_len =
         u32::MAX as usize - usize::from(furry_format::CHUNK_HEADER_LEN) - furry_crypto::TAG_LEN;
@@ -111,17 +124,22 @@ where
         if let Some(path) = input_path {
             if let Some(meta) = extract_meta_from_path(path, original_format) {
                 if let Some(tags_json) = meta.tags_json {
-                    let _ = writer.write_meta_chunk(MetaKind::Tags, tags_json.as_bytes(), 0);
+                    write_optional_meta_chunk(
+                        &mut writer,
+                        MetaKind::Tags,
+                        tags_json.as_bytes(),
+                        0,
+                    )?;
                 }
                 if let Some(cover) = meta.cover {
                     let mut payload = Vec::with_capacity(cover.mime.len() + 1 + cover.bytes.len());
                     payload.extend_from_slice(cover.mime.as_bytes());
                     payload.push(0);
                     payload.extend_from_slice(&cover.bytes);
-                    let _ = writer.write_meta_chunk(MetaKind::CoverArt, &payload, 0);
+                    write_optional_meta_chunk(&mut writer, MetaKind::CoverArt, &payload, 0)?;
                 }
                 if let Some(lyrics) = meta.lyrics {
-                    let _ = writer.write_meta_chunk(MetaKind::Lyrics, lyrics.as_bytes(), 0);
+                    write_optional_meta_chunk(&mut writer, MetaKind::Lyrics, lyrics.as_bytes(), 0)?;
                 }
             }
         }
@@ -404,7 +422,61 @@ fn meta_value_to_string(v: &MetaValue) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
+    use std::io::{self, Cursor, Seek, SeekFrom, Write};
+
+    struct FailingWriter {
+        inner: Cursor<Vec<u8>>,
+        fail_after: usize,
+    }
+
+    impl FailingWriter {
+        fn new(fail_after: usize) -> Self {
+            Self {
+                inner: Cursor::new(Vec::new()),
+                fail_after,
+            }
+        }
+    }
+
+    impl Write for FailingWriter {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            let position = self.inner.position() as usize;
+            if position >= self.fail_after {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    "synthetic write failure",
+                ));
+            }
+
+            let writable = (self.fail_after - position).min(buf.len());
+            if writable == 0 {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    "synthetic write failure",
+                ));
+            }
+
+            self.inner.write_all(&buf[..writable])?;
+            if writable < buf.len() {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    "synthetic write failure",
+                ));
+            }
+
+            Ok(writable)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            self.inner.flush()
+        }
+    }
+
+    impl Seek for FailingWriter {
+        fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+            self.inner.seek(pos)
+        }
+    }
 
     #[test]
     fn test_pack_unpack_roundtrip() {
@@ -536,6 +608,22 @@ mod tests {
                 name: "padding_chunk_size",
                 value: 0
             }
+        ));
+    }
+
+    #[test]
+    fn test_optional_meta_write_propagates_real_writer_errors() {
+        let master_key = MasterKey::default_key();
+        let writer_backend = FailingWriter::new(100);
+        let mut writer = FurryWriter::create(writer_backend, &master_key, OriginalFormat::Mp3)
+            .expect("create writer");
+
+        let error = write_optional_meta_chunk(&mut writer, MetaKind::Tags, br#"{"title":"x"}"#, 0)
+            .expect_err("should propagate writer failure");
+
+        assert!(matches!(
+            error,
+            ConverterError::Format(furry_format::FormatError::Io(_))
         ));
     }
 }
