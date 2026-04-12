@@ -88,6 +88,14 @@ fn is_valid_furry_path(path: &PathBuf) -> Result<bool, String> {
     Ok(FurryReader::open(file, &master_key).is_ok())
 }
 
+fn validity_status_from_result(result: Result<bool, String>) -> jint {
+    match result {
+        Ok(true) => 1,
+        Ok(false) => 0,
+        Err(_) => -90,
+    }
+}
+
 fn padding_bytes_from_jni_arg(padding_kb: jlong) -> Result<u64, jint> {
     let padding_kb = u64::try_from(padding_kb).map_err(|_| -6)?;
     padding_bytes_from_kib(padding_kb).map_err(|_| -6)
@@ -354,22 +362,49 @@ pub extern "system" fn Java_com_furry_furry_1flutter_1app_NativeLib_isValidFurry
     _class: JClass<'local>,
     file_path: JString<'local>,
 ) -> jboolean {
-    is_valid_furry_file_impl(&mut env, file_path)
-}
-
-fn is_valid_furry_file_impl(env: &mut JNIEnv<'_>, file_path: JString<'_>) -> jboolean {
-    let path_str: String = match env.get_string(&file_path) {
-        Ok(s) => s.into(),
-        Err(_) => return JNI_FALSE,
-    };
-
-    let path = PathBuf::from(path_str);
-
-    if matches!(is_valid_furry_path(&path), Ok(true)) {
+    if is_valid_furry_file_detailed_impl(&mut env, file_path) > 0 {
         JNI_TRUE
     } else {
         JNI_FALSE
     }
+}
+
+fn is_valid_furry_file_impl(env: &mut JNIEnv<'_>, file_path: JString<'_>) -> jboolean {
+    if is_valid_furry_file_detailed_impl(env, file_path) > 0 {
+        JNI_TRUE
+    } else {
+        JNI_FALSE
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_furry_player_NativeLib_isValidFurryFileDetailed<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    file_path: JString<'local>,
+) -> jint {
+    is_valid_furry_file_detailed_impl(&mut env, file_path)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_furry_furry_1flutter_1app_NativeLib_isValidFurryFileDetailed<
+    'local,
+>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    file_path: JString<'local>,
+) -> jint {
+    is_valid_furry_file_detailed_impl(&mut env, file_path)
+}
+
+fn is_valid_furry_file_detailed_impl(env: &mut JNIEnv<'_>, file_path: JString<'_>) -> jint {
+    let path_str: String = match env.get_string(&file_path) {
+        Ok(s) => s.into(),
+        Err(_) => return -1,
+    };
+
+    let path = PathBuf::from(path_str);
+    validity_status_from_result(is_valid_furry_path(&path))
 }
 
 /// JNI: 获取 .furry 的原始格式扩展名（不带点）
@@ -612,5 +647,15 @@ mod tests {
     #[test]
     fn rejects_overflowing_padding_kb_for_android_pack() {
         assert_eq!(padding_bytes_from_jni_arg(jlong::MAX), Err(-6));
+    }
+
+    #[test]
+    fn validity_status_returns_expected_codes() {
+        assert_eq!(validity_status_from_result(Ok(true)), 1);
+        assert_eq!(validity_status_from_result(Ok(false)), 0);
+        assert_eq!(
+            validity_status_from_result(Err("master key".to_string())),
+            -90
+        );
     }
 }

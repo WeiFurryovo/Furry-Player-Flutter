@@ -71,6 +71,14 @@ fn is_valid_furry_path(path: &Path) -> Result<bool, c_int> {
     Ok(FurryReader::open(file, &master_key).is_ok())
 }
 
+fn validity_status_from_result(result: Result<bool, c_int>) -> c_int {
+    match result {
+        Ok(true) => 1,
+        Ok(false) => 0,
+        Err(error_code) => error_code,
+    }
+}
+
 fn padding_bytes_for_ffi(padding_kb: u64) -> Result<u64, c_int> {
     padding_bytes_from_kib(padding_kb).map_err(|_| -6)
 }
@@ -133,12 +141,17 @@ pub extern "C" fn furry_pack_to_furry(
 
 #[no_mangle]
 pub extern "C" fn furry_is_valid_furry_file(file_path: *const c_char) -> bool {
+    furry_is_valid_furry_file_detailed(file_path) > 0
+}
+
+#[no_mangle]
+pub extern "C" fn furry_is_valid_furry_file_detailed(file_path: *const c_char) -> c_int {
     let path = match cstr_to_path(file_path) {
-        Ok(p) => p,
-        Err(_) => return false,
+        Ok(path) => path,
+        Err(error_code) => return error_code,
     };
 
-    matches!(is_valid_furry_path(&path), Ok(true))
+    validity_status_from_result(is_valid_furry_path(&path))
 }
 
 fn original_ext(path: &PathBuf, master_key: &MasterKey) -> Result<&'static str, ()> {
@@ -463,6 +476,50 @@ mod tests {
         assert!(matches!(is_valid_furry_path(&path), Ok(false)));
 
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn detailed_validity_returns_one_for_valid_file() {
+        let input_path = unique_temp_path("furry_validity_input", "mp3");
+        let output_path = unique_temp_path("furry_validity_output", "furry");
+
+        std::fs::write(&input_path, b"fake audio payload").unwrap();
+
+        let master_key = MasterKey::default_key();
+        let mut input = File::open(&input_path).unwrap();
+        let mut output = File::create(&output_path).unwrap();
+
+        pack_to_furry(
+            &mut input,
+            &mut output,
+            Some(&input_path),
+            detect_format(&input_path),
+            &master_key,
+            &PackOptions::default(),
+        )
+        .unwrap();
+
+        let output_cstr = CString::new(output_path.to_string_lossy().as_bytes()).unwrap();
+        assert_eq!(furry_is_valid_furry_file_detailed(output_cstr.as_ptr()), 1);
+
+        let _ = std::fs::remove_file(input_path);
+        let _ = std::fs::remove_file(output_path);
+    }
+
+    #[test]
+    fn detailed_validity_returns_zero_for_invalid_file() {
+        let path = unique_temp_path("furry_invalid_detailed", "bin");
+        std::fs::write(&path, b"plain bytes").unwrap();
+
+        let path_cstr = CString::new(path.to_string_lossy().as_bytes()).unwrap();
+        assert_eq!(furry_is_valid_furry_file_detailed(path_cstr.as_ptr()), 0);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn detailed_validity_returns_pointer_error_for_null_input() {
+        assert_eq!(furry_is_valid_furry_file_detailed(std::ptr::null()), -1);
     }
 
     #[test]
