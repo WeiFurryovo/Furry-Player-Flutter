@@ -25,6 +25,9 @@ pub enum ConverterError {
     #[error("Format error: {0}")]
     Format(#[from] furry_format::FormatError),
 
+    #[error("Invalid pack option {name}: {value}")]
+    InvalidPackOption { name: &'static str, value: usize },
+
     #[error("Unsupported format: {0}")]
     UnsupportedFormat(String),
 }
@@ -53,6 +56,29 @@ impl Default for PackOptions {
     }
 }
 
+fn validate_pack_options(options: &PackOptions) -> Result<(), ConverterError> {
+    let max_plain_len =
+        u32::MAX as usize - usize::from(furry_format::CHUNK_HEADER_LEN) - furry_crypto::TAG_LEN;
+
+    if options.chunk_size == 0 || options.chunk_size > max_plain_len {
+        return Err(ConverterError::InvalidPackOption {
+            name: "chunk_size",
+            value: options.chunk_size,
+        });
+    }
+
+    if options.padding_bytes > 0
+        && (options.padding_chunk_size == 0 || options.padding_chunk_size > max_plain_len)
+    {
+        return Err(ConverterError::InvalidPackOption {
+            name: "padding_chunk_size",
+            value: options.padding_chunk_size,
+        });
+    }
+
+    Ok(())
+}
+
 /// 从文件扩展名检测格式
 pub fn detect_format(path: &Path) -> OriginalFormat {
     path.extension()
@@ -76,6 +102,8 @@ where
     R: Read + Seek,
     W: Write + Seek,
 {
+    validate_pack_options(options)?;
+
     // 创建 writer
     let mut writer = FurryWriter::create(output, master_key, original_format)?;
 
@@ -449,5 +477,65 @@ mod tests {
         unpack_from_furry(&mut furry_input, &mut unpacked_output, &master_key).unwrap();
 
         assert_eq!(unpacked_output.into_inner(), original_data);
+    }
+
+    #[test]
+    fn test_pack_rejects_zero_chunk_size() {
+        let master_key = MasterKey::default_key();
+        let original_data = b"audio";
+        let mut input = Cursor::new(&original_data[..]);
+        let mut furry_output = Cursor::new(Vec::new());
+
+        let error = pack_to_furry(
+            &mut input,
+            &mut furry_output,
+            None,
+            OriginalFormat::Mp3,
+            &master_key,
+            &PackOptions {
+                chunk_size: 0,
+                ..Default::default()
+            },
+        )
+        .expect_err("should reject zero chunk_size");
+
+        assert!(matches!(
+            error,
+            ConverterError::InvalidPackOption {
+                name: "chunk_size",
+                value: 0
+            }
+        ));
+    }
+
+    #[test]
+    fn test_pack_rejects_zero_padding_chunk_size() {
+        let master_key = MasterKey::default_key();
+        let original_data = b"audio";
+        let mut input = Cursor::new(&original_data[..]);
+        let mut furry_output = Cursor::new(Vec::new());
+
+        let error = pack_to_furry(
+            &mut input,
+            &mut furry_output,
+            None,
+            OriginalFormat::Mp3,
+            &master_key,
+            &PackOptions {
+                chunk_size: 1024,
+                padding_bytes: 1024,
+                padding_chunk_size: 0,
+                include_meta: false,
+            },
+        )
+        .expect_err("should reject zero padding_chunk_size");
+
+        assert!(matches!(
+            error,
+            ConverterError::InvalidPackOption {
+                name: "padding_chunk_size",
+                value: 0
+            }
+        ));
     }
 }
