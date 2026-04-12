@@ -6,7 +6,9 @@ use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 
-use furry_converter::{detect_format, pack_to_furry, unpack_from_furry, PackOptions};
+use furry_converter::{
+    detect_format, pack_to_furry, padding_bytes_from_kib, unpack_from_furry, PackOptions,
+};
 use furry_crypto::{MasterKey, MASTER_KEY_ENV_VAR, MASTER_KEY_REQUIRE_ENV_VAR};
 use furry_format::FurryReader;
 
@@ -67,6 +69,13 @@ fn main() {
             let input_path = PathBuf::from(&args[2]);
             let output_path = PathBuf::from(&args[3]);
             let padding_kb: u64 = args.get(4).and_then(|s| s.parse().ok()).unwrap_or(0);
+            let padding_bytes = match padding_bytes_from_kib(padding_kb) {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    eprintln!("Invalid padding_kb: {}", error);
+                    std::process::exit(1);
+                }
+            };
 
             let format = detect_format(&input_path);
             println!("Detected format: {:?}", format);
@@ -75,7 +84,7 @@ fn main() {
             let mut output = File::create(&output_path).expect("Failed to create output file");
 
             let options = PackOptions {
-                padding_bytes: padding_kb * 1024,
+                padding_bytes,
                 ..Default::default()
             };
 

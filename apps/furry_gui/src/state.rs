@@ -4,7 +4,9 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use crossbeam_channel::{Receiver, Sender};
-use furry_converter::{detect_format, pack_to_furry, unpack_from_furry, PackOptions};
+use furry_converter::{
+    detect_format, pack_to_furry, padding_bytes_from_kib, unpack_from_furry, PackOptions,
+};
 use furry_crypto::MasterKey;
 use furry_player::{PlayerCommand, PlayerEvent};
 
@@ -316,8 +318,10 @@ impl AppState {
                 }
 
                 let format = detect_format(&input_path);
+                let padding_bytes =
+                    padding_bytes_from_kib(padding_kb).map_err(|e| e.to_string())?;
                 let options = PackOptions {
-                    padding_bytes: padding_kb * 1024,
+                    padding_bytes,
                     ..Default::default()
                 };
 

@@ -28,6 +28,9 @@ pub enum ConverterError {
     #[error("Invalid pack option {name}: {value}")]
     InvalidPackOption { name: &'static str, value: usize },
 
+    #[error("Invalid padding_kb value: {0}")]
+    InvalidPaddingKib(u64),
+
     #[error("Unsupported format: {0}")]
     UnsupportedFormat(String),
 }
@@ -90,6 +93,12 @@ fn validate_pack_options(options: &PackOptions) -> Result<(), ConverterError> {
     }
 
     Ok(())
+}
+
+pub fn padding_bytes_from_kib(padding_kib: u64) -> Result<u64, ConverterError> {
+    padding_kib
+        .checked_mul(1024)
+        .ok_or(ConverterError::InvalidPaddingKib(padding_kib))
 }
 
 /// 从文件扩展名检测格式
@@ -625,5 +634,12 @@ mod tests {
             error,
             ConverterError::Format(furry_format::FormatError::Io(_))
         ));
+    }
+
+    #[test]
+    fn test_padding_bytes_from_kib_rejects_overflow() {
+        let error = padding_bytes_from_kib(u64::MAX).expect_err("should reject overflow");
+
+        assert!(matches!(error, ConverterError::InvalidPaddingKib(u64::MAX)));
     }
 }

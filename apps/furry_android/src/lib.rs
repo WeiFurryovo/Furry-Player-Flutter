@@ -10,7 +10,9 @@ use jni::objects::{JClass, JString};
 use jni::sys::{jboolean, jbyteArray, jint, jlong, jstring, JNI_FALSE, JNI_TRUE};
 use jni::JNIEnv;
 
-use furry_converter::{detect_format, pack_to_furry, unpack_from_furry, PackOptions};
+use furry_converter::{
+    detect_format, pack_to_furry, padding_bytes_from_kib, unpack_from_furry, PackOptions,
+};
 use furry_crypto::{LoadedMasterKey, MasterKey, MASTER_KEY_ENV_VAR};
 use furry_format::{FurryReader, MetaKind};
 
@@ -83,6 +85,11 @@ fn is_valid_furry_path(path: &PathBuf) -> Result<bool, String> {
 
     let master_key = load_master_key()?;
     Ok(FurryReader::open(file, &master_key).is_ok())
+}
+
+fn padding_bytes_from_jni_arg(padding_kb: jlong) -> Result<u64, jint> {
+    let padding_kb = u64::try_from(padding_kb).map_err(|_| -6)?;
+    padding_bytes_from_kib(padding_kb).map_err(|_| -6)
 }
 
 /// JNI: 初始化库
@@ -163,9 +170,13 @@ fn pack_to_furry_impl(
         Ok(master_key) => master_key,
         Err(_) => return -90,
     };
+    let padding_bytes = match padding_bytes_from_jni_arg(padding_kb) {
+        Ok(bytes) => bytes,
+        Err(error_code) => return error_code,
+    };
 
     let options = PackOptions {
-        padding_bytes: (padding_kb as u64) * 1024,
+        padding_bytes,
         ..Default::default()
     };
 
@@ -584,5 +595,15 @@ mod tests {
         assert!(matches!(is_valid_furry_path(&path), Ok(false)));
 
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn rejects_negative_padding_kb_for_android_pack() {
+        assert_eq!(padding_bytes_from_jni_arg(-1), Err(-6));
+    }
+
+    #[test]
+    fn rejects_overflowing_padding_kb_for_android_pack() {
+        assert_eq!(padding_bytes_from_jni_arg(jlong::MAX), Err(-6));
     }
 }

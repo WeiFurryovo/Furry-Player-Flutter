@@ -6,7 +6,9 @@ use std::os::raw::{c_char, c_int, c_uchar};
 use std::path::{Path, PathBuf};
 use std::sync::{Once, OnceLock};
 
-use furry_converter::{detect_format, pack_to_furry, unpack_from_furry, PackOptions};
+use furry_converter::{
+    detect_format, pack_to_furry, padding_bytes_from_kib, unpack_from_furry, PackOptions,
+};
 use furry_crypto::{LoadedMasterKey, MasterKey, MASTER_KEY_ENV_VAR};
 use furry_format::{FurryReader, MetaKind};
 
@@ -68,6 +70,10 @@ fn is_valid_furry_path(path: &Path) -> Result<bool, c_int> {
     Ok(FurryReader::open(file, &master_key).is_ok())
 }
 
+fn padding_bytes_for_ffi(padding_kb: u64) -> Result<u64, c_int> {
+    padding_bytes_from_kib(padding_kb).map_err(|_| -6)
+}
+
 #[no_mangle]
 pub extern "C" fn furry_pack_to_furry(
     input_path: *const c_char,
@@ -97,8 +103,12 @@ pub extern "C" fn furry_pack_to_furry(
         Ok(master_key) => master_key,
         Err(error_code) => return error_code,
     };
+    let padding_bytes = match padding_bytes_for_ffi(padding_kb) {
+        Ok(bytes) => bytes,
+        Err(error_code) => return error_code,
+    };
     let options = PackOptions {
-        padding_bytes: padding_kb * 1024,
+        padding_bytes,
         ..Default::default()
     };
 
