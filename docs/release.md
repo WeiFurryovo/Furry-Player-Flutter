@@ -19,6 +19,10 @@
 ## CI 自动发版（GitHub Actions）
 见：`docs/github_actions.md`
 
+注意：
+- Release workflow 现在要求显式提供 `FURRY_MASTER_KEY_HEX` secret。
+- 不再建议依赖仓库内置开发密钥来生成正式发布产物。
+
 ## 分平台说明
 
 ### Linux

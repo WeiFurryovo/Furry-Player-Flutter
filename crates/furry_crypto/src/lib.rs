@@ -53,6 +53,8 @@ pub enum CryptoError {
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 pub enum MasterKeyLoadError {
+    #[error("{env_var} is required but not set")]
+    MissingRequiredEnv { env_var: &'static str },
     #[error("{env_var} is not valid UTF-8")]
     InvalidEnvEncoding { env_var: &'static str },
     #[error("{env_var} must be {expected} hexadecimal characters, got {actual}")]
@@ -69,6 +71,12 @@ pub enum MasterKeyLoadError {
 pub enum RuntimeMasterKeySource {
     Environment,
     BuiltInDefault,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuntimeMasterKeyPolicy {
+    AllowBuiltInDefault,
+    RequireEnvironment,
 }
 
 #[derive(Clone)]
@@ -125,15 +133,29 @@ impl MasterKey {
 
     /// 运行时加载主密钥：优先读取环境变量，否则回退到内置默认值。
     pub fn load_runtime() -> Result<LoadedMasterKey, MasterKeyLoadError> {
+        Self::load_runtime_with_policy(RuntimeMasterKeyPolicy::AllowBuiltInDefault)
+    }
+
+    /// 运行时加载主密钥，并按策略决定是否允许回退到内置默认值。
+    pub fn load_runtime_with_policy(
+        policy: RuntimeMasterKeyPolicy,
+    ) -> Result<LoadedMasterKey, MasterKeyLoadError> {
         match std::env::var(MASTER_KEY_ENV_VAR) {
             Ok(hex) => Ok(LoadedMasterKey {
                 key: Self::from_hex(&hex)?,
                 source: RuntimeMasterKeySource::Environment,
             }),
-            Err(std::env::VarError::NotPresent) => Ok(LoadedMasterKey {
-                key: Self::default_key(),
-                source: RuntimeMasterKeySource::BuiltInDefault,
-            }),
+            Err(std::env::VarError::NotPresent) => match policy {
+                RuntimeMasterKeyPolicy::AllowBuiltInDefault => Ok(LoadedMasterKey {
+                    key: Self::default_key(),
+                    source: RuntimeMasterKeySource::BuiltInDefault,
+                }),
+                RuntimeMasterKeyPolicy::RequireEnvironment => {
+                    Err(MasterKeyLoadError::MissingRequiredEnv {
+                        env_var: MASTER_KEY_ENV_VAR,
+                    })
+                }
+            },
             Err(std::env::VarError::NotUnicode(_)) => Err(MasterKeyLoadError::InvalidEnvEncoding {
                 env_var: MASTER_KEY_ENV_VAR,
             }),
@@ -494,5 +516,24 @@ mod tests {
         );
 
         std::env::remove_var(MASTER_KEY_ENV_VAR);
+    }
+
+    #[test]
+    fn test_load_runtime_with_required_policy_rejects_missing_env() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::remove_var(MASTER_KEY_ENV_VAR);
+
+        let error =
+            match MasterKey::load_runtime_with_policy(RuntimeMasterKeyPolicy::RequireEnvironment) {
+                Ok(_) => panic!("expected missing required env"),
+                Err(error) => error,
+            };
+
+        assert_eq!(
+            error,
+            MasterKeyLoadError::MissingRequiredEnv {
+                env_var: MASTER_KEY_ENV_VAR,
+            }
+        );
     }
 }

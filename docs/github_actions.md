@@ -23,7 +23,7 @@
 - `write_sha256_sums.sh` / `write_sha256_sums.ps1`：统一生成平台产物 SHA256SUMS.txt
 - `prepare_flutter_app_windows.ps1`：Windows 下增量同步模板与依赖（基于 deps hash）
 
-## 1) 配置 Secrets（Android 签名必需）
+## 1) 配置 Secrets（Release 必需）
 在 GitHub 仓库设置里：Settings → Secrets and variables → Actions → New repository secret
 
 需要以下 Secrets：
@@ -31,6 +31,7 @@
 - `ANDROID_KEYSTORE_PASSWORD`
 - `ANDROID_KEY_ALIAS`
 - `ANDROID_KEY_PASSWORD`
+- `FURRY_MASTER_KEY_HEX`：32 字节主密钥的 64 位十六进制字符串；Release workflow 会强制校验该值
 
 生成 base64（本地）：
 ```sh
@@ -59,3 +60,5 @@ git push origin v1.0.0
 ## 3) 常见问题
 - Linux/Windows 桌面构建依赖 Flutter 桌面能力：工作流已在对应 runner 上执行 `flutter config --enable-...-desktop`
 - Android 打包失败多半是签名 Secrets 没配齐或 keystore base64 不正确
+- Release workflow 若提示 `FURRY_MASTER_KEY_HEX` 缺失或格式错误，需要在仓库 Secrets 中补齐 64 位十六进制主密钥
+- CI workflow 使用的是仓库内置的非生产测试密钥，只用于验证构建链路；正式发布不要复用它

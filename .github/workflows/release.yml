@@ -11,6 +11,7 @@ permissions:
 env:
   FLUTTER_VERSION: "3.38.8"
   EXPECTED_DART_VERSION: "3.10.7"
+  FURRY_MASTER_KEY_HEX: ${{ secrets.FURRY_MASTER_KEY_HEX }}
 
 jobs:
   flutter-quality:
@@ -24,6 +25,18 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
+
+      - name: Validate release master key secret
+        run: |
+          set -euo pipefail
+          if [ -z "${FURRY_MASTER_KEY_HEX:-}" ]; then
+            echo "[ERROR] Missing required secret: FURRY_MASTER_KEY_HEX" >&2
+            exit 1
+          fi
+          if ! printf '%s' "$FURRY_MASTER_KEY_HEX" | grep -Eq '^[0-9A-Fa-f]{64}$'; then
+            echo "[ERROR] FURRY_MASTER_KEY_HEX must be exactly 64 hexadecimal characters" >&2
+            exit 1
+          fi
 
       - name: Flutter doctor
         run: ./apps/furry_flutter/scripts/flutter_doctor.sh
@@ -39,6 +52,18 @@ jobs:
 
       - name: Install Linux deps for Rust desktop/audio crates
         run: ./apps/furry_flutter/scripts/install_linux_desktop_deps.sh
+
+      - name: Validate release master key secret
+        run: |
+          set -euo pipefail
+          if [ -z "${FURRY_MASTER_KEY_HEX:-}" ]; then
+            echo "[ERROR] Missing required secret: FURRY_MASTER_KEY_HEX" >&2
+            exit 1
+          fi
+          if ! printf '%s' "$FURRY_MASTER_KEY_HEX" | grep -Eq '^[0-9A-Fa-f]{64}$'; then
+            echo "[ERROR] FURRY_MASTER_KEY_HEX must be exactly 64 hexadecimal characters" >&2
+            exit 1
+          fi
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
