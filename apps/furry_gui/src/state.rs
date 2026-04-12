@@ -419,3 +419,92 @@ impl AppState {
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use furry_player::PlaybackState;
+
+    fn sample_track(name: &str) -> TrackItem {
+        TrackItem {
+            path: PathBuf::from(format!("/tmp/{name}.furry")),
+            title: name.to_string(),
+            artist: "tester".to_string(),
+            duration_str: "00:10".to_string(),
+        }
+    }
+
+    #[test]
+    fn track_ended_event_advances_playlist_and_sends_commands() {
+        let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
+        let (evt_tx, evt_rx) = crossbeam_channel::unbounded();
+        let mut state = AppState::new(cmd_tx, evt_rx, MasterKey::default_key());
+        let first = sample_track("first");
+        let second = sample_track("second");
+        state.playlist = vec![first.clone(), second.clone()];
+        state.current_index = Some(0);
+        state.current_track = Some(first);
+
+        evt_tx
+            .send(PlayerEvent::StateChanged(PlaybackState::Playing))
+            .unwrap();
+        evt_tx.send(PlayerEvent::TrackEnded).unwrap();
+
+        state.poll_events();
+
+        assert_eq!(state.current_index, Some(1));
+        assert_eq!(
+            state
+                .current_track
+                .as_ref()
+                .map(|track| track.title.as_str()),
+            Some("second")
+        );
+        assert!(state.is_playing);
+
+        let commands: Vec<_> = cmd_rx.try_iter().collect();
+        assert_eq!(commands.len(), 2);
+        match &commands[0] {
+            PlayerCommand::Load(path) => assert_eq!(path, &second.path),
+            other => panic!("unexpected first command: {other:?}"),
+        }
+        assert!(matches!(commands[1], PlayerCommand::Play));
+    }
+
+    #[test]
+    fn converter_validation_rejects_missing_pack_input() {
+        let mut state = AppState::default();
+        state.pack_output_path = Some(PathBuf::from("/tmp/output.furry"));
+
+        state.start_pack();
+
+        assert!(!state.converter_running);
+        assert!(!state.converter_last_ok);
+        assert_eq!(
+            state.converter_last_message.as_deref(),
+            Some("请选择输入音频文件")
+        );
+    }
+
+    #[test]
+    fn poll_converter_events_applies_backend_result() {
+        let mut state = AppState::default();
+        state.converter_running = true;
+        state
+            .converter_evt_tx
+            .send(ConverterEvent::Finished {
+                ok: false,
+                message: "解包失败：bad file".to_string(),
+            })
+            .unwrap();
+
+        state.poll_converter_events();
+
+        assert!(!state.converter_running);
+        assert!(!state.converter_last_ok);
+        assert_eq!(
+            state.converter_last_message.as_deref(),
+            Some("解包失败：bad file")
+        );
+    }
+}

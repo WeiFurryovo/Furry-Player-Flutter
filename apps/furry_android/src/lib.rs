@@ -534,3 +534,54 @@ fn get_cover_art_impl(env: &mut JNIEnv<'_>, file_path: JString<'_>) -> jbyteArra
     }
     arr.into_raw()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_path(prefix: &str, ext: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or(0);
+        std::env::temp_dir().join(format!("{prefix}_{}_{}.{}", std::process::id(), nanos, ext))
+    }
+
+    #[test]
+    fn detects_valid_furry_file_via_android_helper() {
+        let input_path = unique_temp_path("furry_android_valid_input", "mp3");
+        let output_path = unique_temp_path("furry_android_valid_output", "furry");
+
+        std::fs::write(&input_path, b"fake audio payload").unwrap();
+
+        let master_key = load_master_key().expect("runtime master key");
+        let mut input = File::open(&input_path).unwrap();
+        let mut output = File::create(&output_path).unwrap();
+
+        pack_to_furry(
+            &mut input,
+            &mut output,
+            Some(&input_path),
+            detect_format(&input_path),
+            &master_key,
+            &PackOptions::default(),
+        )
+        .unwrap();
+
+        assert!(matches!(is_valid_furry_path(&output_path), Ok(true)));
+
+        let _ = std::fs::remove_file(input_path);
+        let _ = std::fs::remove_file(output_path);
+    }
+
+    #[test]
+    fn rejects_plain_file_via_android_helper() {
+        let path = unique_temp_path("furry_android_invalid_plain", "bin");
+        std::fs::write(&path, b"plain bytes").unwrap();
+
+        assert!(matches!(is_valid_furry_path(&path), Ok(false)));
+
+        let _ = std::fs::remove_file(path);
+    }
+}
