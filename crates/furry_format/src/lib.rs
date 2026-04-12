@@ -354,4 +354,34 @@ mod tests {
             FormatError::CorruptIndex("audio virtual stream gap or overlap")
         ));
     }
+
+    #[test]
+    fn index_parse_rejects_chunk_sequence_regression() {
+        let mut index = FurryIndexV1::new(6, OriginalFormat::Mp3);
+        index.add_entry(IndexEntryV1::new_audio(1, 96, 59, 3, 0));
+        index.add_entry(IndexEntryV1::new_audio(1, 155, 59, 3, 3));
+
+        let error =
+            FurryIndexV1::parse(&index.to_bytes()).expect_err("should reject chunk_seq regression");
+
+        assert!(matches!(
+            error,
+            FormatError::CorruptIndex("chunk_seq out of order")
+        ));
+    }
+
+    #[test]
+    fn index_parse_rejects_overlapping_file_offsets() {
+        let mut index = FurryIndexV1::new(6, OriginalFormat::Mp3);
+        index.add_entry(IndexEntryV1::new_audio(0, 96, 59, 3, 0));
+        index.add_entry(IndexEntryV1::new_audio(1, 120, 59, 3, 3));
+
+        let error = FurryIndexV1::parse(&index.to_bytes())
+            .expect_err("should reject overlapping file offsets");
+
+        assert!(matches!(
+            error,
+            FormatError::CorruptIndex("chunk file offsets overlap or regress")
+        ));
+    }
 }

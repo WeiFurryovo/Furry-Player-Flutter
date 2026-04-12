@@ -276,13 +276,33 @@ impl FurryIndexV1 {
         let expected_record_len_base =
             u32::from(crate::CHUNK_HEADER_LEN) + furry_crypto::TAG_LEN as u32;
         let mut audio_end = 0u64;
+        let mut previous_chunk_seq = None;
+        let mut previous_file_end = None;
 
         for entry in &self.entries {
+            if let Some(previous_chunk_seq) = previous_chunk_seq {
+                if entry.chunk_seq <= previous_chunk_seq {
+                    return Err(FormatError::CorruptIndex("chunk_seq out of order"));
+                }
+            }
+
             let expected_record_len = expected_record_len_base
                 .checked_add(entry.plain_len)
                 .ok_or(FormatError::CorruptIndex("record_len overflow"))?;
             if entry.record_len != expected_record_len {
                 return Err(FormatError::CorruptIndex("record_len mismatch"));
+            }
+
+            let file_end = entry
+                .file_offset
+                .checked_add(entry.record_len as u64)
+                .ok_or(FormatError::CorruptIndex("file_offset overflow"))?;
+            if let Some(previous_file_end) = previous_file_end {
+                if entry.file_offset < previous_file_end {
+                    return Err(FormatError::CorruptIndex(
+                        "chunk file offsets overlap or regress",
+                    ));
+                }
             }
 
             if entry.chunk_type == ChunkType::Audio {
@@ -295,6 +315,9 @@ impl FurryIndexV1 {
                     FormatError::CorruptIndex("audio virtual stream length overflow"),
                 )?;
             }
+
+            previous_chunk_seq = Some(entry.chunk_seq);
+            previous_file_end = Some(file_end);
         }
 
         if audio_end != self.header.audio_stream_len {
