@@ -5,7 +5,8 @@ use std::time::Instant;
 
 use crossbeam_channel::{Receiver, Sender};
 use furry_converter::{
-    detect_format, pack_to_furry, padding_bytes_from_kib, unpack_from_furry, PackOptions,
+    detect_format, inspect_furry, pack_to_furry, padding_bytes_from_kib, unpack_from_furry,
+    PackOptions,
 };
 use furry_crypto::MasterKey;
 use furry_player::{PlayerCommand, PlayerEvent};
@@ -391,11 +392,11 @@ impl AppState {
         std::thread::spawn(move || {
             let started = Instant::now();
             let result: Result<String, String> = (|| {
+                let mut input = std::fs::File::open(&input_path).map_err(|e| e.to_string())?;
+                let _ = inspect_furry(&mut input, &master_key).map_err(|e| e.to_string())?;
                 if let Some(parent) = output_path.parent() {
                     std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
                 }
-
-                let mut input = std::fs::File::open(&input_path).map_err(|e| e.to_string())?;
                 let mut output = std::fs::File::create(&output_path).map_err(|e| e.to_string())?;
                 let format = unpack_from_furry(&mut input, &mut output, &master_key)
                     .map_err(|e| e.to_string())?;

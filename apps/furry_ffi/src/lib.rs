@@ -7,7 +7,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Once, OnceLock};
 
 use furry_converter::{
-    detect_format, pack_to_furry, padding_bytes_from_kib, unpack_from_furry, PackOptions,
+    detect_format, inspect_furry, pack_to_furry, padding_bytes_from_kib, unpack_from_furry,
+    PackOptions,
 };
 use furry_crypto::{LoadedMasterKey, MasterKey, MASTER_KEY_ENV_VAR};
 use furry_format::{FurryReader, MetaKind};
@@ -261,6 +262,13 @@ pub unsafe extern "C" fn furry_unpack_from_furry_to_file(
         Err(_) => return -23,
     };
 
+    let master_key = match load_master_key() {
+        Ok(master_key) => master_key,
+        Err(error_code) => return error_code,
+    };
+    if inspect_furry(&mut input, &master_key).is_err() {
+        return -26;
+    }
     if let Some(parent) = output_path.parent() {
         if std::fs::create_dir_all(parent).is_err() {
             return -24;
@@ -270,11 +278,6 @@ pub unsafe extern "C" fn furry_unpack_from_furry_to_file(
     let mut output = match File::create(&output_path) {
         Ok(f) => f,
         Err(_) => return -25,
-    };
-
-    let master_key = match load_master_key() {
-        Ok(master_key) => master_key,
-        Err(error_code) => return error_code,
     };
     match unpack_from_furry(&mut input, &mut output, &master_key) {
         Ok(_) => 0,
@@ -472,6 +475,28 @@ mod tests {
         assert!(
             !output_path.exists(),
             "output should not be created on invalid padding"
+        );
+
+        let _ = std::fs::remove_file(input_path);
+        let _ = std::fs::remove_file(output_path);
+    }
+
+    #[test]
+    fn unpack_rejects_invalid_input_without_creating_output() {
+        let input_path = unique_temp_path("furry_unpack_input", "bin");
+        let output_path = unique_temp_path("furry_unpack_output", "mp3");
+        std::fs::write(&input_path, b"plain bytes").unwrap();
+
+        let input_cstr = CString::new(input_path.to_string_lossy().as_bytes()).unwrap();
+        let output_cstr = CString::new(output_path.to_string_lossy().as_bytes()).unwrap();
+
+        let result =
+            unsafe { furry_unpack_from_furry_to_file(input_cstr.as_ptr(), output_cstr.as_ptr()) };
+
+        assert_eq!(result, -26);
+        assert!(
+            !output_path.exists(),
+            "output should not be created on invalid unpack input"
         );
 
         let _ = std::fs::remove_file(input_path);

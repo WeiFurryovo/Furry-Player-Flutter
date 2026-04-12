@@ -97,3 +97,32 @@ fn pack_rejects_invalid_padding_argument_without_creating_output() {
     let _ = std::fs::remove_file(input_path);
     let _ = std::fs::remove_file(output_path);
 }
+
+#[test]
+fn unpack_rejects_invalid_input_without_creating_output() {
+    let input_path = unique_temp_path("furry_cli_unpack_input", "bin");
+    let output_path = unique_temp_path("furry_cli_unpack_output", "mp3");
+    std::fs::write(&input_path, b"plain bytes").expect("write temp input");
+
+    let output = Command::new(cli_binary())
+        .env("FURRY_MASTER_KEY_HEX", TEST_MASTER_KEY_HEX)
+        .arg("unpack")
+        .arg(&input_path)
+        .arg(&output_path)
+        .output()
+        .expect("run furry-cli");
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("Failed to inspect input file"),
+        "stderr was: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !output_path.exists(),
+        "output should not be created on invalid unpack input"
+    );
+
+    let _ = std::fs::remove_file(input_path);
+    let _ = std::fs::remove_file(output_path);
+}

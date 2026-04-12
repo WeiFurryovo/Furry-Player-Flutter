@@ -11,7 +11,8 @@ use jni::sys::{jboolean, jbyteArray, jint, jlong, jstring, JNI_FALSE, JNI_TRUE};
 use jni::JNIEnv;
 
 use furry_converter::{
-    detect_format, pack_to_furry, padding_bytes_from_kib, unpack_from_furry, PackOptions,
+    detect_format, inspect_furry, pack_to_furry, padding_bytes_from_kib, unpack_from_furry,
+    PackOptions,
 };
 use furry_crypto::{LoadedMasterKey, MasterKey, MASTER_KEY_ENV_VAR};
 use furry_format::{FurryReader, MetaKind};
@@ -265,6 +266,13 @@ fn unpack_to_file_impl(
         Err(_) => return -62,
     };
 
+    let master_key = match load_master_key() {
+        Ok(master_key) => master_key,
+        Err(_) => return -90,
+    };
+    if inspect_furry(&mut input, &master_key).is_err() {
+        return -65;
+    }
     if let Some(parent) = output_path.parent() {
         if std::fs::create_dir_all(parent).is_err() {
             return -63;
@@ -274,11 +282,6 @@ fn unpack_to_file_impl(
     let mut output = match File::create(&output_path) {
         Ok(f) => f,
         Err(_) => return -64,
-    };
-
-    let master_key = match load_master_key() {
-        Ok(master_key) => master_key,
-        Err(_) => return -90,
     };
     match unpack_from_furry(&mut input, &mut output, &master_key) {
         Ok(_) => 0,

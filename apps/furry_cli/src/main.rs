@@ -7,7 +7,8 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use furry_converter::{
-    detect_format, pack_to_furry, padding_bytes_from_kib, unpack_from_furry, PackOptions,
+    detect_format, inspect_furry, pack_to_furry, padding_bytes_from_kib, unpack_from_furry,
+    PackOptions,
 };
 use furry_crypto::{MasterKey, MASTER_KEY_ENV_VAR, MASTER_KEY_REQUIRE_ENV_VAR};
 use furry_format::FurryReader;
@@ -125,6 +126,10 @@ fn main() {
             let output_path = PathBuf::from(&args[3]);
 
             let mut input = File::open(&input_path).expect("Failed to open input file");
+            if let Err(error) = inspect_furry(&mut input, &master_key) {
+                eprintln!("Failed to inspect input file: {}", error);
+                std::process::exit(1);
+            }
             let mut output = File::create(&output_path).expect("Failed to create output file");
 
             let format =

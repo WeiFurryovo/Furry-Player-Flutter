@@ -2,7 +2,7 @@
 //!
 //! 提供音频文件与 .furry 格式之间的转换功能。
 
-use std::io::{Read, Seek, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 use furry_crypto::MasterKey;
@@ -99,6 +99,19 @@ pub fn padding_bytes_from_kib(padding_kib: u64) -> Result<u64, ConverterError> {
     padding_kib
         .checked_mul(1024)
         .ok_or(ConverterError::InvalidPaddingKib(padding_kib))
+}
+
+pub fn inspect_furry<R: Read + Seek>(
+    input: &mut R,
+    master_key: &MasterKey,
+) -> Result<OriginalFormat, ConverterError> {
+    input.seek(SeekFrom::Start(0))?;
+    let format = {
+        let reader = FurryReader::open(&mut *input, master_key)?;
+        reader.index.header.original_format
+    };
+    input.seek(SeekFrom::Start(0))?;
+    Ok(format)
 }
 
 /// 从文件扩展名检测格式
@@ -641,5 +654,32 @@ mod tests {
         let error = padding_bytes_from_kib(u64::MAX).expect_err("should reject overflow");
 
         assert!(matches!(error, ConverterError::InvalidPaddingKib(u64::MAX)));
+    }
+
+    #[test]
+    fn test_inspect_furry_resets_reader_position() {
+        let master_key = MasterKey::default_key();
+        let original_data = b"audio bytes";
+        let mut input = Cursor::new(&original_data[..]);
+        let mut furry_output = Cursor::new(Vec::new());
+
+        pack_to_furry(
+            &mut input,
+            &mut furry_output,
+            None,
+            OriginalFormat::Mp3,
+            &master_key,
+            &PackOptions::default(),
+        )
+        .unwrap();
+
+        let furry_data = furry_output.into_inner();
+        let mut furry_input = Cursor::new(furry_data);
+        furry_input.set_position(5);
+
+        let format = inspect_furry(&mut furry_input, &master_key).expect("inspect furry");
+
+        assert_eq!(format, OriginalFormat::Mp3);
+        assert_eq!(furry_input.position(), 0);
     }
 }
