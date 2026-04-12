@@ -4,9 +4,10 @@ use std::ffi::{CStr, CString};
 use std::fs::File;
 use std::os::raw::{c_char, c_int, c_uchar};
 use std::path::{Path, PathBuf};
+use std::sync::{Once, OnceLock};
 
 use furry_converter::{detect_format, pack_to_furry, unpack_from_furry, PackOptions};
-use furry_crypto::MasterKey;
+use furry_crypto::{LoadedMasterKey, MasterKey, MASTER_KEY_ENV_VAR};
 use furry_format::{FurryReader, MetaKind};
 
 fn cstr_to_path(ptr: *const c_char) -> Result<PathBuf, c_int> {
@@ -20,14 +21,50 @@ fn cstr_to_path(ptr: *const c_char) -> Result<PathBuf, c_int> {
     Ok(PathBuf::from(s))
 }
 
-fn is_valid_furry_path(path: &Path) -> bool {
+fn log_master_key_error_once(message: &str) {
+    static ERROR_ONCE: Once = Once::new();
+    ERROR_ONCE.call_once(|| {
+        eprintln!("Master key configuration error: {}", message);
+    });
+}
+
+fn warn_default_master_key_once() {
+    static WARN_ONCE: Once = Once::new();
+    WARN_ONCE.call_once(|| {
+        eprintln!(
+            "Warning: {} is not set, using the built-in development master key.",
+            MASTER_KEY_ENV_VAR
+        );
+    });
+}
+
+fn load_master_key() -> Result<MasterKey, c_int> {
+    static MASTER_KEY: OnceLock<Result<LoadedMasterKey, String>> = OnceLock::new();
+
+    let loaded =
+        MASTER_KEY.get_or_init(|| MasterKey::load_runtime().map_err(|error| error.to_string()));
+    match loaded {
+        Ok(loaded) => {
+            if loaded.uses_default_fallback() {
+                warn_default_master_key_once();
+            }
+            Ok(loaded.clone_key())
+        }
+        Err(error) => {
+            log_master_key_error_once(error);
+            Err(-90)
+        }
+    }
+}
+
+fn is_valid_furry_path(path: &Path) -> Result<bool, c_int> {
     let file = match File::open(path) {
         Ok(file) => file,
-        Err(_) => return false,
+        Err(_) => return Ok(false),
     };
 
-    let master_key = MasterKey::default_key();
-    FurryReader::open(file, &master_key).is_ok()
+    let master_key = load_master_key()?;
+    Ok(FurryReader::open(file, &master_key).is_ok())
 }
 
 #[no_mangle]
@@ -55,7 +92,10 @@ pub extern "C" fn furry_pack_to_furry(
     };
 
     let format = detect_format(&input_path);
-    let master_key = MasterKey::default_key();
+    let master_key = match load_master_key() {
+        Ok(master_key) => master_key,
+        Err(error_code) => return error_code,
+    };
     let options = PackOptions {
         padding_bytes: padding_kb * 1024,
         ..Default::default()
@@ -81,7 +121,7 @@ pub extern "C" fn furry_is_valid_furry_file(file_path: *const c_char) -> bool {
         Err(_) => return false,
     };
 
-    is_valid_furry_path(&path)
+    matches!(is_valid_furry_path(&path), Ok(true))
 }
 
 fn original_ext(path: &PathBuf, master_key: &MasterKey) -> Result<&'static str, ()> {
@@ -117,7 +157,10 @@ pub unsafe extern "C" fn furry_get_original_format(
         Err(e) => return e,
     };
 
-    let master_key = MasterKey::default_key();
+    let master_key = match load_master_key() {
+        Ok(master_key) => master_key,
+        Err(error_code) => return error_code,
+    };
     let ext = match original_ext(&path, &master_key) {
         Ok(v) => v,
         Err(_) => return -11,
@@ -163,7 +206,10 @@ pub unsafe extern "C" fn furry_unpack_from_furry_to_bytes(
         Err(_) => return -21,
     };
 
-    let master_key = MasterKey::default_key();
+    let master_key = match load_master_key() {
+        Ok(master_key) => master_key,
+        Err(error_code) => return error_code,
+    };
     let mut output: Vec<u8> = Vec::new();
     if unpack_from_furry(&mut input, &mut output, &master_key).is_err() {
         return -22;
@@ -215,7 +261,10 @@ pub unsafe extern "C" fn furry_unpack_from_furry_to_file(
         Err(_) => return -25,
     };
 
-    let master_key = MasterKey::default_key();
+    let master_key = match load_master_key() {
+        Ok(master_key) => master_key,
+        Err(error_code) => return error_code,
+    };
     match unpack_from_furry(&mut input, &mut output, &master_key) {
         Ok(_) => 0,
         Err(_) => -26,
@@ -248,7 +297,10 @@ pub unsafe extern "C" fn furry_get_tags_json_to_bytes(
         Err(_) => return -31,
     };
 
-    let master_key = MasterKey::default_key();
+    let master_key = match load_master_key() {
+        Ok(master_key) => master_key,
+        Err(error_code) => return error_code,
+    };
     let mut reader = match FurryReader::open(file, &master_key) {
         Ok(r) => r,
         Err(_) => return -32,
@@ -299,7 +351,10 @@ pub unsafe extern "C" fn furry_get_cover_art_to_bytes(
         Err(_) => return -41,
     };
 
-    let master_key = MasterKey::default_key();
+    let master_key = match load_master_key() {
+        Ok(master_key) => master_key,
+        Err(error_code) => return error_code,
+    };
     let mut reader = match FurryReader::open(file, &master_key) {
         Ok(r) => r,
         Err(_) => return -42,
@@ -372,7 +427,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(is_valid_furry_path(&output_path));
+        assert!(matches!(is_valid_furry_path(&output_path), Ok(true)));
 
         let _ = std::fs::remove_file(input_path);
         let _ = std::fs::remove_file(output_path);
@@ -385,7 +440,7 @@ mod tests {
         file.write_all(b"FURRYFMT").unwrap();
         file.flush().unwrap();
 
-        assert!(!is_valid_furry_path(&path));
+        assert!(matches!(is_valid_furry_path(&path), Ok(false)));
 
         let _ = std::fs::remove_file(path);
     }

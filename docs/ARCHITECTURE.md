@@ -40,9 +40,14 @@ Flutter UI 以 “模板 → 生成工程” 的方式维护：
 2. **读取（read）**：`furry_format::FurryReader` 解析 header/index → 通过 file keys 解密 index / chunk。
 3. **播放（play）**：`furry_player::VirtualAudioStream` 将分段 AUDIO chunk 映射为连续、可 seek 的字节流 → `symphonia` 解码 → `AudioOutput` 播放。
 
+## 主密钥配置
+
+- 运行时入口（CLI / GUI / Android JNI / Desktop FFI）优先读取环境变量 `FURRY_MASTER_KEY_HEX`。
+- 该值必须是 32 字节主密钥的 64 位十六进制字符串。
+- 如果未设置，会回退到内置开发密钥以保持兼容；生产环境不应依赖该回退。
+
 ## 注释/文档原则
 
 - 优先写“为什么这样做”而不是重复代码本身。
 - 对外暴露的接口（FFI、MethodChannel、公共 struct/enum）必须有清晰语义与约束说明。
 - 生成物/依赖（如 `flutter/`、构建产物）不建议补注释或改动。
-

@@ -4,13 +4,14 @@
 
 use std::fs::File;
 use std::path::PathBuf;
+use std::sync::{Once, OnceLock};
 
 use jni::objects::{JClass, JString};
 use jni::sys::{jboolean, jbyteArray, jint, jlong, jstring, JNI_FALSE, JNI_TRUE};
 use jni::JNIEnv;
 
 use furry_converter::{detect_format, pack_to_furry, unpack_from_furry, PackOptions};
-use furry_crypto::MasterKey;
+use furry_crypto::{LoadedMasterKey, MasterKey, MASTER_KEY_ENV_VAR};
 use furry_format::{FurryReader, MetaKind};
 
 /// 初始化日志（Android）
@@ -26,14 +27,61 @@ fn init_logging() {
 #[cfg(not(target_os = "android"))]
 fn init_logging() {}
 
-fn is_valid_furry_path(path: &PathBuf) -> bool {
+fn log_master_key_error_once(message: &str) {
+    static ERROR_ONCE: Once = Once::new();
+    ERROR_ONCE.call_once(|| {
+        init_logging();
+        #[cfg(target_os = "android")]
+        log::error!("Master key configuration error: {}", message);
+        #[cfg(not(target_os = "android"))]
+        eprintln!("Master key configuration error: {}", message);
+    });
+}
+
+fn warn_default_master_key_once() {
+    static WARN_ONCE: Once = Once::new();
+    WARN_ONCE.call_once(|| {
+        init_logging();
+        #[cfg(target_os = "android")]
+        log::warn!(
+            "{} is not set, using the built-in development master key.",
+            MASTER_KEY_ENV_VAR
+        );
+        #[cfg(not(target_os = "android"))]
+        eprintln!(
+            "Warning: {} is not set, using the built-in development master key.",
+            MASTER_KEY_ENV_VAR
+        );
+    });
+}
+
+fn load_master_key() -> Result<MasterKey, String> {
+    static MASTER_KEY: OnceLock<Result<LoadedMasterKey, String>> = OnceLock::new();
+
+    let loaded =
+        MASTER_KEY.get_or_init(|| MasterKey::load_runtime().map_err(|error| error.to_string()));
+    match loaded {
+        Ok(loaded) => {
+            if loaded.uses_default_fallback() {
+                warn_default_master_key_once();
+            }
+            Ok(loaded.clone_key())
+        }
+        Err(error) => {
+            log_master_key_error_once(error);
+            Err(error.clone())
+        }
+    }
+}
+
+fn is_valid_furry_path(path: &PathBuf) -> Result<bool, String> {
     let file = match File::open(path) {
         Ok(file) => file,
-        Err(_) => return false,
+        Err(_) => return Ok(false),
     };
 
-    let master_key = MasterKey::default_key();
-    FurryReader::open(file, &master_key).is_ok()
+    let master_key = load_master_key()?;
+    Ok(FurryReader::open(file, &master_key).is_ok())
 }
 
 /// JNI: 初始化库
@@ -110,7 +158,10 @@ fn pack_to_furry_impl(
     };
 
     let format = detect_format(&input_path);
-    let master_key = MasterKey::default_key();
+    let master_key = match load_master_key() {
+        Ok(master_key) => master_key,
+        Err(_) => return -90,
+    };
 
     let options = PackOptions {
         padding_bytes: (padding_kb as u64) * 1024,
@@ -214,7 +265,10 @@ fn unpack_to_file_impl(
         Err(_) => return -64,
     };
 
-    let master_key = MasterKey::default_key();
+    let master_key = match load_master_key() {
+        Ok(master_key) => master_key,
+        Err(_) => return -90,
+    };
     match unpack_from_furry(&mut input, &mut output, &master_key) {
         Ok(_) => 0,
         Err(_) => -65,
@@ -234,7 +288,10 @@ fn unpack_from_furry_to_bytes_impl(env: &mut JNIEnv<'_>, input_path: JString<'_>
         Err(_) => return std::ptr::null_mut(),
     };
 
-    let master_key = MasterKey::default_key();
+    let master_key = match load_master_key() {
+        Ok(master_key) => master_key,
+        Err(_) => return std::ptr::null_mut(),
+    };
     let mut output: Vec<u8> = Vec::new();
 
     if unpack_from_furry(&mut input, &mut output, &master_key).is_err() {
@@ -289,7 +346,7 @@ fn is_valid_furry_file_impl(env: &mut JNIEnv<'_>, file_path: JString<'_>) -> jbo
 
     let path = PathBuf::from(path_str);
 
-    if is_valid_furry_path(&path) {
+    if matches!(is_valid_furry_path(&path), Ok(true)) {
         JNI_TRUE
     } else {
         JNI_FALSE
@@ -335,7 +392,10 @@ fn get_original_format_impl(env: &mut JNIEnv<'_>, file_path: JString<'_>) -> jst
         Err(_) => return to_jstring(env, ""),
     };
 
-    let master_key = MasterKey::default_key();
+    let master_key = match load_master_key() {
+        Ok(master_key) => master_key,
+        Err(_) => return to_jstring(env, ""),
+    };
     let reader = match FurryReader::open(file, &master_key) {
         Ok(r) => r,
         Err(_) => return to_jstring(env, ""),
@@ -391,7 +451,10 @@ fn get_tags_json_impl(env: &mut JNIEnv<'_>, file_path: JString<'_>) -> jstring {
         Err(_) => return to_jstring(env, ""),
     };
 
-    let master_key = MasterKey::default_key();
+    let master_key = match load_master_key() {
+        Ok(master_key) => master_key,
+        Err(_) => return to_jstring(env, ""),
+    };
     let mut reader = match FurryReader::open(file, &master_key) {
         Ok(r) => r,
         Err(_) => return to_jstring(env, ""),
@@ -439,7 +502,10 @@ fn get_cover_art_impl(env: &mut JNIEnv<'_>, file_path: JString<'_>) -> jbyteArra
         Err(_) => return std::ptr::null_mut(),
     };
 
-    let master_key = MasterKey::default_key();
+    let master_key = match load_master_key() {
+        Ok(master_key) => master_key,
+        Err(_) => return std::ptr::null_mut(),
+    };
     let mut reader = match FurryReader::open(file, &master_key) {
         Ok(r) => r,
         Err(_) => return std::ptr::null_mut(),

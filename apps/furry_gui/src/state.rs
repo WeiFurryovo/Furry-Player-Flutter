@@ -52,6 +52,7 @@ pub struct AppState {
     // 转换器任务通信
     converter_evt_tx: Sender<ConverterEvent>,
     converter_evt_rx: Receiver<ConverterEvent>,
+    master_key: MasterKey,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -92,15 +93,21 @@ impl Default for AppState {
             evt_rx: None,
             converter_evt_tx,
             converter_evt_rx,
+            master_key: MasterKey::default_key(),
         }
     }
 }
 
 impl AppState {
-    pub fn new(cmd_tx: Sender<PlayerCommand>, evt_rx: Receiver<PlayerEvent>) -> Self {
+    pub fn new(
+        cmd_tx: Sender<PlayerCommand>,
+        evt_rx: Receiver<PlayerEvent>,
+        master_key: MasterKey,
+    ) -> Self {
         Self {
             cmd_tx: Some(cmd_tx),
             evt_rx: Some(evt_rx),
+            master_key,
             ..Default::default()
         }
     }
@@ -295,6 +302,7 @@ impl AppState {
 
         let padding_kb = self.pack_padding_kb;
         let tx = self.converter_evt_tx.clone();
+        let master_key = self.master_key.clone();
 
         self.converter_running = true;
         self.converter_last_ok = true;
@@ -308,7 +316,6 @@ impl AppState {
                 }
 
                 let format = detect_format(&input_path);
-                let master_key = MasterKey::default_key();
                 let options = PackOptions {
                     padding_bytes: padding_kb * 1024,
                     ..Default::default()
@@ -371,6 +378,7 @@ impl AppState {
         };
 
         let tx = self.converter_evt_tx.clone();
+        let master_key = self.master_key.clone();
 
         self.converter_running = true;
         self.converter_last_ok = true;
@@ -382,8 +390,6 @@ impl AppState {
                 if let Some(parent) = output_path.parent() {
                     std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
                 }
-
-                let master_key = MasterKey::default_key();
 
                 let mut input = std::fs::File::open(&input_path).map_err(|e| e.to_string())?;
                 let mut output = std::fs::File::create(&output_path).map_err(|e| e.to_string())?;

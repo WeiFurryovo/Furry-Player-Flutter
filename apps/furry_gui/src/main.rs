@@ -4,13 +4,33 @@ mod state;
 mod ui;
 
 use eframe::egui;
-use furry_crypto::MasterKey;
+use furry_crypto::{MasterKey, MASTER_KEY_ENV_VAR};
 use furry_player::spawn_player;
 
 use state::AppState;
 use ui::{ConverterWindow, FurryTheme, LibrarySidebar, PlayerDeck};
 
+fn load_master_key_or_exit() -> MasterKey {
+    let loaded = match MasterKey::load_runtime() {
+        Ok(loaded) => loaded,
+        Err(error) => {
+            eprintln!("Failed to load runtime master key: {}", error);
+            std::process::exit(1);
+        }
+    };
+
+    if loaded.uses_default_fallback() {
+        eprintln!(
+            "Warning: {} is not set, using the built-in development master key.",
+            MASTER_KEY_ENV_VAR
+        );
+    }
+
+    loaded.into_inner()
+}
+
 fn main() -> eframe::Result<()> {
+    let runtime_master_key = load_master_key_or_exit();
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1000.0, 700.0])
@@ -22,15 +42,18 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Furry Player",
         options,
-        Box::new(|cc| {
+        Box::new(move |cc| {
             // 应用主题
             FurryTheme::apply(&cc.egui_ctx);
 
             // 启动播放引擎
-            let master_key = MasterKey::default_key();
-            let handle = spawn_player(master_key);
+            let handle = spawn_player(runtime_master_key.clone());
 
-            Ok(Box::new(FurryApp::new(handle.cmd_tx, handle.evt_rx)))
+            Ok(Box::new(FurryApp::new(
+                handle.cmd_tx,
+                handle.evt_rx,
+                runtime_master_key.clone(),
+            )))
         }),
     )
 }
@@ -43,9 +66,10 @@ impl FurryApp {
     fn new(
         cmd_tx: crossbeam_channel::Sender<furry_player::PlayerCommand>,
         evt_rx: crossbeam_channel::Receiver<furry_player::PlayerEvent>,
+        master_key: MasterKey,
     ) -> Self {
         Self {
-            state: AppState::new(cmd_tx, evt_rx),
+            state: AppState::new(cmd_tx, evt_rx, master_key),
         }
     }
 }

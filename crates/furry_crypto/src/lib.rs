@@ -26,6 +26,8 @@ pub const CHUNK_HEADER_LEN: usize = 40;
 
 pub const AAD_PREFIX: [u8; 8] = *b"FURRYAAD";
 pub const AAD_LEN: usize = 8 + 2 + 4 + FILE_ID_LEN + CHUNK_HEADER_LEN; // 70 bytes
+pub const MASTER_KEY_ENV_VAR: &str = "FURRY_MASTER_KEY_HEX";
+pub const MASTER_KEY_HEX_LEN: usize = AEAD_KEY_LEN * 2;
 
 /// 硬编码主密钥（生产环境应更换）
 pub const MASTER_KEY_BYTES: [u8; AEAD_KEY_LEN] = [
@@ -49,6 +51,32 @@ pub enum CryptoError {
     Random,
 }
 
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+pub enum MasterKeyLoadError {
+    #[error("{env_var} is not valid UTF-8")]
+    InvalidEnvEncoding { env_var: &'static str },
+    #[error("{env_var} must be {expected} hexadecimal characters, got {actual}")]
+    InvalidHexLength {
+        env_var: &'static str,
+        expected: usize,
+        actual: usize,
+    },
+    #[error("{env_var} contains invalid hexadecimal data at character {index}")]
+    InvalidHexDigit { env_var: &'static str, index: usize },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuntimeMasterKeySource {
+    Environment,
+    BuiltInDefault,
+}
+
+#[derive(Clone)]
+pub struct LoadedMasterKey {
+    key: MasterKey,
+    source: RuntimeMasterKeySource,
+}
+
 // ============================================================================
 // 主密钥
 // ============================================================================
@@ -68,15 +96,86 @@ impl MasterKey {
         Self(MASTER_KEY_BYTES)
     }
 
+    /// 从十六进制字符串创建主密钥。
+    pub fn from_hex(hex: &str) -> Result<Self, MasterKeyLoadError> {
+        let trimmed = hex.trim();
+        let hex = trimmed.strip_prefix("0x").unwrap_or(trimmed);
+        if hex.len() != MASTER_KEY_HEX_LEN {
+            return Err(MasterKeyLoadError::InvalidHexLength {
+                env_var: MASTER_KEY_ENV_VAR,
+                expected: MASTER_KEY_HEX_LEN,
+                actual: hex.len(),
+            });
+        }
+
+        let mut bytes = [0u8; AEAD_KEY_LEN];
+        for (index, chunk) in hex.as_bytes().chunks_exact(2).enumerate() {
+            let hi = decode_hex_nibble(chunk[0]).ok_or(MasterKeyLoadError::InvalidHexDigit {
+                env_var: MASTER_KEY_ENV_VAR,
+                index: index * 2,
+            })?;
+            let lo = decode_hex_nibble(chunk[1]).ok_or(MasterKeyLoadError::InvalidHexDigit {
+                env_var: MASTER_KEY_ENV_VAR,
+                index: index * 2 + 1,
+            })?;
+            bytes[index] = (hi << 4) | lo;
+        }
+        Ok(Self(bytes))
+    }
+
+    /// 运行时加载主密钥：优先读取环境变量，否则回退到内置默认值。
+    pub fn load_runtime() -> Result<LoadedMasterKey, MasterKeyLoadError> {
+        match std::env::var(MASTER_KEY_ENV_VAR) {
+            Ok(hex) => Ok(LoadedMasterKey {
+                key: Self::from_hex(&hex)?,
+                source: RuntimeMasterKeySource::Environment,
+            }),
+            Err(std::env::VarError::NotPresent) => Ok(LoadedMasterKey {
+                key: Self::default_key(),
+                source: RuntimeMasterKeySource::BuiltInDefault,
+            }),
+            Err(std::env::VarError::NotUnicode(_)) => Err(MasterKeyLoadError::InvalidEnvEncoding {
+                env_var: MASTER_KEY_ENV_VAR,
+            }),
+        }
+    }
+
     /// 获取密钥字节
     pub fn bytes(&self) -> &[u8; AEAD_KEY_LEN] {
         &self.0
     }
 }
 
+impl LoadedMasterKey {
+    pub fn into_inner(self) -> MasterKey {
+        self.key
+    }
+
+    pub fn clone_key(&self) -> MasterKey {
+        self.key.clone()
+    }
+
+    pub fn source(&self) -> RuntimeMasterKeySource {
+        self.source
+    }
+
+    pub fn uses_default_fallback(&self) -> bool {
+        self.source == RuntimeMasterKeySource::BuiltInDefault
+    }
+}
+
 impl Drop for MasterKey {
     fn drop(&mut self) {
         self.0.zeroize();
+    }
+}
+
+fn decode_hex_nibble(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
     }
 }
 
@@ -265,6 +364,9 @@ pub fn generate_random_bytes(buf: &mut [u8]) -> Result<(), CryptoError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_key_derivation() {
@@ -343,5 +445,54 @@ mod tests {
         // 反混淆
         xor_meta_in_place(&keys.meta_xor_key, 42, &mut buffer);
         assert_eq!(&buffer[..], &original[..]);
+    }
+
+    #[test]
+    fn test_master_key_from_hex() {
+        let key =
+            MasterKey::from_hex("46555252595f4d41535445525f4b45595f323032365f56315f53454352455421")
+                .unwrap();
+
+        assert_eq!(key.bytes(), &MASTER_KEY_BYTES);
+    }
+
+    #[test]
+    fn test_master_key_from_hex_rejects_invalid_length() {
+        let error = match MasterKey::from_hex("abcd") {
+            Ok(_) => panic!("expected invalid hex length"),
+            Err(error) => error,
+        };
+
+        assert_eq!(
+            error,
+            MasterKeyLoadError::InvalidHexLength {
+                env_var: MASTER_KEY_ENV_VAR,
+                expected: MASTER_KEY_HEX_LEN,
+                actual: 4,
+            }
+        );
+    }
+
+    #[test]
+    fn test_load_runtime_prefers_environment_key() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::set_var(
+            MASTER_KEY_ENV_VAR,
+            "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+        );
+
+        let loaded = MasterKey::load_runtime().unwrap();
+
+        assert_eq!(loaded.source(), RuntimeMasterKeySource::Environment);
+        assert_eq!(
+            loaded.clone_key().bytes(),
+            &[
+                0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd,
+                0xee, 0xff, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,
+                0xcc, 0xdd, 0xee, 0xff,
+            ]
+        );
+
+        std::env::remove_var(MASTER_KEY_ENV_VAR);
     }
 }

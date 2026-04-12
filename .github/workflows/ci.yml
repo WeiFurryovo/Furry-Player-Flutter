@@ -31,9 +31,30 @@ jobs:
       - name: Verify Flutter quality gate
         run: ./apps/furry_flutter/scripts/flutter_quality_gate.sh
 
+  rust-test:
+    name: Rust Workspace Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux deps for Rust desktop/audio crates
+        run: ./apps/furry_flutter/scripts/install_linux_desktop_deps.sh
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+
+      - name: Run Rust workspace tests
+        run: cargo test --workspace --all-targets
+
   android-debug:
     name: Android Debug APK (artifact)
-    needs: [flutter-quality]
+    needs: [flutter-quality, rust-test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -92,7 +113,7 @@ jobs:
 
   linux-desktop:
     name: Linux Desktop (artifact)
-    needs: [flutter-quality]
+    needs: [flutter-quality, rust-test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -142,7 +163,7 @@ jobs:
 
   windows-desktop:
     name: Windows Desktop (artifact)
-    needs: [flutter-quality]
+    needs: [flutter-quality, rust-test]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4

@@ -7,8 +7,27 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use furry_converter::{detect_format, pack_to_furry, unpack_from_furry, PackOptions};
-use furry_crypto::MasterKey;
+use furry_crypto::{MasterKey, MASTER_KEY_ENV_VAR};
 use furry_format::FurryReader;
+
+fn load_master_key_or_exit() -> MasterKey {
+    let loaded = match MasterKey::load_runtime() {
+        Ok(loaded) => loaded,
+        Err(error) => {
+            eprintln!("Failed to load runtime master key: {}", error);
+            std::process::exit(2);
+        }
+    };
+
+    if loaded.uses_default_fallback() {
+        eprintln!(
+            "Warning: {} is not set, using the built-in development master key.",
+            MASTER_KEY_ENV_VAR
+        );
+    }
+
+    loaded.into_inner()
+}
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -21,11 +40,15 @@ fn main() {
             "  {} info <input.furry>   # prints JSON (valid/original_format)",
             args[0]
         );
+        eprintln!(
+            "Optional: set {} to a 64-character hex master key.",
+            MASTER_KEY_ENV_VAR
+        );
         std::process::exit(1);
     }
 
     let command = &args[1];
-    let master_key = MasterKey::default_key();
+    let master_key = load_master_key_or_exit();
 
     match command.as_str() {
         "pack" => {
