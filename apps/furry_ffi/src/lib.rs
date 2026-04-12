@@ -93,10 +93,6 @@ pub extern "C" fn furry_pack_to_furry(
         Ok(f) => f,
         Err(_) => return -3,
     };
-    let mut output = match File::create(&output_path) {
-        Ok(f) => f,
-        Err(_) => return -4,
-    };
 
     let format = detect_format(&input_path);
     let master_key = match load_master_key() {
@@ -106,6 +102,10 @@ pub extern "C" fn furry_pack_to_furry(
     let padding_bytes = match padding_bytes_for_ffi(padding_kb) {
         Ok(bytes) => bytes,
         Err(error_code) => return error_code,
+    };
+    let mut output = match File::create(&output_path) {
+        Ok(f) => f,
+        Err(_) => return -4,
     };
     let options = PackOptions {
         padding_bytes,
@@ -406,6 +406,7 @@ pub unsafe extern "C" fn furry_free_bytes(ptr: *mut c_uchar, len: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ffi::CString;
     use std::io::Write;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -454,5 +455,26 @@ mod tests {
         assert!(matches!(is_valid_furry_path(&path), Ok(false)));
 
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn pack_rejects_overflowing_padding_without_creating_output() {
+        let input_path = unique_temp_path("furry_pack_input", "mp3");
+        let output_path = unique_temp_path("furry_pack_output", "furry");
+        std::fs::write(&input_path, b"fake audio payload").unwrap();
+
+        let input_cstr = CString::new(input_path.to_string_lossy().as_bytes()).unwrap();
+        let output_cstr = CString::new(output_path.to_string_lossy().as_bytes()).unwrap();
+
+        let result = furry_pack_to_furry(input_cstr.as_ptr(), output_cstr.as_ptr(), u64::MAX);
+
+        assert_eq!(result, -6);
+        assert!(
+            !output_path.exists(),
+            "output should not be created on invalid padding"
+        );
+
+        let _ = std::fs::remove_file(input_path);
+        let _ = std::fs::remove_file(output_path);
     }
 }

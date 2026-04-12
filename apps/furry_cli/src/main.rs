@@ -68,7 +68,16 @@ fn main() {
 
             let input_path = PathBuf::from(&args[2]);
             let output_path = PathBuf::from(&args[3]);
-            let padding_kb: u64 = args.get(4).and_then(|s| s.parse().ok()).unwrap_or(0);
+            let padding_kb = match args.get(4) {
+                Some(value) => match value.parse::<u64>() {
+                    Ok(value) => value,
+                    Err(_) => {
+                        eprintln!("Invalid padding_kb argument: {}", value);
+                        std::process::exit(1);
+                    }
+                },
+                None => 0,
+            };
             let padding_bytes = match padding_bytes_from_kib(padding_kb) {
                 Ok(bytes) => bytes,
                 Err(error) => {

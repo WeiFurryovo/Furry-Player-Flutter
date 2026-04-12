@@ -67,3 +67,33 @@ fn info_fails_fast_when_master_key_env_is_invalid() {
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+#[test]
+fn pack_rejects_invalid_padding_argument_without_creating_output() {
+    let input_path = unique_temp_path("furry_cli_pack_input", "mp3");
+    let output_path = unique_temp_path("furry_cli_pack_output", "furry");
+    std::fs::write(&input_path, b"fake audio bytes").expect("write temp input");
+
+    let output = Command::new(cli_binary())
+        .env("FURRY_MASTER_KEY_HEX", TEST_MASTER_KEY_HEX)
+        .arg("pack")
+        .arg(&input_path)
+        .arg(&output_path)
+        .arg("not-a-number")
+        .output()
+        .expect("run furry-cli");
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("Invalid padding_kb argument"),
+        "stderr was: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !output_path.exists(),
+        "output should not be created on invalid padding argument"
+    );
+
+    let _ = std::fs::remove_file(input_path);
+    let _ = std::fs::remove_file(output_path);
+}

@@ -160,11 +160,6 @@ fn pack_to_furry_impl(
         Err(_) => return -3,
     };
 
-    let mut output = match File::create(&output_path) {
-        Ok(f) => f,
-        Err(_) => return -4,
-    };
-
     let format = detect_format(&input_path);
     let master_key = match load_master_key() {
         Ok(master_key) => master_key,
@@ -173,6 +168,10 @@ fn pack_to_furry_impl(
     let padding_bytes = match padding_bytes_from_jni_arg(padding_kb) {
         Ok(bytes) => bytes,
         Err(error_code) => return error_code,
+    };
+    let mut output = match File::create(&output_path) {
+        Ok(f) => f,
+        Err(_) => return -4,
     };
 
     let options = PackOptions {
