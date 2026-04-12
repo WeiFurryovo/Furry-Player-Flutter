@@ -45,3 +45,85 @@ pub enum FormatError {
     #[error("Corrupt index: {0}")]
     CorruptIndex(&'static str),
 }
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use furry_crypto::MasterKey;
+
+    use crate::{
+        FormatError, FurryHeaderV1, FurryIndexV1, FurryReader, FurryWriter, IndexEntryV1, MetaKind,
+        OriginalFormat,
+    };
+
+    #[test]
+    fn reader_writer_roundtrip_preserves_audio_and_latest_meta() {
+        let master_key = MasterKey::default_key();
+        let cursor = Cursor::new(Vec::new());
+        let mut writer =
+            FurryWriter::create(cursor, &master_key, OriginalFormat::Mp3).expect("create writer");
+
+        writer
+            .write_audio_chunk(b"abc", 0)
+            .expect("write first audio chunk");
+        writer
+            .write_audio_chunk(b"defg", 3)
+            .expect("write second audio chunk");
+        writer
+            .write_meta_chunk(MetaKind::Tags, br#"{"title":"old"}"#, 0)
+            .expect("write first meta chunk");
+        writer
+            .write_meta_chunk(MetaKind::Tags, br#"{"title":"new"}"#, 0)
+            .expect("write second meta chunk");
+
+        let cursor = writer.finish().expect("finish writer");
+        let mut reader =
+            FurryReader::open(Cursor::new(cursor.into_inner()), &master_key).expect("open reader");
+
+        assert!(reader.header.index_offset > 96);
+        assert!(reader.header.index_total_len > 0);
+        assert_eq!(reader.index.header.original_format, OriginalFormat::Mp3);
+
+        let audio_entries = reader.index.audio_entries();
+        assert_eq!(audio_entries.len(), 2);
+        assert_eq!(audio_entries[0].virtual_offset, 0);
+        assert_eq!(audio_entries[1].virtual_offset, 3);
+
+        let second_audio = (*audio_entries[1]).clone();
+        let tags = reader
+            .read_latest_meta(MetaKind::Tags)
+            .expect("read latest tags")
+            .expect("tags should exist");
+
+        assert_eq!(
+            reader.read_chunk(&second_audio).expect("read second audio"),
+            b"defg"
+        );
+        assert_eq!(tags, br#"{"title":"new"}"#);
+    }
+
+    #[test]
+    fn header_rejects_invalid_magic() {
+        let mut cursor = Cursor::new(b"NOTFURRY".to_vec());
+        let error = FurryHeaderV1::read_from(&mut cursor).expect_err("should reject invalid magic");
+
+        assert!(matches!(error, FormatError::InvalidMagic));
+    }
+
+    #[test]
+    fn index_parse_rejects_length_mismatch() {
+        let mut index = FurryIndexV1::new(3, OriginalFormat::Mp3);
+        index.add_entry(IndexEntryV1::new_audio(0, 96, 59, 3, 0));
+
+        let mut plain = index.to_bytes();
+        plain.pop();
+
+        let error = FurryIndexV1::parse(&plain).expect_err("should reject truncated index");
+
+        assert!(matches!(
+            error,
+            FormatError::CorruptIndex("index length mismatch")
+        ));
+    }
+}
