@@ -8,6 +8,9 @@ use crate::FormatError;
 pub const FURRY_MAGIC: [u8; 8] = *b"FURRYFMT";
 pub const FURRY_VERSION: u16 = 1;
 pub const FURRY_HEADER_LEN: u16 = 96;
+pub const FURRY_KDF_ID: u16 = 1;
+pub const FURRY_AEAD_ID: u16 = 1;
+pub const FURRY_FILE_CHUNK_HEADER_VERSION: u16 = 1;
 
 /// .furry 文件主头部 (v1, 96 bytes)
 #[derive(Debug, Clone)]
@@ -36,9 +39,9 @@ impl FurryHeaderV1 {
             fake_header_len: 0,
             file_id,
             salt,
-            kdf_id: 1,  // HKDF-SHA256
-            aead_id: 1, // AES-256-GCM
-            chunk_header_version: 1,
+            kdf_id: FURRY_KDF_ID,   // HKDF-SHA256
+            aead_id: FURRY_AEAD_ID, // AES-256-GCM
+            chunk_header_version: FURRY_FILE_CHUNK_HEADER_VERSION,
             index_offset: 0,
             index_total_len: 0,
             header_crc32: 0,
@@ -74,8 +77,19 @@ impl FurryHeaderV1 {
         r.read_exact(&mut salt)?;
 
         let kdf_id = r.read_u16::<LittleEndian>()?;
+        if kdf_id != FURRY_KDF_ID {
+            return Err(FormatError::UnsupportedKdfId(kdf_id));
+        }
         let aead_id = r.read_u16::<LittleEndian>()?;
+        if aead_id != FURRY_AEAD_ID {
+            return Err(FormatError::UnsupportedAeadId(aead_id));
+        }
         let chunk_header_version = r.read_u16::<LittleEndian>()?;
+        if chunk_header_version != FURRY_FILE_CHUNK_HEADER_VERSION {
+            return Err(FormatError::UnsupportedChunkHeaderVersion(
+                chunk_header_version,
+            ));
+        }
         let _reserved1 = r.read_u16::<LittleEndian>()?;
 
         let index_offset = r.read_u64::<LittleEndian>()?;

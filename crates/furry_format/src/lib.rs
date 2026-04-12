@@ -27,6 +27,12 @@ pub enum FormatError {
     #[error("Invalid header size: {0}")]
     InvalidHeaderSize(u16),
 
+    #[error("Unsupported KDF id: {0}")]
+    UnsupportedKdfId(u16),
+
+    #[error("Unsupported AEAD id: {0}")]
+    UnsupportedAeadId(u16),
+
     #[error("Invalid chunk magic")]
     InvalidChunkMagic,
 
@@ -124,6 +130,51 @@ mod tests {
         assert!(matches!(
             error,
             FormatError::CorruptIndex("index length mismatch")
+        ));
+    }
+
+    #[test]
+    fn header_rejects_unsupported_kdf_id() {
+        let mut header = FurryHeaderV1::new([1u8; 16], [2u8; 16]);
+        header.kdf_id = 9;
+
+        let mut bytes = Vec::new();
+        header.write_to(&mut bytes).expect("write header");
+
+        let error = FurryHeaderV1::read_from(&mut Cursor::new(bytes))
+            .expect_err("should reject unsupported kdf id");
+
+        assert!(matches!(error, FormatError::UnsupportedKdfId(9)));
+    }
+
+    #[test]
+    fn header_rejects_unsupported_aead_id() {
+        let mut header = FurryHeaderV1::new([1u8; 16], [2u8; 16]);
+        header.aead_id = 7;
+
+        let mut bytes = Vec::new();
+        header.write_to(&mut bytes).expect("write header");
+
+        let error = FurryHeaderV1::read_from(&mut Cursor::new(bytes))
+            .expect_err("should reject unsupported aead id");
+
+        assert!(matches!(error, FormatError::UnsupportedAeadId(7)));
+    }
+
+    #[test]
+    fn header_rejects_unsupported_chunk_header_version() {
+        let mut header = FurryHeaderV1::new([1u8; 16], [2u8; 16]);
+        header.chunk_header_version = 2;
+
+        let mut bytes = Vec::new();
+        header.write_to(&mut bytes).expect("write header");
+
+        let error = FurryHeaderV1::read_from(&mut Cursor::new(bytes))
+            .expect_err("should reject unsupported chunk header version");
+
+        assert!(matches!(
+            error,
+            FormatError::UnsupportedChunkHeaderVersion(2)
         ));
     }
 }
