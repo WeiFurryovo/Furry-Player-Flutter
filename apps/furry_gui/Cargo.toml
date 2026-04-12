@@ -11,4 +11,4 @@ furry_crypto = { path = "../../crates/furry_crypto" }
 furry_converter = { path = "../../crates/furry_converter" }
 furry_player = { path = "../../crates/furry_player" }
 crossbeam-channel.workspace = true
-rfd = "0.14"
+rfd = "0.15.4"
