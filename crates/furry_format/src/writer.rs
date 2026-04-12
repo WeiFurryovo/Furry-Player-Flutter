@@ -186,6 +186,7 @@ impl<W: Write + Seek> FurryWriter<W> {
         // 更新头部
         self.header.index_offset = index_offset;
         self.header.index_total_len = index_total_len;
+        self.header.header_crc32 = self.header.compute_crc32();
 
         self.inner.seek(SeekFrom::Start(0))?;
         self.header.write_to(&mut self.inner)?;

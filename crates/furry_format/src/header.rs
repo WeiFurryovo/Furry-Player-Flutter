@@ -1,6 +1,6 @@
 //! 文件头定义
 
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::{Read, Write};
 
 use crate::FormatError;
@@ -99,7 +99,7 @@ impl FurryHeaderV1 {
         let mut reserved2 = [0u8; 16];
         r.read_exact(&mut reserved2)?;
 
-        Ok(Self {
+        let header = Self {
             version,
             header_size,
             flags,
@@ -113,27 +113,49 @@ impl FurryHeaderV1 {
             index_total_len,
             header_crc32,
             reserved2,
-        })
+        };
+
+        if header.header_crc32 != 0 {
+            let expected = header.compute_crc32();
+            if header.header_crc32 != expected {
+                return Err(FormatError::InvalidHeaderCrc32 {
+                    expected,
+                    actual: header.header_crc32,
+                });
+            }
+        }
+
+        Ok(header)
     }
 
     pub fn write_to<W: Write>(&self, w: &mut W) -> Result<(), FormatError> {
-        w.write_all(&FURRY_MAGIC)?;
-        w.write_u16::<LittleEndian>(self.version)?;
-        w.write_u16::<LittleEndian>(self.header_size)?;
-        w.write_u32::<LittleEndian>(self.flags)?;
-        w.write_u32::<LittleEndian>(self.fake_header_len)?;
-        w.write_u32::<LittleEndian>(0)?; // reserved0
-        w.write_all(&self.file_id)?;
-        w.write_all(&self.salt)?;
-        w.write_u16::<LittleEndian>(self.kdf_id)?;
-        w.write_u16::<LittleEndian>(self.aead_id)?;
-        w.write_u16::<LittleEndian>(self.chunk_header_version)?;
-        w.write_u16::<LittleEndian>(0)?; // reserved1
-        w.write_u64::<LittleEndian>(self.index_offset)?;
-        w.write_u32::<LittleEndian>(self.index_total_len)?;
-        w.write_u32::<LittleEndian>(self.header_crc32)?;
-        w.write_all(&self.reserved2)?;
+        w.write_all(&self.to_bytes_with_crc(self.header_crc32))?;
         Ok(())
+    }
+
+    pub fn compute_crc32(&self) -> u32 {
+        crc32fast::hash(&self.to_bytes_with_crc(0))
+    }
+
+    fn to_bytes_with_crc(&self, crc32: u32) -> [u8; FURRY_HEADER_LEN as usize] {
+        let mut out = [0u8; FURRY_HEADER_LEN as usize];
+        out[0..8].copy_from_slice(&FURRY_MAGIC);
+        out[8..10].copy_from_slice(&self.version.to_le_bytes());
+        out[10..12].copy_from_slice(&self.header_size.to_le_bytes());
+        out[12..16].copy_from_slice(&self.flags.to_le_bytes());
+        out[16..20].copy_from_slice(&self.fake_header_len.to_le_bytes());
+        out[20..24].copy_from_slice(&0u32.to_le_bytes());
+        out[24..40].copy_from_slice(&self.file_id);
+        out[40..56].copy_from_slice(&self.salt);
+        out[56..58].copy_from_slice(&self.kdf_id.to_le_bytes());
+        out[58..60].copy_from_slice(&self.aead_id.to_le_bytes());
+        out[60..62].copy_from_slice(&self.chunk_header_version.to_le_bytes());
+        out[62..64].copy_from_slice(&0u16.to_le_bytes());
+        out[64..72].copy_from_slice(&self.index_offset.to_le_bytes());
+        out[72..76].copy_from_slice(&self.index_total_len.to_le_bytes());
+        out[76..80].copy_from_slice(&crc32.to_le_bytes());
+        out[80..96].copy_from_slice(&self.reserved2);
+        out
     }
 
     /// 计算数据起始偏移（跳过 fake header）

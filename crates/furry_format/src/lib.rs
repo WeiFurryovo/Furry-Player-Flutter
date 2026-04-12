@@ -27,6 +27,9 @@ pub enum FormatError {
     #[error("Invalid header size: {0}")]
     InvalidHeaderSize(u16),
 
+    #[error("Invalid header CRC32: expected {expected:#010x}, got {actual:#010x}")]
+    InvalidHeaderCrc32 { expected: u32, actual: u32 },
+
     #[error("Unsupported KDF id: {0}")]
     UnsupportedKdfId(u16),
 
@@ -98,6 +101,7 @@ mod tests {
 
         assert!(reader.header.index_offset > 96);
         assert!(reader.header.index_total_len > 0);
+        assert_ne!(reader.header.header_crc32, 0);
         assert_eq!(reader.index.header.original_format, OriginalFormat::Mp3);
 
         let audio_entries = reader.index.audio_entries();
@@ -124,6 +128,33 @@ mod tests {
         let error = FurryHeaderV1::read_from(&mut cursor).expect_err("should reject invalid magic");
 
         assert!(matches!(error, FormatError::InvalidMagic));
+    }
+
+    #[test]
+    fn header_rejects_invalid_crc_when_present() {
+        let mut header = FurryHeaderV1::new([1u8; 16], [2u8; 16]);
+        header.header_crc32 = header.compute_crc32();
+
+        let mut bytes = Vec::new();
+        header.write_to(&mut bytes).expect("write header");
+        bytes[24] ^= 0xFF;
+
+        let error = FurryHeaderV1::read_from(&mut Cursor::new(bytes))
+            .expect_err("should reject invalid header crc");
+
+        assert!(matches!(error, FormatError::InvalidHeaderCrc32 { .. }));
+    }
+
+    #[test]
+    fn header_accepts_zero_crc_for_backward_compatibility() {
+        let header = FurryHeaderV1::new([1u8; 16], [2u8; 16]);
+        let mut bytes = Vec::new();
+        header.write_to(&mut bytes).expect("write header");
+
+        let parsed = FurryHeaderV1::read_from(&mut Cursor::new(bytes))
+            .expect("parse legacy zero-crc header");
+
+        assert_eq!(parsed.header_crc32, 0);
     }
 
     #[test]
