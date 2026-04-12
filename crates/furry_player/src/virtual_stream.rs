@@ -132,21 +132,29 @@ impl Read for VirtualAudioStream {
             return Ok(0);
         }
 
-        self.ensure_chunk_loaded().map_err(std::io::Error::other)?;
+        let mut total_read = 0usize;
+        while total_read < buf.len() && self.position < self.total_len {
+            self.ensure_chunk_loaded().map_err(std::io::Error::other)?;
 
-        let cache = self.current_chunk.as_ref().ok_or_else(|| {
-            std::io::Error::other(
-                "virtual stream chunk cache missing after ensure_chunk_loaded",
-            )
-        })?;
-        let offset_in_chunk = (self.position - cache.virtual_start) as usize;
-        let available = cache.data.len() - offset_in_chunk;
-        let to_read = buf.len().min(available);
+            let cache = self.current_chunk.as_ref().ok_or_else(|| {
+                std::io::Error::other(
+                    "virtual stream chunk cache missing after ensure_chunk_loaded",
+                )
+            })?;
+            let offset_in_chunk = (self.position - cache.virtual_start) as usize;
+            let available = cache.data.len() - offset_in_chunk;
+            let to_read = (buf.len() - total_read).min(available);
+            if to_read == 0 {
+                break;
+            }
 
-        buf[..to_read].copy_from_slice(&cache.data[offset_in_chunk..offset_in_chunk + to_read]);
-        self.position += to_read as u64;
+            buf[total_read..total_read + to_read]
+                .copy_from_slice(&cache.data[offset_in_chunk..offset_in_chunk + to_read]);
+            self.position += to_read as u64;
+            total_read += to_read;
+        }
 
-        Ok(to_read)
+        Ok(total_read)
     }
 }
 
@@ -178,5 +186,102 @@ impl symphonia::core::io::MediaSource for VirtualAudioStream {
 
     fn byte_len(&self) -> Option<u64> {
         Some(self.total_len)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use furry_crypto::MasterKey;
+    use furry_format::{FurryWriter, MetaKind, OriginalFormat};
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_path(prefix: &str, ext: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or(0);
+        std::env::temp_dir().join(format!("{prefix}_{}_{}.{}", std::process::id(), nanos, ext))
+    }
+
+    fn build_test_stream() -> (PathBuf, MasterKey) {
+        let path = unique_temp_path("furry_virtual_stream", "furry");
+        let master_key = MasterKey::default_key();
+        let file = File::create(&path).expect("create furry file");
+        let mut writer =
+            FurryWriter::create(file, &master_key, OriginalFormat::Mp3).expect("create writer");
+
+        writer
+            .write_audio_chunk(b"abc", 0)
+            .expect("write first audio chunk");
+        writer
+            .write_audio_chunk(b"defg", 3)
+            .expect("write second audio chunk");
+        writer
+            .write_meta_chunk(MetaKind::Tags, br#"{"title":"stream"}"#, 0)
+            .expect("write meta chunk");
+        writer.finish().expect("finish writer");
+
+        (path, master_key)
+    }
+
+    #[test]
+    fn read_spans_multiple_audio_chunks() {
+        let (path, master_key) = build_test_stream();
+        let mut stream = VirtualAudioStream::open(&path, &master_key).expect("open stream");
+        let mut buf = [0u8; 7];
+
+        let read = stream.read(&mut buf).expect("read stream");
+
+        assert_eq!(read, 7);
+        assert_eq!(&buf, b"abcdefg");
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn seek_and_read_respects_chunk_boundaries() {
+        let (path, master_key) = build_test_stream();
+        let mut stream = VirtualAudioStream::open(&path, &master_key).expect("open stream");
+
+        assert_eq!(stream.seek(SeekFrom::Start(2)).expect("seek"), 2);
+
+        let mut buf = [0u8; 3];
+        let read = stream.read(&mut buf).expect("read after seek");
+
+        assert_eq!(read, 3);
+        assert_eq!(&buf, b"cde");
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn seek_before_start_is_rejected() {
+        let (path, master_key) = build_test_stream();
+        let mut stream = VirtualAudioStream::open(&path, &master_key).expect("open stream");
+
+        let error = stream
+            .seek(SeekFrom::Current(-1))
+            .expect_err("negative seek should fail");
+
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn seeking_past_end_yields_eof_on_read() {
+        let (path, master_key) = build_test_stream();
+        let mut stream = VirtualAudioStream::open(&path, &master_key).expect("open stream");
+
+        assert_eq!(stream.seek(SeekFrom::Start(99)).expect("seek"), 99);
+
+        let mut buf = [0u8; 4];
+        let read = stream.read(&mut buf).expect("read past eof");
+
+        assert_eq!(read, 0);
+
+        let _ = std::fs::remove_file(path);
     }
 }

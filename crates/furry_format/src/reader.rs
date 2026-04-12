@@ -36,6 +36,15 @@ impl<R: Read + Seek> FurryReader<R> {
         header: &FurryHeaderV1,
         keys: &FileKeys,
     ) -> Result<FurryIndexV1, FormatError> {
+        if header.index_offset < header.data_start_offset() {
+            return Err(FormatError::InvalidIndexOffset(header.index_offset));
+        }
+        let min_index_record_len =
+            u32::from(crate::CHUNK_HEADER_LEN) + furry_crypto::TAG_LEN as u32;
+        if header.index_total_len < min_index_record_len {
+            return Err(FormatError::InvalidIndexLength(header.index_total_len));
+        }
+
         inner.seek(SeekFrom::Start(header.index_offset))?;
 
         let chunk_header = ChunkRecordHeaderV1::read_from(inner)?;

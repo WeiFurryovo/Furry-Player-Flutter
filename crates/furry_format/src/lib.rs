@@ -45,6 +45,12 @@ pub enum FormatError {
     #[error("Unsupported index version: {0}")]
     UnsupportedIndexVersion(u16),
 
+    #[error("Invalid index offset: {0}")]
+    InvalidIndexOffset(u64),
+
+    #[error("Invalid index length: {0}")]
+    InvalidIndexLength(u32),
+
     #[error("Crypto error: {0}")]
     Crypto(#[from] furry_crypto::CryptoError),
 
@@ -176,5 +182,42 @@ mod tests {
             error,
             FormatError::UnsupportedChunkHeaderVersion(2)
         ));
+    }
+
+    #[test]
+    fn reader_rejects_index_offset_before_data_start() {
+        let master_key = MasterKey::default_key();
+        let mut header = FurryHeaderV1::new([1u8; 16], [2u8; 16]);
+        header.fake_header_len = 32;
+        header.index_offset = 96;
+        header.index_total_len = 56;
+
+        let mut bytes = Vec::new();
+        header.write_to(&mut bytes).expect("write header");
+
+        let error = match FurryReader::open(Cursor::new(bytes), &master_key) {
+            Ok(_) => panic!("should reject invalid index offset"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(error, FormatError::InvalidIndexOffset(96)));
+    }
+
+    #[test]
+    fn reader_rejects_too_small_index_length() {
+        let master_key = MasterKey::default_key();
+        let mut header = FurryHeaderV1::new([1u8; 16], [2u8; 16]);
+        header.index_offset = 96;
+        header.index_total_len = 20;
+
+        let mut bytes = Vec::new();
+        header.write_to(&mut bytes).expect("write header");
+
+        let error = match FurryReader::open(Cursor::new(bytes), &master_key) {
+            Ok(_) => panic!("should reject too small index length"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(error, FormatError::InvalidIndexLength(20)));
     }
 }
