@@ -7,11 +7,11 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use furry_converter::{detect_format, pack_to_furry, unpack_from_furry, PackOptions};
-use furry_crypto::{MasterKey, MASTER_KEY_ENV_VAR};
+use furry_crypto::{MasterKey, MASTER_KEY_ENV_VAR, MASTER_KEY_REQUIRE_ENV_VAR};
 use furry_format::FurryReader;
 
 fn load_master_key_or_exit() -> MasterKey {
-    let loaded = match MasterKey::load_runtime() {
+    let loaded = match MasterKey::load_runtime_from_env_policy() {
         Ok(loaded) => loaded,
         Err(error) => {
             eprintln!("Failed to load runtime master key: {}", error);
@@ -43,6 +43,10 @@ fn main() {
         eprintln!(
             "Optional: set {} to a 64-character hex master key.",
             MASTER_KEY_ENV_VAR
+        );
+        eprintln!(
+            "Set {}=1 to require an explicit runtime master key.",
+            MASTER_KEY_REQUIRE_ENV_VAR
         );
         std::process::exit(1);
     }

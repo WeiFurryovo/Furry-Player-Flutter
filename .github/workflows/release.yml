@@ -12,6 +12,7 @@ env:
   FLUTTER_VERSION: "3.38.8"
   EXPECTED_DART_VERSION: "3.10.7"
   FURRY_MASTER_KEY_HEX: ${{ secrets.FURRY_MASTER_KEY_HEX }}
+  FURRY_REQUIRE_MASTER_KEY: "1"
 
 jobs:
   flutter-quality:

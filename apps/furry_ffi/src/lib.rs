@@ -41,8 +41,9 @@ fn warn_default_master_key_once() {
 fn load_master_key() -> Result<MasterKey, c_int> {
     static MASTER_KEY: OnceLock<Result<LoadedMasterKey, String>> = OnceLock::new();
 
-    let loaded =
-        MASTER_KEY.get_or_init(|| MasterKey::load_runtime().map_err(|error| error.to_string()));
+    let loaded = MASTER_KEY.get_or_init(|| {
+        MasterKey::load_runtime_from_env_policy().map_err(|error| error.to_string())
+    });
     match loaded {
         Ok(loaded) => {
             if loaded.uses_default_fallback() {

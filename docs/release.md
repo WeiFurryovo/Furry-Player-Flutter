@@ -21,6 +21,7 @@
 
 注意：
 - Release workflow 现在要求显式提供 `FURRY_MASTER_KEY_HEX` secret。
+- Release workflow 还会设置 `FURRY_REQUIRE_MASTER_KEY=1`，运行时缺少主密钥会直接失败。
 - 不再建议依赖仓库内置开发密钥来生成正式发布产物。
 
 ## 分平台说明

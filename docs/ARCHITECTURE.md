@@ -45,6 +45,7 @@ Flutter UI 以 “模板 → 生成工程” 的方式维护：
 - 运行时入口（CLI / GUI / Android JNI / Desktop FFI）优先读取环境变量 `FURRY_MASTER_KEY_HEX`。
 - 该值必须是 32 字节主密钥的 64 位十六进制字符串。
 - 如果未设置，会回退到内置开发密钥以保持兼容；生产环境不应依赖该回退。
+- 设置 `FURRY_REQUIRE_MASTER_KEY=1` 后，运行时会拒绝该回退并直接报错。
 
 ## 注释/文档原则
 

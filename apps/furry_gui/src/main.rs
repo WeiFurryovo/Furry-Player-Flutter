@@ -11,7 +11,7 @@ use state::AppState;
 use ui::{ConverterWindow, FurryTheme, LibrarySidebar, PlayerDeck};
 
 fn load_master_key_or_exit() -> MasterKey {
-    let loaded = match MasterKey::load_runtime() {
+    let loaded = match MasterKey::load_runtime_from_env_policy() {
         Ok(loaded) => loaded,
         Err(error) => {
             eprintln!("Failed to load runtime master key: {}", error);

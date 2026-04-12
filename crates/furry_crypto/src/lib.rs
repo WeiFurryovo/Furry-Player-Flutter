@@ -27,6 +27,7 @@ pub const CHUNK_HEADER_LEN: usize = 40;
 pub const AAD_PREFIX: [u8; 8] = *b"FURRYAAD";
 pub const AAD_LEN: usize = 8 + 2 + 4 + FILE_ID_LEN + CHUNK_HEADER_LEN; // 70 bytes
 pub const MASTER_KEY_ENV_VAR: &str = "FURRY_MASTER_KEY_HEX";
+pub const MASTER_KEY_REQUIRE_ENV_VAR: &str = "FURRY_REQUIRE_MASTER_KEY";
 pub const MASTER_KEY_HEX_LEN: usize = AEAD_KEY_LEN * 2;
 
 /// 硬编码主密钥（生产环境应更换）
@@ -136,6 +137,18 @@ impl MasterKey {
         Self::load_runtime_with_policy(RuntimeMasterKeyPolicy::AllowBuiltInDefault)
     }
 
+    /// 根据环境变量策略加载主密钥：
+    /// - `FURRY_REQUIRE_MASTER_KEY=1/true/yes/on` 时强制要求环境变量密钥
+    /// - 其他情况允许回退到内置开发密钥
+    pub fn load_runtime_from_env_policy() -> Result<LoadedMasterKey, MasterKeyLoadError> {
+        let policy = if require_runtime_master_key_from_env() {
+            RuntimeMasterKeyPolicy::RequireEnvironment
+        } else {
+            RuntimeMasterKeyPolicy::AllowBuiltInDefault
+        };
+        Self::load_runtime_with_policy(policy)
+    }
+
     /// 运行时加载主密钥，并按策略决定是否允许回退到内置默认值。
     pub fn load_runtime_with_policy(
         policy: RuntimeMasterKeyPolicy,
@@ -198,6 +211,16 @@ fn decode_hex_nibble(byte: u8) -> Option<u8> {
         b'a'..=b'f' => Some(byte - b'a' + 10),
         b'A'..=b'F' => Some(byte - b'A' + 10),
         _ => None,
+    }
+}
+
+fn require_runtime_master_key_from_env() -> bool {
+    match std::env::var(MASTER_KEY_REQUIRE_ENV_VAR) {
+        Ok(value) => matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes" | "on"
+        ),
+        Err(_) => false,
     }
 }
 
@@ -522,6 +545,7 @@ mod tests {
     fn test_load_runtime_with_required_policy_rejects_missing_env() {
         let _guard = ENV_LOCK.lock().unwrap();
         std::env::remove_var(MASTER_KEY_ENV_VAR);
+        std::env::remove_var(MASTER_KEY_REQUIRE_ENV_VAR);
 
         let error =
             match MasterKey::load_runtime_with_policy(RuntimeMasterKeyPolicy::RequireEnvironment) {
@@ -535,5 +559,26 @@ mod tests {
                 env_var: MASTER_KEY_ENV_VAR,
             }
         );
+    }
+
+    #[test]
+    fn test_load_runtime_from_env_policy_requires_env_when_flag_enabled() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::remove_var(MASTER_KEY_ENV_VAR);
+        std::env::set_var(MASTER_KEY_REQUIRE_ENV_VAR, "true");
+
+        let error = match MasterKey::load_runtime_from_env_policy() {
+            Ok(_) => panic!("expected strict env policy to reject fallback"),
+            Err(error) => error,
+        };
+
+        assert_eq!(
+            error,
+            MasterKeyLoadError::MissingRequiredEnv {
+                env_var: MASTER_KEY_ENV_VAR,
+            }
+        );
+
+        std::env::remove_var(MASTER_KEY_REQUIRE_ENV_VAR);
     }
 }
