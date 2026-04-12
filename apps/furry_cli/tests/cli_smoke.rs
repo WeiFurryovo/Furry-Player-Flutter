@@ -126,3 +126,34 @@ fn unpack_rejects_invalid_input_without_creating_output() {
     let _ = std::fs::remove_file(input_path);
     let _ = std::fs::remove_file(output_path);
 }
+
+#[test]
+fn pack_creates_missing_output_parent_directory() {
+    let input_path = unique_temp_path("furry_cli_pack_nested_input", "mp3");
+    let base_dir = unique_temp_path("furry_cli_pack_nested_dir", "tmp");
+    let nested_dir = base_dir.join("nested").join("out");
+    let output_path = nested_dir.join("result.furry");
+    std::fs::write(&input_path, b"fake audio bytes").expect("write temp input");
+
+    let output = Command::new(cli_binary())
+        .env("FURRY_MASTER_KEY_HEX", TEST_MASTER_KEY_HEX)
+        .arg("pack")
+        .arg(&input_path)
+        .arg(&output_path)
+        .output()
+        .expect("run furry-cli");
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr was: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        output_path.exists(),
+        "output file should be created in nested directory"
+    );
+
+    let _ = std::fs::remove_file(input_path);
+    let _ = std::fs::remove_dir_all(base_dir);
+}

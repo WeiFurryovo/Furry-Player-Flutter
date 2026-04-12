@@ -104,6 +104,11 @@ pub extern "C" fn furry_pack_to_furry(
         Ok(bytes) => bytes,
         Err(error_code) => return error_code,
     };
+    if let Some(parent) = output_path.parent() {
+        if std::fs::create_dir_all(parent).is_err() {
+            return -4;
+        }
+    }
     let mut output = match File::create(&output_path) {
         Ok(f) => f,
         Err(_) => return -4,
@@ -501,5 +506,27 @@ mod tests {
 
         let _ = std::fs::remove_file(input_path);
         let _ = std::fs::remove_file(output_path);
+    }
+
+    #[test]
+    fn pack_creates_missing_output_parent_directory() {
+        let input_path = unique_temp_path("furry_pack_nested_input", "mp3");
+        let base_dir = unique_temp_path("furry_pack_nested_dir", "tmp");
+        let output_path = base_dir.join("nested").join("result.furry");
+        std::fs::write(&input_path, b"fake audio payload").unwrap();
+
+        let input_cstr = CString::new(input_path.to_string_lossy().as_bytes()).unwrap();
+        let output_cstr = CString::new(output_path.to_string_lossy().as_bytes()).unwrap();
+
+        let result = furry_pack_to_furry(input_cstr.as_ptr(), output_cstr.as_ptr(), 0);
+
+        assert_eq!(result, 0);
+        assert!(
+            output_path.exists(),
+            "output should be created in nested directory"
+        );
+
+        let _ = std::fs::remove_file(input_path);
+        let _ = std::fs::remove_dir_all(base_dir);
     }
 }

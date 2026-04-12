@@ -170,6 +170,11 @@ fn pack_to_furry_impl(
         Ok(bytes) => bytes,
         Err(error_code) => return error_code,
     };
+    if let Some(parent) = output_path.parent() {
+        if std::fs::create_dir_all(parent).is_err() {
+            return -4;
+        }
+    }
     let mut output = match File::create(&output_path) {
         Ok(f) => f,
         Err(_) => return -4,

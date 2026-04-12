@@ -32,6 +32,15 @@ fn load_master_key_or_exit() -> MasterKey {
     loaded.into_inner()
 }
 
+fn ensure_output_parent_or_exit(output_path: &PathBuf) {
+    if let Some(parent) = output_path.parent() {
+        if let Err(error) = std::fs::create_dir_all(parent) {
+            eprintln!("Failed to create output directory: {}", error);
+            std::process::exit(1);
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
@@ -90,8 +99,21 @@ fn main() {
             let format = detect_format(&input_path);
             println!("Detected format: {:?}", format);
 
-            let mut input = File::open(&input_path).expect("Failed to open input file");
-            let mut output = File::create(&output_path).expect("Failed to create output file");
+            let mut input = match File::open(&input_path) {
+                Ok(file) => file,
+                Err(error) => {
+                    eprintln!("Failed to open input file: {}", error);
+                    std::process::exit(1);
+                }
+            };
+            ensure_output_parent_or_exit(&output_path);
+            let mut output = match File::create(&output_path) {
+                Ok(file) => file,
+                Err(error) => {
+                    eprintln!("Failed to create output file: {}", error);
+                    std::process::exit(1);
+                }
+            };
 
             let options = PackOptions {
                 padding_bytes,
@@ -106,10 +128,23 @@ fn main() {
                 &master_key,
                 &options,
             )
-            .expect("Failed to pack");
+            .unwrap_or_else(|error| {
+                eprintln!("Failed to pack: {}", error);
+                std::process::exit(1);
+            });
 
-            let input_size = std::fs::metadata(&input_path).unwrap().len();
-            let output_size = std::fs::metadata(&output_path).unwrap().len();
+            let input_size = std::fs::metadata(&input_path)
+                .map(|meta| meta.len())
+                .unwrap_or_else(|error| {
+                    eprintln!("Failed to stat input file: {}", error);
+                    std::process::exit(1);
+                });
+            let output_size = std::fs::metadata(&output_path)
+                .map(|meta| meta.len())
+                .unwrap_or_else(|error| {
+                    eprintln!("Failed to stat output file: {}", error);
+                    std::process::exit(1);
+                });
 
             println!("Packed successfully!");
             println!("  Input:  {} bytes", input_size);
@@ -125,15 +160,31 @@ fn main() {
             let input_path = PathBuf::from(&args[2]);
             let output_path = PathBuf::from(&args[3]);
 
-            let mut input = File::open(&input_path).expect("Failed to open input file");
+            let mut input = match File::open(&input_path) {
+                Ok(file) => file,
+                Err(error) => {
+                    eprintln!("Failed to open input file: {}", error);
+                    std::process::exit(1);
+                }
+            };
             if let Err(error) = inspect_furry(&mut input, &master_key) {
                 eprintln!("Failed to inspect input file: {}", error);
                 std::process::exit(1);
             }
-            let mut output = File::create(&output_path).expect("Failed to create output file");
+            ensure_output_parent_or_exit(&output_path);
+            let mut output = match File::create(&output_path) {
+                Ok(file) => file,
+                Err(error) => {
+                    eprintln!("Failed to create output file: {}", error);
+                    std::process::exit(1);
+                }
+            };
 
             let format =
-                unpack_from_furry(&mut input, &mut output, &master_key).expect("Failed to unpack");
+                unpack_from_furry(&mut input, &mut output, &master_key).unwrap_or_else(|error| {
+                    eprintln!("Failed to unpack: {}", error);
+                    std::process::exit(1);
+                });
 
             println!("Unpacked successfully!");
             println!("  Original format: {:?}", format);
