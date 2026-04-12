@@ -84,6 +84,24 @@ impl<R: Read + Seek> FurryReader<R> {
         self.inner.seek(SeekFrom::Start(entry.file_offset))?;
 
         let chunk_header = ChunkRecordHeaderV1::read_from(&mut self.inner)?;
+        if chunk_header.chunk_seq != entry.chunk_seq {
+            return Err(FormatError::ChunkRecordMismatch("chunk_seq"));
+        }
+        if chunk_header.chunk_type != entry.chunk_type {
+            return Err(FormatError::ChunkRecordMismatch("chunk_type"));
+        }
+        if chunk_header.chunk_flags != entry.chunk_flags {
+            return Err(FormatError::ChunkRecordMismatch("chunk_flags"));
+        }
+        if chunk_header.virtual_offset != entry.virtual_offset {
+            return Err(FormatError::ChunkRecordMismatch("virtual_offset"));
+        }
+        if chunk_header.plain_len != entry.plain_len {
+            return Err(FormatError::ChunkRecordMismatch("plain_len"));
+        }
+        if chunk_header.record_len() != entry.record_len {
+            return Err(FormatError::ChunkRecordMismatch("record_len"));
+        }
 
         let mut ciphertext = vec![0u8; chunk_header.plain_len as usize];
         self.inner.read_exact(&mut ciphertext)?;

@@ -51,6 +51,9 @@ pub enum FormatError {
     #[error("Invalid index length: {0}")]
     InvalidIndexLength(u32),
 
+    #[error("Chunk record does not match index: {0}")]
+    ChunkRecordMismatch(&'static str),
+
     #[error("Crypto error: {0}")]
     Crypto(#[from] furry_crypto::CryptoError),
 
@@ -219,5 +222,63 @@ mod tests {
         };
 
         assert!(matches!(error, FormatError::InvalidIndexLength(20)));
+    }
+
+    #[test]
+    fn read_chunk_rejects_plain_len_mismatch_with_index() {
+        let master_key = MasterKey::default_key();
+        let cursor = Cursor::new(Vec::new());
+        let mut writer =
+            FurryWriter::create(cursor, &master_key, OriginalFormat::Mp3).expect("create writer");
+        writer
+            .write_audio_chunk(b"abc", 0)
+            .expect("write audio chunk");
+
+        let cursor = writer.finish().expect("finish writer");
+        let mut bytes = cursor.into_inner();
+        bytes[124..128].copy_from_slice(&4u32.to_le_bytes());
+
+        let mut reader =
+            FurryReader::open(Cursor::new(bytes), &master_key).expect("open mutated reader");
+        let entry = reader.index.audio_entries()[0].clone().clone();
+
+        let error = match reader.read_chunk(&entry) {
+            Ok(_) => panic!("should reject chunk/plain_len mismatch"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(
+            error,
+            FormatError::ChunkRecordMismatch("plain_len")
+        ));
+    }
+
+    #[test]
+    fn read_chunk_rejects_chunk_sequence_mismatch_with_index() {
+        let master_key = MasterKey::default_key();
+        let cursor = Cursor::new(Vec::new());
+        let mut writer =
+            FurryWriter::create(cursor, &master_key, OriginalFormat::Mp3).expect("create writer");
+        writer
+            .write_audio_chunk(b"abc", 0)
+            .expect("write audio chunk");
+
+        let cursor = writer.finish().expect("finish writer");
+        let mut bytes = cursor.into_inner();
+        bytes[108..116].copy_from_slice(&99u64.to_le_bytes());
+
+        let mut reader =
+            FurryReader::open(Cursor::new(bytes), &master_key).expect("open mutated reader");
+        let entry = reader.index.audio_entries()[0].clone().clone();
+
+        let error = match reader.read_chunk(&entry) {
+            Ok(_) => panic!("should reject chunk_seq mismatch"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(
+            error,
+            FormatError::ChunkRecordMismatch("chunk_seq")
+        ));
     }
 }
