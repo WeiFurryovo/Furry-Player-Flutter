@@ -20,6 +20,15 @@ pub struct FurryWriter<W: Write + Seek> {
 }
 
 impl<W: Write + Seek> FurryWriter<W> {
+    fn validate_chunk_plain_len(len: usize) -> Result<u32, FormatError> {
+        let max_plain_len =
+            u32::MAX - u32::from(crate::CHUNK_HEADER_LEN) - furry_crypto::TAG_LEN as u32;
+        if len > max_plain_len as usize {
+            return Err(FormatError::ChunkDataTooLarge(len));
+        }
+        Ok(len as u32)
+    }
+
     /// 创建新的 .furry 文件
     pub fn create(
         mut inner: W,
@@ -59,6 +68,7 @@ impl<W: Write + Seek> FurryWriter<W> {
 
     /// 写入 PADDING chunk
     pub fn write_padding_chunk(&mut self, size: usize) -> Result<(), FormatError> {
+        Self::validate_chunk_plain_len(size)?;
         let mut padding = vec![0u8; size];
         furry_crypto::generate_random_bytes(&mut padding)?;
         self.write_chunk_internal(ChunkType::Padding, &padding, 0, 0, 0)
@@ -82,11 +92,22 @@ impl<W: Write + Seek> FurryWriter<W> {
         meta_kind: u16,
         chunk_flags: u8,
     ) -> Result<(), FormatError> {
+        let plain_len = Self::validate_chunk_plain_len(data.len())?;
+        if chunk_type == ChunkType::Audio {
+            let expected_offset = self.index.header.audio_stream_len;
+            if virtual_offset != expected_offset {
+                return Err(FormatError::InvalidAudioVirtualOffset {
+                    expected: expected_offset,
+                    actual: virtual_offset,
+                });
+            }
+        }
+
         let chunk_seq = self.chunk_seq;
         self.chunk_seq += 1;
 
         let mut chunk_header =
-            ChunkRecordHeaderV1::new(chunk_type, chunk_seq, virtual_offset, data.len() as u32);
+            ChunkRecordHeaderV1::new(chunk_type, chunk_seq, virtual_offset, plain_len);
         chunk_header.chunk_flags = chunk_flags;
 
         // 加密数据
@@ -115,17 +136,25 @@ impl<W: Write + Seek> FurryWriter<W> {
         self.inner.write_all(&tag)?;
 
         let record_len = chunk_header.record_len();
-        self.current_offset += record_len as u64;
+        self.current_offset = self
+            .current_offset
+            .checked_add(record_len as u64)
+            .ok_or(FormatError::OffsetOverflow("current_offset"))?;
 
         // 添加索引条目
         let entry = match chunk_type {
             ChunkType::Audio => {
-                self.index.header.audio_stream_len += data.len() as u64;
+                self.index.header.audio_stream_len = self
+                    .index
+                    .header
+                    .audio_stream_len
+                    .checked_add(u64::from(plain_len))
+                    .ok_or(FormatError::OffsetOverflow("audio_stream_len"))?;
                 IndexEntryV1::new_audio(
                     chunk_seq,
                     file_offset,
                     record_len,
-                    data.len() as u32,
+                    plain_len,
                     virtual_offset,
                 )
             }
@@ -135,13 +164,13 @@ impl<W: Write + Seek> FurryWriter<W> {
                     chunk_seq,
                     file_offset,
                     record_len,
-                    data.len() as u32,
+                    plain_len,
                     kind,
                     chunk_flags,
                 )
             }
             ChunkType::Padding => {
-                IndexEntryV1::new_padding(chunk_seq, file_offset, record_len, data.len() as u32)
+                IndexEntryV1::new_padding(chunk_seq, file_offset, record_len, plain_len)
             }
             _ => return Ok(()),
         };

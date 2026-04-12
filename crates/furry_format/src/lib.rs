@@ -64,6 +64,15 @@ pub enum FormatError {
     #[error("Invalid chunk range: offset {offset}, len {len}, limit {limit}")]
     InvalidChunkRange { offset: u64, len: u32, limit: u64 },
 
+    #[error("Chunk data too large: {0} bytes")]
+    ChunkDataTooLarge(usize),
+
+    #[error("Invalid audio virtual offset: expected {expected}, got {actual}")]
+    InvalidAudioVirtualOffset { expected: u64, actual: u64 },
+
+    #[error("Offset overflow: {0}")]
+    OffsetOverflow(&'static str),
+
     #[error("Chunk record does not match index: {0}")]
     ChunkRecordMismatch(&'static str),
 
@@ -82,7 +91,7 @@ mod tests {
 
     use crate::{
         FormatError, FurryHeaderV1, FurryIndexV1, FurryReader, FurryWriter, IndexEntryV1, MetaKind,
-        OriginalFormat,
+        OriginalFormat, CHUNK_HEADER_LEN,
     };
 
     #[test]
@@ -331,6 +340,46 @@ mod tests {
             error,
             FormatError::CorruptIndex("index_total_len mismatch")
         ));
+    }
+
+    #[test]
+    fn writer_rejects_non_contiguous_audio_virtual_offset() {
+        let master_key = MasterKey::default_key();
+        let cursor = Cursor::new(Vec::new());
+        let mut writer =
+            FurryWriter::create(cursor, &master_key, OriginalFormat::Mp3).expect("create writer");
+        writer
+            .write_audio_chunk(b"abc", 0)
+            .expect("write first audio chunk");
+
+        let error = writer
+            .write_audio_chunk(b"def", 4)
+            .expect_err("should reject non-contiguous audio offset");
+
+        assert!(matches!(
+            error,
+            FormatError::InvalidAudioVirtualOffset {
+                expected: 3,
+                actual: 4
+            }
+        ));
+    }
+
+    #[test]
+    fn writer_rejects_padding_chunk_larger_than_record_limit() {
+        let master_key = MasterKey::default_key();
+        let cursor = Cursor::new(Vec::new());
+        let mut writer =
+            FurryWriter::create(cursor, &master_key, OriginalFormat::Mp3).expect("create writer");
+        let oversize = (u32::MAX as usize)
+            - (u32::from(CHUNK_HEADER_LEN) + furry_crypto::TAG_LEN as u32) as usize
+            + 1;
+
+        let error = writer
+            .write_padding_chunk(oversize)
+            .expect_err("should reject oversized padding chunk");
+
+        assert!(matches!(error, FormatError::ChunkDataTooLarge(size) if size == oversize));
     }
 
     #[test]
