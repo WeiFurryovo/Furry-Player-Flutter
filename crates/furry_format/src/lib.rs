@@ -54,6 +54,16 @@ pub enum FormatError {
     #[error("Invalid index length: {0}")]
     InvalidIndexLength(u32),
 
+    #[error("Invalid index range: offset {offset}, len {len}, file_len {file_len}")]
+    InvalidIndexRange {
+        offset: u64,
+        len: u32,
+        file_len: u64,
+    },
+
+    #[error("Invalid chunk range: offset {offset}, len {len}, limit {limit}")]
+    InvalidChunkRange { offset: u64, len: u32, limit: u64 },
+
     #[error("Chunk record does not match index: {0}")]
     ChunkRecordMismatch(&'static str),
 
@@ -253,6 +263,74 @@ mod tests {
         };
 
         assert!(matches!(error, FormatError::InvalidIndexLength(20)));
+    }
+
+    #[test]
+    fn reader_rejects_index_range_beyond_file_end() {
+        let master_key = MasterKey::default_key();
+        let cursor = Cursor::new(Vec::new());
+        let mut writer =
+            FurryWriter::create(cursor, &master_key, OriginalFormat::Mp3).expect("create writer");
+        writer
+            .write_audio_chunk(b"abc", 0)
+            .expect("write audio chunk");
+
+        let cursor = writer.finish().expect("finish writer");
+        let mut bytes = cursor.into_inner();
+
+        let mut header =
+            FurryHeaderV1::read_from(&mut Cursor::new(bytes.clone())).expect("read header");
+        header.index_total_len += 4096;
+        header.header_crc32 = header.compute_crc32();
+        let mut header_bytes = Vec::new();
+        header.write_to(&mut header_bytes).expect("write header");
+        bytes[..header_bytes.len()].copy_from_slice(&header_bytes);
+
+        let error = match FurryReader::open(Cursor::new(bytes), &master_key) {
+            Ok(_) => panic!("should reject index range beyond file end"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(
+            error,
+            FormatError::InvalidIndexRange {
+                offset,
+                len,
+                file_len
+            } if offset == header.index_offset && len == header.index_total_len && file_len < offset + len as u64
+        ));
+    }
+
+    #[test]
+    fn reader_rejects_index_total_len_mismatch_with_index_chunk() {
+        let master_key = MasterKey::default_key();
+        let cursor = Cursor::new(Vec::new());
+        let mut writer =
+            FurryWriter::create(cursor, &master_key, OriginalFormat::Mp3).expect("create writer");
+        writer
+            .write_audio_chunk(b"abc", 0)
+            .expect("write audio chunk");
+
+        let cursor = writer.finish().expect("finish writer");
+        let mut bytes = cursor.into_inner();
+
+        let mut header =
+            FurryHeaderV1::read_from(&mut Cursor::new(bytes.clone())).expect("read header");
+        header.index_total_len -= 1;
+        header.header_crc32 = header.compute_crc32();
+        let mut header_bytes = Vec::new();
+        header.write_to(&mut header_bytes).expect("write header");
+        bytes[..header_bytes.len()].copy_from_slice(&header_bytes);
+
+        let error = match FurryReader::open(Cursor::new(bytes), &master_key) {
+            Ok(_) => panic!("should reject mismatched index_total_len"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(
+            error,
+            FormatError::CorruptIndex("index_total_len mismatch")
+        ));
     }
 
     #[test]

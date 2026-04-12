@@ -17,11 +17,13 @@ pub struct FurryReader<R: Read + Seek> {
 impl<R: Read + Seek> FurryReader<R> {
     /// 打开 .furry 文件
     pub fn open(mut inner: R, master_key: &MasterKey) -> Result<Self, FormatError> {
+        let file_len = inner.seek(SeekFrom::End(0))?;
         inner.seek(SeekFrom::Start(0))?;
         let header = FurryHeaderV1::read_from(&mut inner)?;
 
         let keys = furry_crypto::derive_file_keys(master_key, &header.salt)?;
-        let index = Self::read_and_decrypt_index(&mut inner, &header, &keys)?;
+        let index = Self::read_and_decrypt_index(&mut inner, &header, &keys, file_len)?;
+        Self::validate_entry_ranges(&header, &index)?;
 
         Ok(Self {
             inner,
@@ -35,6 +37,7 @@ impl<R: Read + Seek> FurryReader<R> {
         inner: &mut R,
         header: &FurryHeaderV1,
         keys: &FileKeys,
+        file_len: u64,
     ) -> Result<FurryIndexV1, FormatError> {
         if header.index_offset < header.data_start_offset() {
             return Err(FormatError::InvalidIndexOffset(header.index_offset));
@@ -44,6 +47,21 @@ impl<R: Read + Seek> FurryReader<R> {
         if header.index_total_len < min_index_record_len {
             return Err(FormatError::InvalidIndexLength(header.index_total_len));
         }
+        let index_end = header
+            .index_offset
+            .checked_add(header.index_total_len as u64)
+            .ok_or(FormatError::InvalidIndexRange {
+                offset: header.index_offset,
+                len: header.index_total_len,
+                file_len,
+            })?;
+        if index_end > file_len {
+            return Err(FormatError::InvalidIndexRange {
+                offset: header.index_offset,
+                len: header.index_total_len,
+                file_len,
+            });
+        }
 
         inner.seek(SeekFrom::Start(header.index_offset))?;
 
@@ -52,6 +70,9 @@ impl<R: Read + Seek> FurryReader<R> {
             return Err(FormatError::CorruptIndex(
                 "index_offset not pointing to INDEX chunk",
             ));
+        }
+        if chunk_header.record_len() != header.index_total_len {
+            return Err(FormatError::CorruptIndex("index_total_len mismatch"));
         }
 
         let mut ciphertext = vec![0u8; chunk_header.plain_len as usize];
@@ -77,6 +98,42 @@ impl<R: Read + Seek> FurryReader<R> {
         )?;
 
         FurryIndexV1::parse(&ciphertext)
+    }
+
+    fn validate_entry_ranges(
+        header: &FurryHeaderV1,
+        index: &FurryIndexV1,
+    ) -> Result<(), FormatError> {
+        let data_start = header.data_start_offset();
+        let data_limit = header.index_offset;
+
+        for entry in &index.entries {
+            if entry.file_offset < data_start {
+                return Err(FormatError::InvalidChunkRange {
+                    offset: entry.file_offset,
+                    len: entry.record_len,
+                    limit: data_limit,
+                });
+            }
+
+            let file_end = entry
+                .file_offset
+                .checked_add(entry.record_len as u64)
+                .ok_or(FormatError::InvalidChunkRange {
+                    offset: entry.file_offset,
+                    len: entry.record_len,
+                    limit: data_limit,
+                })?;
+            if file_end > data_limit {
+                return Err(FormatError::InvalidChunkRange {
+                    offset: entry.file_offset,
+                    len: entry.record_len,
+                    limit: data_limit,
+                });
+            }
+        }
+
+        Ok(())
     }
 
     /// 读取并解密指定 chunk
@@ -164,5 +221,57 @@ impl<R: Read + Seek> FurryReader<R> {
     /// 获取内部 reader
     pub fn into_inner(self) -> R {
         self.inner
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use crate::{FormatError, FurryHeaderV1, FurryIndexV1, IndexEntryV1, OriginalFormat};
+
+    use super::FurryReader;
+
+    #[test]
+    fn validate_entry_ranges_rejects_chunk_before_data_region() {
+        let mut header = FurryHeaderV1::new([1u8; 16], [2u8; 16]);
+        header.fake_header_len = 32;
+        header.index_offset = 256;
+
+        let mut index = FurryIndexV1::new(3, OriginalFormat::Mp3);
+        index.add_entry(IndexEntryV1::new_audio(0, 120, 59, 3, 0));
+
+        let error = FurryReader::<Cursor<Vec<u8>>>::validate_entry_ranges(&header, &index)
+            .expect_err("should reject chunk before data region");
+
+        assert!(matches!(
+            error,
+            FormatError::InvalidChunkRange {
+                offset: 120,
+                len: 59,
+                limit: 256
+            }
+        ));
+    }
+
+    #[test]
+    fn validate_entry_ranges_rejects_chunk_crossing_into_index_region() {
+        let mut header = FurryHeaderV1::new([1u8; 16], [2u8; 16]);
+        header.index_offset = 200;
+
+        let mut index = FurryIndexV1::new(3, OriginalFormat::Mp3);
+        index.add_entry(IndexEntryV1::new_audio(0, 160, 59, 3, 0));
+
+        let error = FurryReader::<Cursor<Vec<u8>>>::validate_entry_ranges(&header, &index)
+            .expect_err("should reject chunk crossing into index region");
+
+        assert!(matches!(
+            error,
+            FormatError::InvalidChunkRange {
+                offset: 160,
+                len: 59,
+                limit: 200
+            }
+        ));
     }
 }
