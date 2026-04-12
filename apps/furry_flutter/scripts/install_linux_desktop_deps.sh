@@ -15,5 +15,5 @@ fi
 "${APT[@]}" update
 "${APT[@]}" install -y \
   clang cmake ninja-build pkg-config \
-  libgtk-3-dev libblkid-dev liblzma-dev \
+  libgtk-3-dev libblkid-dev liblzma-dev libasound2-dev \
   libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev

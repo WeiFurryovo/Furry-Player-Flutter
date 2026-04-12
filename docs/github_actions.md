@@ -63,3 +63,4 @@ git push origin v1.0.0
 - Release workflow 若提示 `FURRY_MASTER_KEY_HEX` 缺失或格式错误，需要在仓库 Secrets 中补齐 64 位十六进制主密钥
 - CI workflow 使用的是仓库内置的非生产测试密钥，只用于验证构建链路；正式发布不要复用它
 - Release workflow 还会设置 `FURRY_REQUIRE_MASTER_KEY=1`，确保运行时本身也拒绝默认密钥回退
+- 如果 Linux 上出现 `alsa-sys` / `pkg-config --libs --cflags alsa` 失败，说明缺少 `libasound2-dev`；该依赖已纳入 `install_linux_desktop_deps.sh`
