@@ -312,4 +312,46 @@ mod tests {
             FormatError::ChunkRecordMismatch("chunk_seq")
         ));
     }
+
+    #[test]
+    fn index_parse_rejects_record_length_mismatch() {
+        let mut index = FurryIndexV1::new(3, OriginalFormat::Mp3);
+        index.add_entry(IndexEntryV1::new_audio(0, 96, 58, 3, 0));
+
+        let error =
+            FurryIndexV1::parse(&index.to_bytes()).expect_err("should reject invalid record_len");
+
+        assert!(matches!(
+            error,
+            FormatError::CorruptIndex("record_len mismatch")
+        ));
+    }
+
+    #[test]
+    fn index_parse_rejects_audio_stream_len_mismatch() {
+        let mut index = FurryIndexV1::new(10, OriginalFormat::Mp3);
+        index.add_entry(IndexEntryV1::new_audio(0, 96, 59, 3, 0));
+
+        let error = FurryIndexV1::parse(&index.to_bytes())
+            .expect_err("should reject audio_stream_len mismatch");
+
+        assert!(matches!(
+            error,
+            FormatError::CorruptIndex("audio_stream_len mismatch")
+        ));
+    }
+
+    #[test]
+    fn index_parse_rejects_audio_virtual_gap() {
+        let mut index = FurryIndexV1::new(6, OriginalFormat::Mp3);
+        index.add_entry(IndexEntryV1::new_audio(0, 96, 59, 3, 0));
+        index.add_entry(IndexEntryV1::new_audio(1, 155, 59, 3, 4));
+
+        let error = FurryIndexV1::parse(&index.to_bytes()).expect_err("should reject audio gap");
+
+        assert!(matches!(
+            error,
+            FormatError::CorruptIndex("audio virtual stream gap or overlap")
+        ));
+    }
 }

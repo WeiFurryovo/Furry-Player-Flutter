@@ -267,7 +267,41 @@ impl FurryIndexV1 {
             });
         }
 
-        Ok(Self { header, entries })
+        let index = Self { header, entries };
+        index.validate()?;
+        Ok(index)
+    }
+
+    fn validate(&self) -> Result<(), FormatError> {
+        let expected_record_len_base =
+            u32::from(crate::CHUNK_HEADER_LEN) + furry_crypto::TAG_LEN as u32;
+        let mut audio_end = 0u64;
+
+        for entry in &self.entries {
+            let expected_record_len = expected_record_len_base
+                .checked_add(entry.plain_len)
+                .ok_or(FormatError::CorruptIndex("record_len overflow"))?;
+            if entry.record_len != expected_record_len {
+                return Err(FormatError::CorruptIndex("record_len mismatch"));
+            }
+
+            if entry.chunk_type == ChunkType::Audio {
+                if entry.virtual_offset != audio_end {
+                    return Err(FormatError::CorruptIndex(
+                        "audio virtual stream gap or overlap",
+                    ));
+                }
+                audio_end = audio_end.checked_add(entry.plain_len as u64).ok_or(
+                    FormatError::CorruptIndex("audio virtual stream length overflow"),
+                )?;
+            }
+        }
+
+        if audio_end != self.header.audio_stream_len {
+            return Err(FormatError::CorruptIndex("audio_stream_len mismatch"));
+        }
+
+        Ok(())
     }
 
     /// 序列化为字节（加密前）
